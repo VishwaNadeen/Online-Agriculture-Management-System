@@ -1,19 +1,20 @@
-import express from 'express';
-import cors from 'cors';
-import 'dotenv/config';
+import express from "express"
+import cors from "cors"
+import "dotenv/config"
+import connectDB from "./config/mongodb.js"
 
+const app = express()
+const port = process.env.PORT || 4000
+connectDB()
 
-// app config
-const app = express();
-const port = process.env.PORT || 4000;
+// Middlewares
+app.use(express.json())
+app.use(cors())
 
-// middlewares
-app.use(express.json());
-app.use(cors());
-
-// api endpoints
+// api endpoints)
 app.get('/', (req, res) => {
-    res.status(200).send('Hello from backend server');
+  res.status(200).send("Hello from backend server")
 });
 
-app.listen(port, () => console.log(`Server is running on port: ${port}`));
+// Start server
+app.listen(port, () => console.log("🚀 Server is running on port: ",port))
