@@ -14,7 +14,6 @@ app.use(express.json())
 app.use(cors())
 
 // api endpoints)
-
 app.get('/', (req, res) => {
   res.status(200).send("Hello from backend server")
 });
