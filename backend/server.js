@@ -3,19 +3,24 @@ import cors from "cors"
 import "dotenv/config"
 import connectDB from "./config/mongodb.js"
 import connectCloudinary from "./config/cloudinary.js"
+import appointmentRoutes from "./routes/AppointmentRoute.js";
 
 const app = express()
 const port = process.env.PORT || 4000
+
 connectDB()
 connectCloudinary()
 
-// Middlewares
-app.use(express.json())
-app.use(cors())
+// middlewares
+app.use(express.json());
+app.use(cors());
 
-// api endpoints)
-app.get('/', (req, res) => {
-  res.status(200).send("Hello from backend server")
+// routes
+app.use("/appointments", appointmentRoutes);
+
+// api endpoints
+app.get("/", (req, res) => {
+  res.status(200).send("Hello from backend server");
 });
 
 // Start server
