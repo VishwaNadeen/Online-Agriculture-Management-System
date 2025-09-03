@@ -1,32 +1,33 @@
-const mongoose = require("mongoose");
-const Post = require("../models/post");
+/**
+ * backend/controllers/CommunityCtrl.js
+ *
+ * Controllers for Green Grow community posts.
+ */
 
-// If you have an auth middleware that sets req.user, you can gate actions by role.
-const isAdminOrMod = (user) =>
-  user && ["admin", "moderator"].includes(user.role);
+import mongoose from "mongoose";
+import Community from "../models/CommunityModel.js";
 
-function pick(obj, keys) {
-  return keys.reduce((acc, k) => {
+/* ----------------------------- Helpers ----------------------------- */
+const isAdminOrMod = (user) => user && ["admin", "moderator"].includes(user.role);
+
+const pick = (obj, keys) =>
+  keys.reduce((acc, k) => {
     if (obj[k] !== undefined) acc[k] = obj[k];
     return acc;
   }, {});
-}
 
-function parseNumber(x, fallback) {
+const parseNumber = (x, fallback) => {
   const n = Number(x);
   return Number.isFinite(n) ? n : fallback;
-}
+};
 
-function parseArray(q) {
+const parseArray = (q) => {
   if (!q) return undefined;
   if (Array.isArray(q)) return q;
-  return String(q)
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
+  return String(q).split(",").map((s) => s.trim()).filter(Boolean);
+};
 
-function buildFilters(query) {
+const buildFilters = (query) => {
   const filters = {};
   const {
     q,
@@ -40,7 +41,6 @@ function buildFilters(query) {
   } = query;
 
   if (q) filters.$text = { $search: q };
-
   if (author) filters.author = new mongoose.Types.ObjectId(author);
   if (crop) filters.crop = crop;
   if (growthStage) filters.growthStage = growthStage;
@@ -69,7 +69,7 @@ function buildFilters(query) {
     const [latStr, lngStr, kmStr] = String(query.near).split(",");
     const lat = parseFloat(latStr);
     const lng = parseFloat(lngStr);
-    const km = parseFloat(kmStr || "25"); // default 25km
+    const km = parseFloat(kmStr || "25");
     if (
       Number.isFinite(lat) &&
       Number.isFinite(lng) &&
@@ -87,20 +87,20 @@ function buildFilters(query) {
     }
   }
 
-  // Exclude soft-deleted by default
   if (!query.includeDeleted) {
     filters.deletedAt = { $exists: false };
   }
 
   return filters;
-}
+};
 
-/** Create a post */
-exports.createPost = async (req, res, next) => {
+/* ----------------------------- Controllers ----------------------------- */
+
+/** Create */
+export const createPost = async (req, res, next) => {
   try {
-    const userId = req.user?._id || req.body.author; // fallback for tests
-    if (!userId)
-      return res.status(401).json({ message: "Unauthorized: no user" });
+    const userId = req.user?._id || req.body.author;
+    if (!userId) return res.status(401).json({ message: "Unauthorized: no user" });
 
     const payload = pick(req.body, [
       "title",
@@ -118,14 +118,13 @@ exports.createPost = async (req, res, next) => {
       "diagnosisStatus",
     ]);
 
-    const doc = await Post.create({
+    const doc = await Community.create({
       ...payload,
       author: userId,
       roleAtPostTime: req.user?.role || "farmer",
       lastActivityAt: new Date(),
     });
 
-    // Optional populate (adjust fields to match your User model)
     await doc.populate({ path: "author", select: "name role avatar" });
 
     return res.status(201).json({ data: doc });
@@ -134,12 +133,12 @@ exports.createPost = async (req, res, next) => {
   }
 };
 
-/** Get a single post by id + bump view count */
-exports.getPostById = async (req, res, next) => {
+/** Read one (and bump views) */
+export const getPostById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const post = await Post.findById(id)
+    const post = await Community.findById(id)
       .populate({ path: "author", select: "name role avatar" })
       .populate({ path: "acceptedAnswer", select: "author content createdAt" })
       .lean();
@@ -149,17 +148,21 @@ exports.getPostById = async (req, res, next) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // Fire-and-forget: bump view counter
-    await Post.bumpCounter(id, "views", 1);
+    await Community.bumpCounter(id, "views", 1);
 
-    return res.json({ data: { ...post, counters: { ...post.counters, views: (post.counters?.views || 0) + 1 } } });
+    return res.json({
+      data: {
+        ...post,
+        counters: { ...post.counters, views: (post.counters?.views || 0) + 1 },
+      },
+    });
   } catch (err) {
     next(err);
   }
 };
 
-/** List posts with pagination, filtering, search, and sorting */
-exports.listPosts = async (req, res, next) => {
+/** List with pagination, filtering, search, geo, and sort */
+export const listPosts = async (req, res, next) => {
   try {
     const page = Math.max(1, parseNumber(req.query.page, 1));
     const limit = Math.min(100, Math.max(1, parseNumber(req.query.limit, 20)));
@@ -167,7 +170,6 @@ exports.listPosts = async (req, res, next) => {
 
     const filters = buildFilters(req.query);
 
-    // Sort presets: recent, top, active
     let sort = { createdAt: -1 };
     switch (req.query.sort) {
       case "top":
@@ -181,13 +183,13 @@ exports.listPosts = async (req, res, next) => {
     }
 
     const [items, total] = await Promise.all([
-      Post.find(filters)
+      Community.find(filters)
         .sort(sort)
         .skip(skip)
         .limit(limit)
         .populate({ path: "author", select: "name role avatar" })
         .lean(),
-      Post.countDocuments(filters),
+      Community.countDocuments(filters),
     ]);
 
     return res.json({
@@ -204,8 +206,8 @@ exports.listPosts = async (req, res, next) => {
   }
 };
 
-/** Update a post (author or moderator/admin) */
-exports.updatePost = async (req, res, next) => {
+/** Update (owner or moderator/admin) */
+export const updatePost = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -226,12 +228,10 @@ exports.updatePost = async (req, res, next) => {
       "acceptedAnswer",
     ]);
 
-    const existing = await Post.findById(id);
+    const existing = await Community.findById(id);
     if (!existing) return res.status(404).json({ message: "Post not found" });
 
-    const isOwner =
-      req.user && String(existing.author) === String(req.user._id);
-
+    const isOwner = req.user && String(existing.author) === String(req.user._id);
     if (!isOwner && !isAdminOrMod(req.user)) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -250,17 +250,15 @@ exports.updatePost = async (req, res, next) => {
   }
 };
 
-/** Soft delete a post (author or moderator/admin) */
-exports.softDeletePost = async (req, res, next) => {
+/** Soft delete (owner or moderator/admin) */
+export const softDeletePost = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const doc = await Post.findById(id);
+    const doc = await Community.findById(id);
     if (!doc) return res.status(404).json({ message: "Post not found" });
 
-    const isOwner =
-      req.user && String(doc.author) === String(req.user._id);
-
+    const isOwner = req.user && String(doc.author) === String(req.user._id);
     if (!isOwner && !isAdminOrMod(req.user)) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -273,13 +271,13 @@ exports.softDeletePost = async (req, res, next) => {
   }
 };
 
-/** Vote on a post: body { dir: 1 | -1 } */
-exports.votePost = async (req, res, next) => {
+/** Vote: body { dir: 1 | -1 } */
+export const votePost = async (req, res, next) => {
   try {
     const { id } = req.params;
     const dir = Number(req.body?.dir) === -1 ? -1 : 1;
 
-    const updated = await Post.vote(id, dir);
+    const updated = await Community.vote(id, dir);
     if (!updated) return res.status(404).json({ message: "Post not found" });
 
     return res.json({ data: updated });
@@ -288,21 +286,18 @@ exports.votePost = async (req, res, next) => {
   }
 };
 
-/** Accept an answer: body { commentId } (post owner or moderator/admin) */
-exports.acceptAnswer = async (req, res, next) => {
+/** Accept answer: body { commentId } (owner or moderator/admin) */
+export const acceptAnswer = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { commentId } = req.body || {};
 
-    if (!commentId)
-      return res.status(400).json({ message: "commentId is required" });
+    if (!commentId) return res.status(400).json({ message: "commentId is required" });
 
-    const doc = await Post.findById(id);
+    const doc = await Community.findById(id);
     if (!doc) return res.status(404).json({ message: "Post not found" });
 
-    const isOwner =
-      req.user && String(doc.author) === String(req.user._id);
-
+    const isOwner = req.user && String(doc.author) === String(req.user._id);
     if (!isOwner && !isAdminOrMod(req.user)) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -318,13 +313,13 @@ exports.acceptAnswer = async (req, res, next) => {
   }
 };
 
-/** Flag a post for moderation: body { reason } */
-exports.flagPost = async (req, res, next) => {
+/** Flag */
+export const flagPost = async (req, res, next) => {
   try {
     const { id } = req.params;
     const reason = String(req.body?.reason || "").slice(0, 500);
 
-    const doc = await Post.findByIdAndUpdate(
+    const doc = await Community.findByIdAndUpdate(
       id,
       {
         $set: {
@@ -344,8 +339,8 @@ exports.flagPost = async (req, res, next) => {
   }
 };
 
-/** Clear moderation flag (moderator/admin only) */
-exports.unflagPost = async (req, res, next) => {
+/** Unflag (moderator/admin only) */
+export const unflagPost = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -353,7 +348,7 @@ exports.unflagPost = async (req, res, next) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    const doc = await Post.findByIdAndUpdate(
+    const doc = await Community.findByIdAndUpdate(
       id,
       {
         $set: {

@@ -1,17 +1,21 @@
+/**
+ * backend/models/CommunityModel.js
+ *
+ * Community model for Green Grow (pest diagnosis + community forum).
+ */
 
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const { Schema, Types } = mongoose;
 
-// Small reusable sub-schemas
+/* ---------- Sub-schemas ---------- */
 const ImageSchema = new Schema(
   {
     url: { type: String, required: true, trim: true },
     caption: { type: String, trim: true, maxlength: 280 },
     width: Number,
     height: Number,
-    // Optional: helps dedupe uploads if you compute it client/server side
-    sha256: { type: String, trim: true },
+    sha256: { type: String, trim: true }, // optional for dedupe
   },
   { _id: false }
 );
@@ -32,7 +36,7 @@ const AttachmentSchema = new Schema(
 const GeoPointSchema = new Schema(
   {
     type: { type: String, enum: ["Point"], default: "Point" },
-    // [longitude, latitude] per GeoJSON spec
+    // GeoJSON coordinates: [lng, lat]
     coordinates: {
       type: [Number],
       validate: {
@@ -50,17 +54,10 @@ const GeoPointSchema = new Schema(
   { _id: false }
 );
 
-const PostSchema = new Schema(
+/* ---------- Main schema ---------- */
+const CommunitySchema = new Schema(
   {
-    // Who created the post (required)
-    author: {
-      type: Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-
-    // Snapshot of user's role at time of posting (for analytics/moderation)
+    author: { type: Types.ObjectId, ref: "User", required: true, index: true },
     roleAtPostTime: {
       type: String,
       enum: ["farmer", "expert", "moderator", "admin", "unknown"],
@@ -68,43 +65,26 @@ const PostSchema = new Schema(
     },
 
     // Core content
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 140,
-    },
-    description: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 8000,
-    },
+    title: { type: String, required: true, trim: true, maxlength: 140 },
+    description: { type: String, required: true, trim: true, maxlength: 8000 },
 
     // Agronomy context
-    crop: {
-      type: String,
-      trim: true,
-      default: "Unknown",
-      // You can later validate against a controlled list in app logic
-    },
+    crop: { type: String, trim: true, default: "Unknown" },
     growthStage: {
       type: String,
       enum: ["seedling", "vegetative", "flowering", "fruiting", "harvest", "unknown"],
       default: "unknown",
     },
-    suspectedPests: [
-      { type: String, trim: true, lowercase: true, maxlength: 120 },
-    ],
+    suspectedPests: [{ type: String, trim: true, lowercase: true, maxlength: 120 }],
     symptoms: [{ type: String, trim: true, lowercase: true, maxlength: 120 }],
 
-    // Where and when the issue occurred
+    // Location & time
     location: {
       district: { type: String, trim: true, maxlength: 120 },
       country: { type: String, trim: true, maxlength: 120, default: "Sri Lanka" },
-      geo: GeoPointSchema, // enables "near me" queries
+      geo: GeoPointSchema,
     },
-    occurredAt: { type: Date }, // When the farmer first noticed symptoms
+    occurredAt: { type: Date },
 
     // Media
     images: {
@@ -117,31 +97,23 @@ const PostSchema = new Schema(
         },
       ],
     },
-    attachments: {
-      type: [AttachmentSchema],
-      default: [],
-    },
+    attachments: { type: [AttachmentSchema], default: [] },
 
-    // Community + workflow
+    // Community & workflow
     tags: [{ type: String, trim: true, lowercase: true, maxlength: 40 }],
-    visibility: {
-      type: String,
-      enum: ["public", "unlisted", "private"],
-      default: "public",
-      index: true,
-    },
+    visibility: { type: String, enum: ["public", "unlisted", "private"], default: "public", index: true },
     diagnosisStatus: {
       type: String,
       enum: ["open", "needs-more-info", "answered", "resolved", "closed"],
       default: "open",
       index: true,
     },
-    acceptedAnswer: { type: Types.ObjectId, ref: "Comment" }, // comment chosen as the solution
+    acceptedAnswer: { type: Types.ObjectId, ref: "Comment" },
 
-    // Lightweight counters for quick UI (updated by service layer)
+    // Counters
     counters: {
       comments: { type: Number, default: 0, min: 0 },
-      saves: { type: Number, default: 0, min: 0 }, // bookmarks
+      saves: { type: Number, default: 0, min: 0 },
       views: { type: Number, default: 0, min: 0 },
     },
 
@@ -159,63 +131,50 @@ const PostSchema = new Schema(
 
     // System
     isEdited: { type: Boolean, default: false },
-    lastActivityAt: { type: Date, index: true }, // for sorting feeds efficiently
-    deletedAt: { type: Date }, // soft delete (keep for audits)
+    lastActivityAt: { type: Date, index: true },
+    deletedAt: { type: Date },
   },
   {
-    timestamps: true, // adds createdAt, updatedAt
+    timestamps: true,
     versionKey: false,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-// Full-text search across common fields (supports $text queries)
-PostSchema.index({
+/* ---------- Indexes ---------- */
+CommunitySchema.index({
   title: "text",
   description: "text",
   symptoms: "text",
   suspectedPests: "text",
 });
+CommunitySchema.index({ "location.geo": "2dsphere" });
+CommunitySchema.index({ diagnosisStatus: 1, lastActivityAt: -1 });
+CommunitySchema.index({ visibility: 1, createdAt: -1 });
 
-// Geospatial index for location-based search (nearby farms/diagnoses)
-PostSchema.index({ "location.geo": "2dsphere" });
-
-// Feed sorting: open posts updated recently, etc.
-PostSchema.index({ diagnosisStatus: 1, lastActivityAt: -1 });
-PostSchema.index({ visibility: 1, createdAt: -1 });
-
-// Keep lastActivityAt fresh; mark edits
-PostSchema.pre("save", function (next) {
+/* ---------- Hooks ---------- */
+CommunitySchema.pre("save", function (next) {
   if (this.isNew) {
     this.lastActivityAt = this.lastActivityAt || new Date();
-  } else {
-    if (this.isModified("description") || this.isModified("title")) {
-      this.isEdited = true;
-    }
+  } else if (this.isModified("description") || this.isModified("title")) {
+    this.isEdited = true;
   }
   next();
 });
 
-//Increment a counter safely without reading the doc first.
-//Usage (service layer): await Post.bumpCounter(postId, "views", 1)
-
-PostSchema.statics.bumpCounter = function (postId, key, delta = 1) {
+/* ---------- Statics & Methods ---------- */
+CommunitySchema.statics.bumpCounter = function (postId, key, delta = 1) {
   const allowed = ["views", "comments", "saves"];
   if (!allowed.includes(key)) throw new Error(`Invalid counter key: ${key}`);
   return this.findByIdAndUpdate(
     postId,
-    {
-      $inc: { [`counters.${key}`]: delta },
-      $set: { lastActivityAt: new Date() },
-    },
+    { $inc: { [`counters.${key}`]: delta }, $set: { lastActivityAt: new Date() } },
     { new: true, lean: true }
   ).exec();
 };
 
- // Register an upvote/downvote. Keeps values non-negative.
-
-PostSchema.statics.vote = function (postId, dir = 1) {
+CommunitySchema.statics.vote = function (postId, dir = 1) {
   if (![1, -1].includes(dir)) throw new Error("dir must be +1 or -1");
   const field = dir === 1 ? "votes.up" : "votes.down";
   return this.findByIdAndUpdate(
@@ -225,27 +184,26 @@ PostSchema.statics.vote = function (postId, dir = 1) {
   ).exec();
 };
 
- //Soft delete a post (kept for audit/moderation).
-
-PostSchema.methods.softDelete = function () {
+CommunitySchema.methods.softDelete = function () {
   this.deletedAt = new Date();
   this.visibility = "private";
   this.diagnosisStatus = "closed";
   return this.save();
 };
 
-// Convenience: total score
-PostSchema.virtual("score").get(function () {
+/* ---------- Virtuals ---------- */
+CommunitySchema.virtual("score").get(function () {
   const up = this.votes?.up || 0;
   const down = this.votes?.down || 0;
   return up - down;
 });
 
-// Convenience: isDeleted flag
-PostSchema.virtual("isDeleted").get(function () {
+CommunitySchema.virtual("isDeleted").get(function () {
   return !!this.deletedAt;
 });
 
-const Post = mongoose.models.Post || mongoose.model("Post", PostSchema);
+/* ---------- Model ---------- */
+const Community =
+  mongoose.models.Community || mongoose.model("Community", CommunitySchema);
 
-module.exports = Post;
+export default Community;

@@ -1,12 +1,17 @@
+/**
+ * backend/routes/CommunityRoutes.js
+ *
+ * Express routes for Green Grow community posts.
+ * Mount in server: app.use("/community", communityRoutes)
+ */
+
 import express from "express";
-import * as ctrl from "../controllers/post.controller.js";
+import * as ctrl from "../controllers/CommunityCtrl.js";
 
 const router = express.Router();
 
-// Optional auth stubs (replace with your real middlewares)
+// Optional auth stub (replace with your real middleware)
 const requireAuth = (req, _res, next) => {
-  // Example: if you already decoded a JWT, req.user will be present.
-  // Throw 401 if not authenticated.
   if (!req.user && process.env.REQUIRE_AUTH === "true") {
     const err = new Error("Unauthorized");
     err.status = 401;
@@ -19,7 +24,7 @@ const requireAuth = (req, _res, next) => {
 router.post("/", requireAuth, ctrl.createPost);
 
 // Read
-router.get("/", ctrl.listPosts); // supports filters, pagination, search, geo
+router.get("/", ctrl.listPosts); // filters, pagination, search, geo
 router.get("/:id", ctrl.getPostById);
 
 // Update
