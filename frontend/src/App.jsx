@@ -2,22 +2,20 @@ import React from 'react'
 import Appointment from './components/appointment'
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-
 const App = () => {
   return (
-    <BrowserRouter>
-     <div className=' w-full flex justify-center items-center'>
-
+    
+  <BrowserRouter>
+    <div>
       <Routes>
 
         <Route path="/appoinment" element={<Appointment/>}></Route>
 
       </Routes>
-      
-    </div></BrowserRouter>
+    </div>
+  </BrowserRouter>
    
   )
 }
 
 export default App
-
