@@ -150,4 +150,5 @@ export function PersonCard({ p }) {
       </div>
     </div>
   );
+
 }
