@@ -4,13 +4,8 @@ import "dotenv/config"
 import connectDB from "./config/mongodb.js"
 import connectCloudinary from "./config/cloudinary.js"
 import appointmentRoutes from "./routes/AppointmentRoute.js";
+import userRoutes from "./routes/userRoute.js";
 import courseRouter from "./routes/courseRoter.js";
-
-
-
-
-
-
 
 const app = express()
 const port = process.env.PORT || 4000
@@ -26,8 +21,8 @@ app.use(express.json());
 
 // routes
 app.use("/appointments", appointmentRoutes);
+app.use("/users", userRoutes);
 app.use("/courses", courseRouter);
-
 
 // api endpoints
 app.get("/", (req, res) => {
