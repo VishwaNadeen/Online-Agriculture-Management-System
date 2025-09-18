@@ -2,6 +2,7 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import userCtrl from "../controllers/userCtrl.js";
+import { requireAuth, selfOrAdmin } from "../middlewares/auth.js";
 
 const router = Router();
 
@@ -25,5 +26,9 @@ router.patch("/:id", validateId, userCtrl.update);                 // Update use
 router.patch("/:id/password", validateId, userCtrl.changePassword); // Change password
 
 router.delete("/:id", validateId, userCtrl.remove); // Delete user
+
+router.patch("/:id", validateId, requireAuth, selfOrAdmin, userCtrl.update);
+router.patch("/:id/password", validateId, requireAuth, selfOrAdmin, userCtrl.changePassword);
+router.delete("/:id", validateId, requireAuth, selfOrAdmin, userCtrl.remove);
 
 export default router;

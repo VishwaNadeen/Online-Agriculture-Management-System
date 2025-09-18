@@ -1,21 +1,17 @@
-import React from 'react'
-import Appointment from './components/appointment'
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
+// Make sure these files export default components and the filenames match the casing:
+import Appointment from "./components/appointment";
 
 const App = () => {
   return (
-    
-  <BrowserRouter>
-    <div>
+    <Router>
       <Routes>
-
-        <Route path="/appoinment" element={<Appointment/>}></Route>
-
+        <Route path="/appointment" element={<Appointment />} />
       </Routes>
-    </div>
-  </BrowserRouter>
-   
-  )
-}
+    </Router>
+  );
+};
 
-export default App
+export default App;

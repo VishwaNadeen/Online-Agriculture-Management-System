@@ -18,7 +18,6 @@ app.use(express.json());
 app.use(cors());
 app.use(express.json());
 
-
 // routes
 app.use("/appointments", appointmentRoutes);
 app.use("/users", userRoutes);

@@ -7,8 +7,6 @@ import {
   deleteCourse,
 } from "../controllers/courseController.js";
 
-console.log("✅ courseRouter loaded");
-
 const courseRouter = express.Router();
 
 courseRouter.post("/", createCourse);
