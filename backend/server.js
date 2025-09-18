@@ -4,12 +4,7 @@ import "dotenv/config"
 import connectDB from "./config/mongodb.js"
 import connectCloudinary from "./config/cloudinary.js"
 import appointmentRoutes from "./routes/AppointmentRoute.js";
-import communityRoutes from "./routes/CommunityRoutes.js";
-
-// server.js (or serverr.js)
-import "./models/UserModel.js";
-import "./models/CommentModel.js";
-
+import communityRoutes from "./routes/CommunityPost.js";
 
 const app = express()
 const port = process.env.PORT || 4000
