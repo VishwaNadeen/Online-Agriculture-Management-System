@@ -1,10 +1,8 @@
 import express from "express"
 import cors from "cors"
-import cookieParser from "cookie-parser"
 import "dotenv/config"
 import connectDB from "./config/mongodb.js"
 import connectCloudinary from "./config/cloudinary.js"
-
 import appointmentRoutes from "./routes/AppointmentRoute.js";
 import userRoutes from "./routes/userRoute.js";
 import adminRoute from './routes/adminRoute.js';
@@ -18,11 +16,7 @@ connectCloudinary()
 
 // middlewares
 app.use(express.json());
-app.use(cookieParser());
-app.use(cors({
-  origin: "http://localhost:5173", // your React dev URL
-  credentials: true,               // allow cookies
-}));
+app.use(cors());
 app.use(express.json());
 
 // routes
