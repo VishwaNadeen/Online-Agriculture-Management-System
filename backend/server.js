@@ -5,6 +5,7 @@ import connectDB from "./config/mongodb.js"
 import connectCloudinary from "./config/cloudinary.js"
 import appointmentRoutes from "./routes/AppointmentRoute.js";
 import userRoutes from "./routes/userRoute.js";
+import adminRoute from './routes/adminRoute.js';
 import courseRouter from "./routes/courseRoter.js";
 
 const app = express()
@@ -21,6 +22,7 @@ app.use(express.json());
 // routes
 app.use("/appointments", appointmentRoutes);
 app.use("/users", userRoutes);
+app.use('/api/admin', adminRoute);
 app.use("/courses", courseRouter);
 
 // api endpoints
