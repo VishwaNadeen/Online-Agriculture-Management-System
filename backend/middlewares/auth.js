@@ -1,22 +1,19 @@
-// middlewares/auth.js
 import jwt from "jsonwebtoken";
 
-export const requireAuth = (req, res, next) => {
-  const hdr = req.headers.authorization || "";
-  const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
-  if (!token) return res.status(401).json({ message: "Missing token" });
+const COOKIE_NAME = "user_token";
+
+export function requireUser(req, res, next) {
+  const token =
+    req.cookies?.[COOKIE_NAME] ||
+    req.headers.authorization?.split(" ")?.[1];
+
+  if (!token) return res.status(401).json({ authenticated: false, message: "Not logged in" });
+
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.auth = payload; // { sub, role }
+    req.userId = payload.sub;
     next();
   } catch {
-    return res.status(401).json({ message: "Invalid token" });
+    return res.status(401).json({ authenticated: false, message: "Invalid or expired token" });
   }
-};
-
-export const selfOrAdmin = (req, res, next) => {
-  const isSelf = req.auth?.sub === req.params.id;
-  const isAdmin = req.auth?.role === "admin";
-  if (!isSelf && !isAdmin) return res.status(403).json({ message: "Forbidden" });
-  next();
-};
+}
