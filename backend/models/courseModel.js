@@ -33,12 +33,13 @@ const courseSchema = new mongoose.Schema(
       default: "Beginner",
     },
 
-    // Tutorials / Resources (modified to support names)
+    // Tutorials / Resources (now with thumbnail)
     videoTutorials: {
       type: [
         {
-          name: { type: String }, // display name for the video
-          url: { type: String },  // Supabase video URL
+          name: { type: String },       // display name for the video
+          url: { type: String },        // Supabase video URL
+          thumbnail: { type: String },  // Supabase image URL for thumbnail
         },
       ],
       default: [],
