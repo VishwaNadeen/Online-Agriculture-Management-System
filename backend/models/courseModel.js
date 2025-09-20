@@ -1,79 +1,54 @@
 import mongoose from "mongoose";
 
-const courseSchema = new mongoose.Schema(
+const VideoSchema = new mongoose.Schema(
   {
-    courseID: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    title: {
-      type: String,
-      required: true,
-    },
-    altTitles: {
-      type: [String], // alternative names for searching/filter
-      default: [],
-    },
-    description: {
-      type: String,
-      required: true,
-    },
-    category: {
-      type: String, // e.g. "Organic Farming", "Pest Control", "Irrigation"
-      required: true,
-    },
-    tags: {
-      type: [String], // for searching/filtering (ex: "rice", "wheat", "fertilizer")
-      default: [],
-    },
-    level: {
-      type: String, // Beginner, Intermediate, Advanced
-      enum: ["Beginner", "Intermediate", "Advanced"],
-      default: "Beginner",
-    },
-
-    // Tutorials / Resources
-    videoTutorials: {
-      type: [String], // store Supabase video URLs
-      default: [],
-    },
-    textLessons: {
-      type: [String], // store plain text or markdown lesson content
-      default: [],
-    },
-    pdfResources: {
-      type: [
-        {
-          fileName: { type: String, required: true }, // display name
-          url: { type: String, required: true }, // Supabase public URL
-        },
-      ],
-      default: [],
-    },
-
-    // Meta info
-    isPublished: {
-      type: Boolean,
-      default: true,
-    },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User", // reference to Admin user
-      required: true,
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
+    name: { type: String, trim: true },
+    url:  { type: String, trim: true },
   },
-  { timestamps: true }
+  { _id: false }
 );
 
-const Course = mongoose.model("courses", courseSchema);
+const PdfSchema = new mongoose.Schema(
+  {
+    fileName: { type: String, trim: true },
+    url:      { type: String, trim: true },
+    name:     { type: String, trim: true },
+  },
+  { _id: false }
+);
 
+const TextLessonSchema = new mongoose.Schema(
+  {
+    name:    { type: String, trim: true },
+    content: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const courseSchema = new mongoose.Schema(
+  {
+    courseID:    { type: String, required: true, unique: true, trim: true },
+    title:       { type: String, required: true, trim: true },
+    altTitles:   { type: [String], default: [] },
+    description: { type: String, required: true },
+    category:    { type: String, required: true, trim: true },
+    tags:        { type: [String], default: [] },
+    level:       { type: String, enum: ["Beginner","Intermediate","Advanced"], default: "Beginner" },
+
+    videoTutorials: { type: [VideoSchema], default: [] },
+    textLessons:    { type: [TextLessonSchema], default: [] },
+    pdfResources:   { type: [PdfSchema], default: [] },
+
+    isPublished: { type: Boolean, default: true },
+
+    // keep as String if you send a plain ID from the UI; switch to ObjectId if you want strict refs
+    createdBy: { type: String, trim: true },
+  },
+  {
+    timestamps: true,
+    collection: "courses", // <-- pins collection name explicitly
+  }
+);
+
+const Course = mongoose.model("Course", courseSchema); // <-- singular model name
 export default Course;

@@ -1,23 +1,38 @@
-import React from 'react'
-import Appointment from './components/appointment'
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
+// Make sure these files export default components and the filenames match the casing:
+import Appointment from "./components/appointment";
+import Navbar from "./components/navbar";
+import Footer from "./components/footer";
+import Home from "./pages/home";
+import About from "./pages/about";
+import UserRegistration from "./pages/userRegistration.jsx";
+import UserRoleDetails from "./pages/userRoleDetails";
+import AddnewCourse from "./pages/addCourses";
 
 const App = () => {
+ 
   return (
-    <BrowserRouter>
-     <div className=' w-full flex justify-center items-center'>
-
-      <Routes>
-
-        <Route path="/appoinment" element={<Appointment/>}></Route>
-
-      </Routes>
+    
+    <Router>
       
-    </div></BrowserRouter>
-   
-  )
-}
+    <Navbar />
+    
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/appointment" element={<Appointment />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/signup" element={<UserRegistration />} />
+        <Route path="/register-step2" element={<UserRoleDetails />} />
+        <Route path="/addcourse" element={<AddnewCourse />} />
+      </Routes>
 
-export default App
+    <Footer />
 
+    </Router>
+
+  );
+};
+
+export default App;
