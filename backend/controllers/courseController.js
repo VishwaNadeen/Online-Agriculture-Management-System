@@ -1,98 +1,89 @@
+// controllers/courseController.js
 import Course from "../models/courseModel.js";
 
-// ================= CREATE COURSE =================
+/* ================= CREATE ================= */
 export async function createCourse(req, res) {
+  const course = new Course(req.body);
+
   try {
-    const course = await Course.create(req.body);
-    return res.status(201).json({
+    const response = await course.save();
+
+    res.json({
       message: "Course created successfully",
-      course,
+      course: response,
     });
   } catch (error) {
-    console.error("Course creation failed:", error);
-    return res.status(500).json({
+    console.error("Course creation failed", error);
+    res.status(500).json({
       message: "Course creation failed",
-      error: error.message,
     });
   }
 }
 
-// ================= GET ALL COURSES =================
+/* ================= READ: ALL ================= */
 export async function getCourses(req, res) {
   try {
-    const courses = await Course.find().lean();
-    return res.json(courses);
+    const courses = await Course.find();
+    res.json(courses);
   } catch (error) {
-    console.error("Error fetching courses:", error);
-    return res.status(400).json({
+    console.error("Error fetching courses", error);
+    res.status(400).json({
       message: "Failed to fetch courses",
-      error: error.message,
     });
   }
 }
 
-// ================= GET COURSE INFO =================
+/* ================= READ: ONE ================= */
 export async function getCourseInfo(req, res) {
   try {
-    const { courseID } = req.params;
-    const course = await Course.findOne({ courseID }).lean();
+    const courseID = req.params.courseID;
+    const course = await Course.findOne({ courseID });
+
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
-    return res.json(course);
+
+    res.json(course);
   } catch (error) {
-    console.error("Error fetching course info:", error);
-    return res.status(500).json({
-      message: "Error fetching course",
-      error: error.message,
-    });
+    console.error("Error fetching course info", error);
+    res.status(404).json({ message: "Error fetching course" });
   }
 }
 
-// ================= UPDATE COURSE =================
+/* ================= UPDATE ================= */
 export async function updateCourse(req, res) {
+  const courseID = req.params.courseID;
+  const data = req.body;
+  data.courseID = courseID; // keep consistent
+
   try {
-    const { courseID } = req.params;
-    const data = req.body;
+    await Course.updateOne({ courseID }, data);
 
-    // ensure updatedAt is refreshed when using findOneAndUpdate
-    const updated = await Course.findOneAndUpdate(
-      { courseID },
-      { $set: data, $currentDate: { updatedAt: true } },
-      { new: true, runValidators: true }
-    ).lean();
-
-    if (!updated) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
-    return res.json({
+    res.json({
       message: "Course updated successfully",
-      course: updated,
     });
   } catch (error) {
-    console.error("Course update failed:", error);
-    return res.status(500).json({
+    console.error("Course update failed", error);
+    res.status(500).json({
       message: "Course update unsuccessful",
-      error: error.message,
     });
   }
 }
 
-// ================= DELETE COURSE =================
+/* ================= DELETE ================= */
 export async function deleteCourse(req, res) {
   try {
-    const { courseID } = req.params;
-    const deleted = await Course.deleteOne({ courseID });
-    if (deleted.deletedCount === 0) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-    return res.json({ message: "Course deleted successfully" });
+    const courseID = req.params.courseID;
+
+    await Course.deleteOne({ courseID });
+
+    res.json({
+      message: "Course deleted successfully",
+    });
   } catch (error) {
-    console.error("Course deletion failed:", error);
-    return res.status(500).json({
+    console.error("Course delete failed", error);
+    res.status(500).json({
       message: "Failed to delete course",
-      error: error.message,
     });
   }
 }
