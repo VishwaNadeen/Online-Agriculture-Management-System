@@ -29,7 +29,7 @@ export async function getCourses(req, res) {
     res.status(400).json({
       message: "Failed to fetch courses",
       error: error.message,
-    });
+    })
   }
 }
 

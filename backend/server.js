@@ -6,6 +6,9 @@ import connectCloudinary from "./config/cloudinary.js"
 import appointmentRoutes from "./routes/AppointmentRoute.js";
 import userRoutes from "./routes/userRoute.js";
 import courseRouter from "./routes/courseRoter.js";
+import { configDotenv } from "dotenv"
+
+configDotenv();
 
 const app = express()
 const port = process.env.PORT || 4000
