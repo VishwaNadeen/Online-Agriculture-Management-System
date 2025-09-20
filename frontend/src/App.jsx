@@ -9,9 +9,12 @@ import Home from "./pages/home";
 import About from "./pages/about";
 import UserRegistration from "./pages/userRegistration.jsx";
 import UserRoleDetails from "./pages/userRoleDetails";
+import AddnewCourse from "./pages/addCourses";
 
 const App = () => {
+ 
   return (
+    
     <Router>
       
       <Navbar />
@@ -22,6 +25,7 @@ const App = () => {
         <Route path="/about" element={<About />} />
         <Route path="/signup" element={<UserRegistration />} />
         <Route path="/register-step2" element={<UserRoleDetails />} />
+        <Route path="/addcourse" element={<AddnewCourse />} />
       </Routes>
 
       <Footer />

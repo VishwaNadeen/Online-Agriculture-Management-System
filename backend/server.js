@@ -8,6 +8,9 @@ import appointmentRoutes from "./routes/AppointmentRoute.js";
 import userRoutes from "./routes/userRoute.js";
 import adminRoute from './routes/adminRoute.js';
 import courseRouter from "./routes/courseRoter.js";
+import { configDotenv } from "dotenv"
+
+configDotenv();
 
 
 const app = express()
