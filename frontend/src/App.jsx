@@ -17,8 +17,8 @@ const App = () => {
     
     <Router>
       
-      <Navbar />
-
+    <Navbar />
+    
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/appointment" element={<Appointment />} />
@@ -28,9 +28,10 @@ const App = () => {
         <Route path="/addcourse" element={<AddnewCourse />} />
       </Routes>
 
-      <Footer />
+    <Footer />
 
     </Router>
+
   );
 };
 
