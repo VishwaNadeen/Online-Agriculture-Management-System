@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 // Make sure these files export default components and the filenames match the casing:
-import Appointment from "./components/appointment";
+import Appointment from "./pages/appointment.jsx";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import Home from "./pages/home";
