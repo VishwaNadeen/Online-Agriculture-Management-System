@@ -4,6 +4,7 @@ import { NavLink } from "react-router-dom";
 
 const Home = () => {
   return (
+    
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-6 py-20 flex flex-col items-center text-center">
