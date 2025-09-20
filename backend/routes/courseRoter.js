@@ -16,3 +16,5 @@ courseRouter.put("/:courseID", updateCourse);
 courseRouter.delete("/:courseID", deleteCourse);
 
 export default courseRouter;
+
+
