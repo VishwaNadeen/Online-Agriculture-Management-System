@@ -33,32 +33,20 @@ const courseSchema = new mongoose.Schema(
       default: "Beginner",
     },
 
-    // Tutorials / Resources (now with thumbnail)
+    // Tutorials / Resources
     videoTutorials: {
-      type: [
-        {
-          name: { type: String },       // display name for the video
-          url: { type: String },        // Supabase video URL
-          thumbnail: { type: String },  // Supabase image URL for thumbnail
-        },
-      ],
+      type: [String], // store Supabase video URLs
       default: [],
     },
     textLessons: {
-      type: [
-        {
-          name: { type: String },    // title for the lesson
-          content: { type: String }, // plain text or markdown
-        },
-      ],
+      type: [String], // store plain text or markdown lesson content
       default: [],
     },
     pdfResources: {
       type: [
         {
-          fileName: { type: String }, // original file name
-          url: { type: String },      // Supabase public URL
-          name: { type: String },     // custom display name
+          fileName: { type: String, required: true }, // display name
+          url: { type: String, required: true }, // Supabase public URL
         },
       ],
       default: [],
@@ -70,7 +58,9 @@ const courseSchema = new mongoose.Schema(
       default: true,
     },
     createdBy: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User", // reference to Admin user
+      required: true,
     },
     createdAt: {
       type: Date,

@@ -13,23 +13,9 @@ export default function AddnewCourse() {
   const [category, setcategory] = useState("");
   const [tags, settags] = useState("");
   const [level, setlevel] = useState("Beginner");
-
-  // --- One-by-one builders ---
-  // Videos (array of { file, name, thumbFile })
-  const [videos, setVideos] = useState([]);
-  const [videoFile, setVideoFile] = useState(null);
-  const [videoName, setVideoName] = useState("");
-  const [videoThumbFile, setVideoThumbFile] = useState(null);
-
-  // PDFs (array of { file, name })
-  const [pdfs, setPdfs] = useState([]);
-  const [pdfFile, setPdfFile] = useState(null);
-  const [pdfName, setPdfName] = useState("");
-
-  // Lessons (array of { name })
-  const [lessons, setLessons] = useState([]);
-  const [lessonName, setLessonName] = useState("");
-
+  const [videoTutorials, setvideoTutorials] = useState([]); // FileList
+  const [pdfResources, setpdfResources] = useState([]); // FileList
+  const [textLessons, settextLessons] = useState("");
   const [createdBy, setcreatedBy] = useState("");
 
   const navigate = useNavigate();
@@ -40,93 +26,39 @@ export default function AddnewCourse() {
       .map((s) => s.trim())
       .filter(Boolean);
 
-  // --- Add handlers ---
-  const addVideoItem = () => {
-    if (!videoFile) {
-      toast.error("Please choose a video file.");
-      return;
-    }
-    const base = videoFile.name.replace(/\.[^/.]+$/, "");
-    const name = (videoName || base).trim();
-    setVideos((prev) => [...prev, { file: videoFile, name, thumbFile: videoThumbFile || null }]);
-    // reset current inputs
-    setVideoFile(null);
-    setVideoName("");
-    setVideoThumbFile(null);
-  };
-
-  const removeVideoItem = (idx) => {
-    setVideos((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const addPdfItem = () => {
-    if (!pdfFile) {
-      toast.error("Please choose a PDF file.");
-      return;
-    }
-    const base = pdfFile.name.replace(/\.[^/.]+$/, "");
-    const name = (pdfName || base).trim();
-    setPdfs((prev) => [...prev, { file: pdfFile, name }]);
-    setPdfFile(null);
-    setPdfName("");
-  };
-
-  const removePdfItem = (idx) => {
-    setPdfs((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const addLessonItem = () => {
-    const n = (lessonName || "").trim();
-    if (!n) {
-      toast.error("Please type a lesson name.");
-      return;
-    }
-    setLessons((prev) => [...prev, { name: n }]);
-    setLessonName("");
-  };
-
-  const removeLessonItem = (idx) => {
-    setLessons((prev) => prev.filter((_, i) => i !== idx));
-  };
+  const isValidObjectId = (id) => /^[a-f\d]{24}$/i.test(id);
 
   async function addCourse() {
     if (!courseID?.trim() || !title?.trim() || !description?.trim() || !category?.trim()) {
       toast.error("Please fill Course ID, Title, Description, and Category.");
       return;
     }
+    if (!createdBy?.trim() || !isValidObjectId(createdBy.trim())) {
+      toast.error("Created By must be a valid 24-char Mongo ObjectId.");
+      return;
+    }
 
     try {
       const AltTitlesarr = splitCSV(altTitles);
       const Tagsarr = splitCSV(tags);
+      const TextLessonsarr = splitCSV(textLessons); // -> string[]
 
-      // ---- Upload videos + thumbnails one-by-one ----
-      const videoUrls = await Promise.all(
-        videos.map((v) => uploadfile(v.file))
-      );
-      const thumbUrls = await Promise.all(
-        videos.map((v) => (v.thumbFile ? uploadfile(v.thumbFile) : Promise.resolve("")))
-      );
+      // ---- Upload videos (FileList -> URLs as string[]) ----
+      const videoFiles = Array.from(videoTutorials || []);
+      const videoUrls = videoFiles.length
+        ? await Promise.all(videoFiles.map((f) => uploadfile(f)))
+        : []; // -> string[]
 
-      const videoPayload = videos.map((v, i) => ({
-        name: v.name,
-        url: videoUrls[i],
-        thumbnail: thumbUrls[i] || "",
-      }));
+      // ---- Upload PDFs (FileList -> URLs) ----
+      const pdfFiles = Array.from(pdfResources || []);
+      const pdfUrls = pdfFiles.length
+        ? await Promise.all(pdfFiles.map((f) => uploadfile(f)))
+        : [];
 
-      // ---- Upload PDFs one-by-one ----
-      const pdfUrls = await Promise.all(
-        pdfs.map((p) => uploadfile(p.file))
-      );
-      const pdfPayload = pdfs.map((p, i) => ({
-        fileName: p.file.name,
+      // Map exactly to your schema: { fileName, url }
+      const pdfPayload = pdfFiles.map((f, i) => ({
+        fileName: f.name,
         url: pdfUrls[i],
-        name: p.name,
-      }));
-
-      // ---- Lessons to schema ----
-      const textLessonsPayload = lessons.map((l) => ({
-        name: l.name,
-        content: "",
       }));
 
       const courseData = {
@@ -137,10 +69,10 @@ export default function AddnewCourse() {
         category: category.trim(),
         tags: Tagsarr,
         level,
-        videoTutorials: videoPayload,
-        pdfResources: pdfPayload,
-        textLessons: textLessonsPayload,
-        createdBy: createdBy?.trim() || undefined,
+        videoTutorials: videoUrls,     // <-- string[]
+        textLessons: TextLessonsarr,   // <-- string[]
+        pdfResources: pdfPayload,      // <-- { fileName, url }[]
+        createdBy: createdBy.trim(),   // <-- ObjectId as string
       };
 
       await axios.post(`${import.meta.env.VITE_BACKEND_URL}/courses`, courseData);
@@ -280,158 +212,32 @@ export default function AddnewCourse() {
                 <h2 className="text-lg font-semibold">Learning Materials</h2>
               </div>
 
-              {/* --- Videos: add one-by-one --- */}
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-emerald-900">Video File</label>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-                    className="mt-1 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-4 file:py-2 file:text-white hover:file:bg-emerald-700 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-emerald-900">Video Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Soil Preparation"
-                    value={videoName}
-                    onChange={(e) => setVideoName(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-2 text-emerald-900 placeholder-emerald-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-emerald-900">Thumbnail (image)</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setVideoThumbFile(e.target.files?.[0] || null)}
-                    className="mt-1 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-amber-600 file:px-4 file:py-2 file:text-white hover:file:bg-amber-700 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
-                  />
-                </div>
-                <div className="md:col-span-3">
-                  <button
-                    type="button"
-                    onClick={addVideoItem}
-                    className="mt-1 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                  >
-                    Add Video
-                  </button>
-                  {videos.length > 0 && (
-                    <ul className="mt-3 text-sm text-emerald-900 space-y-1">
-                      {videos.map((v, i) => (
-                        <li key={i} className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/40 px-3 py-2">
-                          <span className="truncate">
-                            {i + 1}. {v.name} <span className="text-emerald-700/70">({v.file?.name})</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeVideoItem(i)}
-                            className="ml-3 rounded-lg bg-emerald-100 px-2 py-1 text-emerald-900 hover:bg-emerald-200"
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+              {/* Video */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-emerald-900">
+                  Video Tutorials
+                </label>
+                <input
+                  multiple
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setvideoTutorials(e.target.files)}
+                  className="mt-1 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-4 file:py-2 file:text-white hover:file:bg-emerald-700 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
+                />
+                <p className="mt-1 text-xs text-emerald-700/70">Upload MP4, MKV, or MOV files.</p>
               </div>
 
-              {/* --- PDFs: add one-by-one --- */}
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-emerald-900">PDF File</label>
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                    className="mt-1 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-lime-600 file:px-4 file:py-2 file:text-white hover:file:bg-lime-700 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-emerald-900">PDF Display Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Paddy Guide"
-                    value={pdfName}
-                    onChange={(e) => setPdfName(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-2 text-emerald-900 placeholder-emerald-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
-                  />
-                </div>
-                <div className="md:self-end">
-                  <button
-                    type="button"
-                    onClick={addPdfItem}
-                    className="mt-1 inline-flex items-center justify-center rounded-xl bg-lime-600 px-4 py-2 text-white shadow-md transition hover:bg-lime-700 focus:outline-none focus:ring-2 focus:ring-lime-300"
-                  >
-                    Add PDF
-                  </button>
-                </div>
-                <div className="md:col-span-3">
-                  {pdfs.length > 0 && (
-                    <ul className="mt-3 text-sm text-emerald-900 space-y-1">
-                      {pdfs.map((p, i) => (
-                        <li key={i} className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/40 px-3 py-2">
-                          <span className="truncate">
-                            {i + 1}. {p.name} <span className="text-emerald-700/70">({p.file?.name})</span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removePdfItem(i)}
-                            className="ml-3 rounded-lg bg-emerald-100 px-2 py-1 text-emerald-900 hover:bg-emerald-200"
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* --- Lessons: add one-by-one --- */}
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-emerald-900">Lesson Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Introduction"
-                    value={lessonName}
-                    onChange={(e) => setLessonName(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-2 text-emerald-900 placeholder-emerald-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
-                  />
-                </div>
-                <div className="md:self-end">
-                  <button
-                    type="button"
-                    onClick={addLessonItem}
-                    className="mt-1 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-white shadow-md transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                  >
-                    Add Lesson
-                  </button>
-                </div>
-                <div className="md:col-span-3">
-                  {lessons.length > 0 && (
-                    <ul className="mt-3 text-sm text-emerald-900 space-y-1">
-                      {lessons.map((l, i) => (
-                        <li key={i} className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/40 px-3 py-2">
-                          <span className="truncate">
-                            {i + 1}. {l.name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeLessonItem(i)}
-                            className="ml-3 rounded-lg bg-emerald-100 px-2 py-1 text-emerald-900 hover:bg-emerald-200"
-                          >
-                            Remove
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+              {/* PDFs */}
+              <div>
+                <label className="block text-sm font-medium text-emerald-900">PDF Resources</label>
+                <input
+                  multiple
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => setpdfResources(e.target.files)}
+                  className="mt-1 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-lime-600 file:px-4 file:py-2 file:text-white hover:file:bg-lime-700 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
+                />
+                <p className="mt-1 text-xs text-emerald-700/70">You can select multiple PDFs.</p>
               </div>
             </div>
 
@@ -440,6 +246,19 @@ export default function AddnewCourse() {
               <div className="mb-3 flex items-center gap-2 text-emerald-900">
                 <span className="text-lg">🍃</span>
                 <h2 className="text-lg font-semibold">Content</h2>
+              </div>
+
+              {/* Text Lessons */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-emerald-900">
+                  Text Lessons (comma separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Lesson 1, Lesson 2"
+                  onChange={(e) => settextLessons(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-2 text-emerald-900 placeholder-emerald-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-300"
+                />
               </div>
 
               {/* Description */}
