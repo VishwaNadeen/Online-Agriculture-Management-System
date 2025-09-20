@@ -1,22 +1,39 @@
-// middlewares/auth.js
 import jwt from "jsonwebtoken";
 
-export const requireAuth = (req, res, next) => {
-  const hdr = req.headers.authorization || "";
-  const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
-  if (!token) return res.status(401).json({ message: "Missing token" });
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.auth = payload; // { sub, role }
-    next();
-  } catch {
-    return res.status(401).json({ message: "Invalid token" });
-  }
+const COOKIE_NAME = "user_token";
+
+// Pull JWT from cookie or "Authorization: Bearer <token>"
+const getToken = (req) => {
+  const fromCookie = req.cookies?.[COOKIE_NAME];
+  const auth = req.headers.authorization || "";
+  const fromHeader = auth.startsWith("Bearer ") ? auth.slice(7) : undefined;
+  return fromCookie || fromHeader;
 };
 
-export const selfOrAdmin = (req, res, next) => {
-  const isSelf = req.auth?.sub === req.params.id;
-  const isAdmin = req.auth?.role === "admin";
-  if (!isSelf && !isAdmin) return res.status(403).json({ message: "Forbidden" });
-  next();
-};
+// Require a valid JWT; attaches payload to req.user
+export function requireAuth(req, res, next) {
+  const token = getToken(req);
+  if (!token) {
+    return res.status(401).json({ authenticated: false, message: "Not logged in" });
+  }
+
+  try {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      // Fail fast if misconfigured
+      return res.status(500).json({ message: "Server misconfigured: missing JWT_SECRET" });
+    }
+    req.user = jwt.verify(token, secret); // e.g. { sub, role, iat, exp }
+    return next();
+  } catch {
+    return res.status(401).json({ authenticated: false, message: "Invalid or expired token" });
+  }
+}
+
+// Allow only the user themself or an admin
+export function selfOrAdmin(req, res, next) {
+  const uid = req.user?.sub;
+  const role = req.user?.role;
+  if (role === "admin" || uid === req.params.id) return next();
+  return res.status(403).json({ message: "Forbidden" });
+}
