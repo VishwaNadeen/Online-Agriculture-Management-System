@@ -1,35 +1,21 @@
 // controllers/userCtrl.js
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import User from "../models/userModel.js";
+import User from "../models/userModel.js"; // << ensure this matches your file name
 
 // ---------- helpers ----------
 const signTokenIfPossible = (user) => {
   const secret = process.env.JWT_SECRET;
   if (!secret) return null;
-  return jwt.sign(
-    { sub: user._id, role: user.role },
-    secret,
-    { expiresIn: "7d" }
-  );
+  return jwt.sign({ sub: user._id, role: user.role }, secret, { expiresIn: "7d" });
 };
 
 // Accept either `address: { ... }` or flat address fields in body
 const buildAddressFromBody = (body) => {
   if (body.address && typeof body.address === "object") return body.address;
-  const {
-    country,
-    stateProvince,
-    city,
-    postalCode,
-    line1,
-    line2,
-  } = body;
-  const any =
-    country || stateProvince || city || postalCode || line1 || line2;
-  return any
-    ? { country, stateProvince, city, postalCode, line1, line2 }
-    : undefined;
+  const { country, stateProvince, city, postalCode, line1, line2 } = body;
+  const any = country || stateProvince || city || postalCode || line1 || line2;
+  return any ? { country, stateProvince, city, postalCode, line1, line2 } : undefined;
 };
 
 // Whitelist top-level updatable fields
@@ -41,14 +27,12 @@ const pickUpdatable = (body) => {
     "email",
     "dateOfBirth",
     "gender",
-    "profilePicture",
+    "profilePicture", // URL from Cloudinary (set in route)
     "role", // "user" | "farmer" | "consultant"
   ];
 
   const out = {};
-  for (const k of allowedTop) {
-    if (body[k] !== undefined) out[k] = body[k];
-  }
+  for (const k of allowedTop) if (body[k] !== undefined) out[k] = body[k];
 
   // address
   const addr = buildAddressFromBody(body);
@@ -78,7 +62,7 @@ const create = async (req, res) => {
       email,
       dateOfBirth,
       gender,
-      profilePicture,
+      profilePicture, // must be a URL already (Cloudinary) — set in the route
       password,
       role,        // "user" | "farmer" | "consultant"
       farmer,      // optional object
@@ -91,9 +75,9 @@ const create = async (req, res) => {
     }
 
     const address = buildAddressFromBody(req.body);
-    if (!address) {
-      return res.status(400).json({ message: "Address is required." });
-    }
+    if (!address) return res.status(400).json({ message: "Address is required." });
+
+    // CLOUD-ONLY: do NOT derive from req.file; the route should set a URL in profilePicture.
 
     // hash password
     const passwordHash = await bcrypt.hash(password, 10);
@@ -101,11 +85,11 @@ const create = async (req, res) => {
     const user = await User.create({
       firstName,
       lastName,
-      phone,
-      email,
+      phone: String(phone).trim(),
+      email: String(email).toLowerCase().trim(),
       dateOfBirth,
       gender,
-      profilePicture,
+      profilePicture, // Cloudinary URL or undefined
       password: passwordHash,
       address,
       role: role || "user",
@@ -137,10 +121,12 @@ const login = async (req, res) => {
       return res.status(400).json({ message: "emailOrPhone and password are required." });
     }
 
-    const user = await User.findOne({
-      $or: [{ email: emailOrPhone.toLowerCase() }, { phone: emailOrPhone }],
-    });
+    const query =
+      String(emailOrPhone).includes("@")
+        ? { email: String(emailOrPhone).toLowerCase().trim() }
+        : { phone: String(emailOrPhone).trim() };
 
+    const user = await User.findOne(query);
     if (!user) return res.status(401).json({ message: "Invalid credentials." });
 
     const ok = await bcrypt.compare(password, user.password);
@@ -160,13 +146,7 @@ const login = async (req, res) => {
 
 const list = async (req, res) => {
   try {
-    const {
-      q,           // search text
-      role,        // filter: user | farmer | consultant
-      page = 1,
-      limit = 20,
-      sort = "-createdAt",
-    } = req.query;
+    const { q, role, page = 1, limit = 20, sort = "-createdAt" } = req.query;
 
     const filter = {};
     if (role) filter.role = role;
@@ -224,11 +204,11 @@ const update = async (req, res) => {
 
     const updates = pickUpdatable(req.body);
 
-    const user = await User.findByIdAndUpdate(
-      id,
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
+    // normalize email/phone if present
+    if (updates.email) updates.email = String(updates.email).toLowerCase().trim();
+    if (updates.phone) updates.phone = String(updates.phone).trim();
+
+    const user = await User.findByIdAndUpdate(id, { $set: updates }, { new: true, runValidators: true });
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
