@@ -22,7 +22,7 @@ import UpdateCourse from "./pages/updateCourse";
 import CoursesAdmin from "./pages/courseAdmin";
 import CoursesPage from "./pages/courses/coursePage";
 import CourseOverview from "./pages/courses/courseOverview";
-<Route path="/courseOverview/:courseID" element={<CourseOverview></CourseOverview>} />
+
 
 
 
