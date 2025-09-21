@@ -7,8 +7,9 @@ import cloudinary, { connectCloudinary } from "./config/cloudinary.js";
 import appointmentRoutes from "./routes/AppointmentRoute.js";
 import userRoutes from "./routes/userRoute.js";
 import adminRoute from './routes/adminRoute.js';
-import courseRouter from "./routes/courseRoter.js";
+import courseRoutes from "./routes/courseRoute.js";
 import { configDotenv } from "dotenv"
+
 
 configDotenv();
 
@@ -37,7 +38,8 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/appointments", appointmentRoutes);
 app.use("/users", userRoutes);
 app.use('/api/admin', adminRoute);
-app.use("/courses", courseRouter);
+app.use("/courses", courseRoutes); 
+
 
 // api endpoints
 app.get("/", (req, res) => {
