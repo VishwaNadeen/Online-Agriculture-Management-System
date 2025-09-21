@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 
-const URL = "http://localhost:4000/users"; // change to your real endpoint
+// 👇 Use the same path you mounted in app.js, e.g. app.use("/appointments", appointmentRoutes)
+const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
+const URL  = `${BASE}/appointments`; // <-- CHANGED from /users to /appointments
 
 const CATEGORY_OPTIONS = [
   "Crop Consultation",
@@ -31,11 +33,7 @@ const Input = ({ id, label, error, className = "", ...props }) => (
       }`}
       {...props}
     />
-    {error && (
-      <p className="mt-1 text-sm text-red-600">
-        {error}
-      </p>
-    )}
+    {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
   </div>
 );
 
@@ -56,11 +54,7 @@ const Select = ({ id, label, error, className = "", children, ...props }) => (
     >
       {children}
     </select>
-    {error && (
-      <p className="mt-1 text-sm text-red-600">
-        {error}
-      </p>
-    )}
+    {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
   </div>
 );
 
@@ -137,13 +131,25 @@ export default function AgriculturalBookingForm() {
 
     setSubmitting(true);
     try {
+      const token = localStorage.getItem("token"); // if your POST is protected
       const res = await fetch(URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const id = `AGR-${Date.now().toString().slice(-6)}`;
+
+      let data = null;
+      try { data = await res.json(); } catch (_) {}
+
+      if (!res.ok) {
+        const msg = data?.message || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      const id = data?.appointment?._id || `AGR-${Date.now().toString().slice(-6)}`;
       setServerMsg({
         type: "success",
         text: `Consultation scheduled successfully! Service ID: ${id}`,
@@ -307,9 +313,7 @@ export default function AgriculturalBookingForm() {
               >
                 <option value="">Select Agricultural Service</option>
                 {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
+                  <option key={opt} value={opt}>{opt}</option>
                 ))}
               </Select>
 
@@ -419,10 +423,7 @@ export default function AgriculturalBookingForm() {
                   step="1"
                   value={form.durationHours}
                   onChange={(e) =>
-                    setField(
-                      "durationHours",
-                      e.target.value === "" ? "" : +e.target.value
-                    )
+                    setField("durationHours", e.target.value === "" ? "" : +e.target.value)
                   }
                   error={errors.durationHours}
                   className="bg-white/90 border-teal-200"
@@ -458,12 +459,8 @@ export default function AgriculturalBookingForm() {
                 maxLength={1000}
                 placeholder="Please specify: crop types, farm size, equipment access, specific concerns, etc."
               />
-              {errors.notes && (
-                <p className="text-sm text-red-600">{errors.notes}</p>
-              )}
-              <div className="text-sm text-amber-600">
-                {form.notes.length}/1000 characters used
-              </div>
+              {errors.notes && <p className="text-sm text-red-600">{errors.notes}</p>}
+              <div className="text-sm text-amber-600">{form.notes.length}/1000 characters used</div>
             </div>
           </div>
 

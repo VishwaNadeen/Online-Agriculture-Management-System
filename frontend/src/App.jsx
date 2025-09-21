@@ -10,6 +10,7 @@ import About from "./pages/about";
 import UserRegistration from "./pages/userRegistration.jsx";
 import UserRoleDetails from "./pages/userRoleDetails";
 import AddnewCourse from "./pages/addCourses";
+import Login from "./pages/logIn";
 
 const App = () => {
  
@@ -26,6 +27,7 @@ const App = () => {
         <Route path="/signup" element={<UserRegistration />} />
         <Route path="/register-step2" element={<UserRoleDetails />} />
         <Route path="/addcourse" element={<AddnewCourse />} />
+        <Route path="/login" element={<Login />} />
       </Routes>
 
     <Footer />
