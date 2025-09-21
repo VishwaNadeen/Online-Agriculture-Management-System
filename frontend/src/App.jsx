@@ -39,6 +39,7 @@ const App = () => {
       <Toaster position='top-right'/>
       <Navbar />
         <Routes>
+          
           //public
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
