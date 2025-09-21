@@ -22,7 +22,7 @@ import UpdateCourse from "./pages/updateCourse";
 import CoursesAdmin from "./pages/courseAdmin";
 import CoursesPage from "./pages/courses/coursePage";
 import CourseOverview from "./pages/courses/courseOverview";
-<Route path="/courseOverview/:courseID" element={<CourseOverview></CourseOverview>} />
+
 
 
 
@@ -57,6 +57,7 @@ const App = () => {
           <Route path="/editcourse" element={<UpdateCourse></UpdateCourse>} />
           <Route path="/courseAdmin" element={<CoursesAdmin></CoursesAdmin>} />
           <Route path="/coursepage" element={<CoursesPage></CoursesPage>} />
+          <Route path="/courses/:courseID" element={<CourseOverview></CourseOverview>} />
 
           
           
