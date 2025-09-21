@@ -56,6 +56,7 @@ const App = () => {
           <Route path="/editcourse" element={<UpdateCourse></UpdateCourse>} />
           <Route path="/courseAdmin" element={<CoursesAdmin></CoursesAdmin>} />
           <Route path="/coursepage" element={<CoursesPage></CoursesPage>} />
+          <Route path="/courses/:courseID" element={<CourseOverview></CourseOverview>} />
 
           
           

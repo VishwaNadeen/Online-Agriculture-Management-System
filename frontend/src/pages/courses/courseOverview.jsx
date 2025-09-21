@@ -41,103 +41,51 @@ export default function CourseOverview() {
 
       {status === "success" && course && (
         <div className="w-full h-full">
-          {/* ===== Top hero: media left + key info right ===== */}
-          <div className="w-full flex flex-col lg:flex-row gap-6 lg:gap-0">
-            {/* Left: Thumbnail / Hero */}
-            <div className="w-full lg:w-[49%] flex items-stretch justify-center">
-              <div className="relative w-full max-w-3xl">
-                <img
-                  src={
-                    (course.thumbnail || "").trim() ||
-                    "https://images.unsplash.com/photo-1604335399105-a0d7f1b8cc4b?q=80&w=1200&auto=format&fit=crop"
-                  }
-                  alt={course.courseName || "Course thumbnail"}
-                  className="w-full h-[320px] md:h-[420px] object-cover rounded-none lg:rounded-r-none"
-                  loading="lazy"
-                />
-                {/* Soft overlay gradient for readability */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/10 to-transparent" />
-                {/* Top-left badges */}
-                <div className="absolute top-3 left-3 flex gap-2">
+          {/* ===== Top hero: FULL-WIDTH media with overlay content (stats panel removed) ===== */}
+          <div className="w-full">
+            <div className="relative w-full">
+              <img
+                src={
+                  (course.thumbnail || "").trim() ||
+                  "https://images.unsplash.com/photo-1604335399105-a0d7f1b8cc4b?q=80&w=1200&auto=format&fit=crop"
+                }
+                alt={course.courseName || "Course thumbnail"}
+                className="w-full h-[360px] md:h-[480px] lg:h-[520px] object-cover"
+                loading="lazy"
+              />
+              {/* Dark gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
+
+              {/* Overlay content */}
+              <div className="absolute inset-0 flex flex-col justify-end p-5 md:p-8">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
                   <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200">
                     {course.category || "Agriculture"}
                   </span>
                   <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/90 text-gray-800 border">
                     {course.level || "Beginner"}
                   </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/90 text-gray-800 border">
+                    {(course.language || "en").toUpperCase()}
+                  </span>
                 </div>
-                {/* Bottom-left date */}
-                <div className="absolute bottom-3 left-3 text-xs text-white/90">
+
+                <h1 className="text-white font-extrabold text-2xl md:text-4xl leading-tight drop-shadow-sm">
+                  {course.courseName}
+                </h1>
+
+                {Array.isArray(course.altTitles) && course.altTitles.length > 0 && (
+                  <p className="text-sm text-white/80 mt-1">{course.altTitles.join(" | ")}</p>
+                )}
+
+                <p className="text-base md:text-lg text-white/90 mt-3 leading-relaxed line-clamp-4">
+                  {course.description}
+                </p>
+
+                <div className="mt-4 text-xs text-white/80">
                   Created: {fmtDate(course.createdAt)}{" "}
                   {course.publishedAt ? `• Published: ${fmtDate(course.publishedAt)}` : ""}
                 </div>
-              </div>
-            </div>
-
-            {/* Right: Details */}
-            <div className="w-full lg:w-[51%] bg-emerald-50/60 pt-6 pb-8 px-5 md:px-8 flex flex-col">
-              <h1 className="text-2xl md:text-3xl font-bold text-emerald-900">
-                {course.courseName}
-              </h1>
-
-              {Array.isArray(course.altTitles) && course.altTitles.length > 0 && (
-                <p className="text-sm text-gray-600 mt-1">{course.altTitles.join(" | ")}</p>
-              )}
-
-              <p className="text-base md:text-lg text-gray-800 mt-4 leading-relaxed">
-                {course.description}
-              </p>
-
-              {/* Tags */}
-              {Array.isArray(course.tags) && course.tags.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {course.tags.map((t, i) => (
-                    <span
-                      key={`${t}-${i}`}
-                      className="text-xs px-2 py-1 rounded-full border bg-white text-gray-700"
-                    >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Quick stats */}
-              <div className="mt-6 grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-xl border border-emerald-200 bg-white py-2">
-                  <p className="text-lg font-semibold text-emerald-800">
-                    {Array.isArray(course.videoTutorials) ? course.videoTutorials.length : 0}
-                  </p>
-                  <p className="text-[12px] text-gray-600">Videos</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white py-2">
-                  <p className="text-lg font-semibold text-emerald-800">
-                    {Array.isArray(course.pdfLessons) ? course.pdfLessons.length : 0}
-                  </p>
-                  <p className="text-[12px] text-gray-600">PDFs</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white py-2">
-                  <p className="text-lg font-semibold text-emerald-800">
-                    {Array.isArray(course.textLessons) ? course.textLessons.length : 0}
-                  </p>
-                  <p className="text-[12px] text-gray-600">Text Lessons</p>
-                </div>
-              </div>
-
-              {/* Meta */}
-              <div className="mt-4 flex flex-wrap gap-2 text-sm text-gray-700">
-                <span className="px-2 py-0.5 rounded-md bg-white border">Language: {(course.language || "en").toUpperCase()}</span>
-                {course.subCategory && <span className="px-2 py-0.5 rounded-md bg-white border">Sub: {course.subCategory}</span>}
-                {course.isPublished ? (
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white">Published</span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-md bg-gray-400 text-white">Draft</span>
-                )}
-                {course.isActive ? (
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border">Active</span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-800 border">Inactive</span>
-                )}
               </div>
             </div>
           </div>
@@ -152,23 +100,36 @@ export default function CourseOverview() {
                   {course.videoTutorials.map((v, i) => (
                     <div
                       key={`vid-${i}`}
-                      className="rounded-xl border border-emerald-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition"
+                      className="group rounded-xl border border-emerald-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition"
                     >
-                      <div className="relative h-40">
+                      <div className="relative h-44 md:h-48">
                         <img
                           src={v.thumbnail || "https://via.placeholder.com/640x360?text=Video"}
                           alt={v.name}
                           className="w-full h-full object-cover"
                           loading="lazy"
                         />
+                        {/* Centered play overlay */}
                         <a
                           href={v.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="absolute bottom-3 right-3 inline-flex items-center gap-1 bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-full shadow hover:bg-emerald-700"
+                          className="absolute inset-0 flex items-center justify-center"
                         >
-                          ▶ Play
+                          <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-600/90 text-white shadow-lg group-hover:scale-105 transition transform">
+                            <svg
+                              className="w-6 h-6"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-5.197-3.028A1 1 0 008 9.028v5.944a1 1 0 001.555.832l5.197-3.028a1 1 0 000-1.664z" />
+                            </svg>
+                          </span>
                         </a>
+                        {/* Subtle bottom gradient for readability on hover */}
+                        <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
                       </div>
                       <div className="p-3">
                         <p className="font-semibold text-emerald-900 line-clamp-2">{v.name}</p>
@@ -252,7 +213,7 @@ export default function CourseOverview() {
               )}
             </section>
 
-            {/* Footer meta */}
+            {/* Footer meta (concise) */}
             <section className="pt-2 text-sm text-gray-600">
               <div className="flex flex-wrap gap-3">
                 <span>Created at: {fmtDate(course.createdAt)}</span>
