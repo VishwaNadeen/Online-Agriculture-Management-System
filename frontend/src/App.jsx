@@ -11,6 +11,9 @@ import UserRegistration from "./pages/userRegistration.jsx";
 import UserRoleDetails from "./pages/userRoleDetails";
 import AddCourse from "./pages/addCourse.jsx";
 
+import UpdateCourse from "./pages/updateCourse.jsx";
+import CoursesAdmin from "./pages/courseAdmin.jsx";
+
 
 const App = () => {
  
@@ -26,7 +29,9 @@ const App = () => {
         <Route path="/about" element={<About />} />
         <Route path="/signup" element={<UserRegistration />} />
         <Route path="/register-step2" element={<UserRoleDetails />} />
-        <Route path="/course" element={<AddCourse></AddCourse>} />
+        <Route path="/addcourse" element={<AddCourse></AddCourse>} />
+       <Route path="/editcourse" element={<UpdateCourse></UpdateCourse>} />
+        <Route path="/courseAdmin" element={<CoursesAdmin></CoursesAdmin>} />
         
       </Routes>
 

@@ -164,7 +164,7 @@ export default function AddCourse() {
       });
 
       toast.success("Course created successfully!", { id: "upload" });
-      navigate("/admin/courses"); // change to your admin list route
+      navigate("/courseAdmin"); // change to your admin list route
     } catch (err) {
       console.error(err);
       toast.error("Failed to create course", { id: "upload" });
