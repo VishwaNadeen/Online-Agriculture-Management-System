@@ -1,5 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
 //public
 import Navbar from "./components/navbar";
@@ -19,12 +20,23 @@ import Appointment from "./pages/appointment";
 import AddCourse from "./pages/addCourse";
 import UpdateCourse from "./pages/updateCourse";
 import CoursesAdmin from "./pages/courseAdmin";
+import CoursesPage from "./pages/courses/coursePage";
+import CourseOverview from "./pages/courses/courseOverview";
+<Route path="/courseOverview/:courseID" element={<CourseOverview></CourseOverview>} />
+
+
+
+
+
+
 
 
 const App = () => {
  
   return (
+    
     <Router>
+      <Toaster position='top-right'/>
       <Navbar />
         <Routes>
           //public
@@ -43,6 +55,9 @@ const App = () => {
           <Route path="/addcourse" element={<AddCourse />} />
           <Route path="/editcourse" element={<UpdateCourse></UpdateCourse>} />
           <Route path="/courseAdmin" element={<CoursesAdmin></CoursesAdmin>} />
+          <Route path="/coursepage" element={<CoursesPage></CoursesPage>} />
+
+          
           
         </Routes>
       <Footer />
