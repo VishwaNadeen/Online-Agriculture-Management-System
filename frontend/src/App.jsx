@@ -1,47 +1,52 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
-// Make sure these files export default components and the filenames match the casing:
-import Appointment from "./pages/appointment.jsx";
+//public
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import Home from "./pages/home";
 import About from "./pages/about";
-import UserRegistration from "./pages/userRegistration.jsx";
+
+//Vishwa
+import UserRegistration from "./pages/userRegistration";
 import UserRoleDetails from "./pages/userRoleDetails";
-import AddnewCourse from "./pages/addCourses";
 import Login from "./pages/logIn";
-import AddCourse from "./pages/addCourse.jsx";
-import UpdateCourse from "./pages/updateCourse.jsx";
-import CoursesAdmin from "./pages/courseAdmin.jsx";
+
+//Methma
+import Appointment from "./pages/appointment";
+
+//chanaka
+import AddCourse from "./pages/addCourse";
+import UpdateCourse from "./pages/updateCourse";
+import CoursesAdmin from "./pages/courseAdmin";
 
 
 const App = () => {
  
   return (
-    
     <Router>
-      
-    <Navbar />
-    
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/appointment" element={<Appointment />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/signup" element={<UserRegistration />} />
-        <Route path="/register-step2" element={<UserRoleDetails />} />
-        <Route path="/addcourse" element={<AddnewCourse />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/addcourse" element={<AddCourse></AddCourse>} />
-        <Route path="/editcourse" element={<UpdateCourse></UpdateCourse>} />
-        <Route path="/courseAdmin" element={<CoursesAdmin></CoursesAdmin>} />
-        
-      </Routes>
+      <Navbar />
+        <Routes>
+          //public
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
 
-    <Footer />
+          //Vishwa
+          <Route path="/signup" element={<UserRegistration />} />
+          <Route path="/register-step2" element={<UserRoleDetails />} />
+          <Route path="/login" element={<Login />} />
 
+          //Methma
+          <Route path="/appointment" element={<Appointment />} />
+
+          //chanaka
+          <Route path="/addcourse" element={<AddCourse />} />
+          <Route path="/editcourse" element={<UpdateCourse></UpdateCourse>} />
+          <Route path="/courseAdmin" element={<CoursesAdmin></CoursesAdmin>} />
+          
+        </Routes>
+      <Footer />
     </Router>
-
   );
 };
 
