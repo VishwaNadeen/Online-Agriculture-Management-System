@@ -1,4 +1,4 @@
-
+// backend/routes/appointmentRoutes.js
 import express from "express";
 import {
   createAppointment,
@@ -10,9 +10,10 @@ import {
 
 const router = express.Router();
 
-// CRUD only
+// If you later want auth, add: import { requireAuth } from "../middlewares/auth.js";
+
 router.post("/", createAppointment);     // Create
-router.get("/", getAllAppointments);     // Read all
+router.get("/", getAllAppointments);     // Read all (supports ?page=&limit=&status=)
 router.get("/:id", getAppointmentById);  // Read one
 router.patch("/:id", updateAppointment); // Update (partial)
 router.delete("/:id", deleteAppointment);// Delete
