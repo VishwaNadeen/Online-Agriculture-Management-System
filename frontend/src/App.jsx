@@ -14,7 +14,7 @@ import Login from "./pages/login";
 
 //Methma
 //import Appointment from "./pages/appointment";
-//import SearchCon from "./pages/SearchCon";
+import SearchCon from "./pages/SearchCon";
 import CreateAppointment from "./pages/appointments/CreateAppointment";
 import EditAppointment from "./pages/appointments/EditAppointment";
 import ListAppointments from "./pages/appointments/ListAppointment";
@@ -44,7 +44,8 @@ const App = () => {
           {/*<Route path="/appointment" element={<Appointment />} 
            <Route path="/searchcon" element={<SearchCon/>} />
            <Route path="/card" element={<ConsultantCard />} />*/}
-           
+
+            <Route path="/searchcon" element={<SearchCon/>} />
             <Route path="/appointment" element={<CreateAppointment />} />
              <Route path="/appointments" element={<ListAppointments />} />
              <Route path="/appointments/:id/edit" element={<EditAppointment />} />

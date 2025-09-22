@@ -9,6 +9,7 @@ import userRoutes from "./routes/userRoute.js";
 import adminRoute from './routes/adminRoute.js';
 import courseRoutes from "./routes/courseRoute.js";
 import { configDotenv } from "dotenv"
+import consultantRoutes from "./routes/consultantRoutes.js";
 
 
 configDotenv();
@@ -36,6 +37,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // routes
 app.use("/appointments", appointmentRoutes);
+app.use("/consultants", consultantRoutes);
 app.use("/users", userRoutes);
 app.use('/api/admin', adminRoute);
 app.use("/courses", courseRoutes); 
