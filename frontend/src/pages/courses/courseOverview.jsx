@@ -94,47 +94,65 @@ export default function CourseOverview() {
           <div className="max-w-6xl mx-auto px-4 md:px-6 py-10 space-y-10">
             {/* Videos */}
             <section>
-              <h2 className="text-xl md:text-2xl font-bold text-emerald-900 mb-4">Video Tutorials</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl md:text-2xl font-bold text-emerald-900">Video Tutorials</h2>
+                {Array.isArray(course.videoTutorials) && course.videoTutorials.length > 0 && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {course.videoTutorials.length} item(s)
+                  </span>
+                )}
+              </div>
+
               {Array.isArray(course.videoTutorials) && course.videoTutorials.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {course.videoTutorials.map((v, i) => (
-                    <div
+                    <a
                       key={`vid-${i}`}
-                      className="group rounded-xl border border-emerald-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition"
+                      href={v.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group relative rounded-2xl border border-emerald-200 bg-white overflow-hidden shadow-sm hover:shadow-lg transition"
                     >
-                      <div className="relative h-44 md:h-48">
+                      <div className="relative w-full aspect-video">
                         <img
                           src={v.thumbnail || "https://via.placeholder.com/640x360?text=Video"}
                           alt={v.name}
-                          className="w-full h-full object-cover"
+                          className="absolute inset-0 w-full h-full object-cover"
                           loading="lazy"
                         />
-                        {/* Centered play overlay */}
-                        <a
-                          href={v.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="absolute inset-0 flex items-center justify-center"
-                        >
-                          <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-600/90 text-white shadow-lg group-hover:scale-105 transition transform">
+                        {/* Gradient + glass overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition" />
+                        {/* Play button */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/90 backdrop-blur shadow-md group-hover:scale-105 transition">
                             <svg
-                              className="w-6 h-6"
-                              fill="none"
+                              className="w-7 h-7 text-emerald-700"
                               viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth="2"
+                              fill="currentColor"
                             >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-5.197-3.028A1 1 0 008 9.028v5.944a1 1 0 001.555.832l5.197-3.028a1 1 0 000-1.664z" />
+                              <path d="M8 5v14l11-7z" />
                             </svg>
                           </span>
-                        </a>
-                        {/* Subtle bottom gradient for readability on hover */}
-                        <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                        </div>
+                        {/* Top-right subtle badge */}
+                        <div className="absolute top-2 right-2 text-[10px] px-2 py-1 rounded-full bg-emerald-600/90 text-white shadow">
+                          Video
+                        </div>
                       </div>
-                      <div className="p-3">
+
+                      <div className="p-4">
                         <p className="font-semibold text-emerald-900 line-clamp-2">{v.name}</p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-xs text-gray-500 truncate">{v.url}</span>
+                          <span className="text-xs font-medium text-emerald-700 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-100">
+                            Watch
+                          </span>
+                        </div>
                       </div>
-                    </div>
+
+                      {/* Hover bottom bar */}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 scale-x-0 origin-left group-hover:scale-x-100 transition" />
+                    </a>
                   ))}
                 </div>
               ) : (
@@ -144,30 +162,74 @@ export default function CourseOverview() {
 
             {/* PDFs */}
             <section>
-              <h2 className="text-xl md:text-2xl font-bold text-emerald-900 mb-4">PDF Lessons</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl md:text-2xl font-bold text-emerald-900">PDF Lessons</h2>
+                {Array.isArray(course.pdfLessons) && course.pdfLessons.length > 0 && (
+                  <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {course.pdfLessons.length} item(s)
+                  </span>
+                )}
+              </div>
+
               {Array.isArray(course.pdfLessons) && course.pdfLessons.length > 0 ? (
-                <div className="rounded-xl border border-emerald-200 bg-white overflow-hidden">
+                <div className="rounded-2xl border border-emerald-200 bg-white overflow-hidden shadow-sm">
                   <ul className="divide-y">
                     {course.pdfLessons.map((p, i) => (
-                      <li key={`pdf-${i}`} className="flex items-center justify-between px-4 py-3">
-                        <div className="min-w-0 pr-3">
-                          <p className="font-medium text-emerald-900 truncate">{p.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{p.url}</p>
+                      <li
+                        key={`pdf-${i}`}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-4 hover:bg-emerald-50/40 transition"
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          {/* Icon */}
+                          <div className="mt-0.5 shrink-0">
+                            <div className="w-10 h-12 rounded-lg border border-emerald-200 bg-gradient-to-br from-white to-emerald-50 flex items-center justify-center shadow-sm">
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-6 h-6 text-emerald-700"
+                                fill="currentColor"
+                              >
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.103.897 2 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z" />
+                                <path d="M8 13h8v2H8zM8 17h8v2H8z" />
+                              </svg>
+                            </div>
+                          </div>
+                          {/* Texts */}
+                          <div className="min-w-0">
+                            <p className="font-semibold text-emerald-900 truncate">{p.name}</p>
+                            <p className="text-xs text-gray-500 truncate">{p.url}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                PDF
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-white text-gray-700 border">
+                                Resource
+                              </span>
+                            </div>
+                          </div>
                         </div>
+
                         <div className="flex gap-2 shrink-0">
                           <a
-                            className="px-3 py-1.5 rounded-lg border text-sm hover:bg-emerald-50"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-sm hover:bg-emerald-50"
                             href={p.url}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M14 3H6a2 2 0 0 0-2 2v14h2V5h8V3z" />
+                              <path d="M21 7h-8a1 1 0 0 0-1 1v13l5-2 5 2V8a1 1 0 0 0-1-1z" />
+                            </svg>
                             View
                           </a>
                           <a
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700"
                             href={p.url}
                             download
                           >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12 16l4-5h-3V4h-2v7H8l4 5z" />
+                              <path d="M20 18H4v2h16v-2z" />
+                            </svg>
                             Download
                           </a>
                         </div>
