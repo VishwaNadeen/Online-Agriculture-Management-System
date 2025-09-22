@@ -1,10 +1,9 @@
 import express from "express"
 import cors from "cors"
 import "dotenv/config"
-import connectDB from "./config/mongodb.js" <<
-<< << < Updated upstream
-import connectCloudinary from "./config/cloudinary.js" ===
-=== =
+import connectDB from "./config/mongodb.js"
+
+import connectCloudinary from "./config/cloudinary.js"
 import cloudinary, { connectCloudinary } from "./config/cloudinary.js";
 import appointmentRoutes from "./routes/AppointmentRoute.js";
 import userRoutes from "./routes/userRoute.js";
@@ -18,52 +17,38 @@ import { configDotenv } from "dotenv"
 
 configDotenv();
 
->>>
->>> > Stashed changes
+
 
 const app = express()
 const port = process.env.PORT || 4000
 connectDB()
 connectCloudinary()
 
-// Middlewares
-app.use(express.json())
-app.use(cors())
+// middlewares
+app.use(express.json());
+//app.use(cors());
+app.use(express.json());
 
-<<
-<< << < Updated upstream
-// api endpoints)
-app.get('/', (req, res) => {
-            res.status(200).send("Hello from backend server") ===
-                === =
-                app.use(cors({
-                    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
-                    credentials: true, // only if you use cookies
-                    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-                    allowedHeaders: ["Content-Type", "Authorization"], // <-- important
-                }));
+app.use(cors({
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    credentials: true, // only if you use cookies
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"], // <-- important
+}));
 
-            app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-            // routes
-            app.use("/appointments", appointmentRoutes);
-            app.use("/users", userRoutes);
-            app.use('/api/admin', adminRoute);
-            app.use("/courses", courseRoutes);
-            app.use("/events", eventRoutes);
-            app.use("/event-feedbacks", eventFeedbackRoutes);
-            app.use("/event-registrations", eventRegistrationRoutes);
+// routes
+app.use("/appointments", appointmentRoutes);
+app.use("/users", userRoutes);
+app.use('/api/admin', adminRoute);
+app.use("/courses", courseRoutes);
 
 
-            // api endpoints
-            app.get("/", (req, res) => {
-                res.status(200).send("Hello from backend server"); <<
-                << << < Updated upstream
-                    >>>
-                    >>> > Stashed changes ===
-                    === = >>>
-                    >>> > Stashed changes
-            });
+// api endpoints
+app.get("/", (req, res) => {
+    res.status(200).send("Hello from backend server");
+});
 
-            // Start server
-            app.listen(port, () => console.log("🚀 Server is running on port: ", port))
+// Start server
+app.listen(port, () => console.log("🚀 Server is running on port: ", port))
