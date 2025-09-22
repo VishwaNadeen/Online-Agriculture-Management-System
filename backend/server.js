@@ -43,6 +43,9 @@ app.use("/appointments", appointmentRoutes);
 app.use("/users", userRoutes);
 app.use('/api/admin', adminRoute);
 app.use("/courses", courseRoutes);
+app.use("/events", eventRoutes);
+app.use("/event-feedbacks", eventFeedbackRoutes);
+app.use("/event-registrations", eventRegistrationRoutes);
 
 
 // api endpoints
