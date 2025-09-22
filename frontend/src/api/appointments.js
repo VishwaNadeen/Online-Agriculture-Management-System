@@ -30,7 +30,7 @@ export const ApptAPI = {
 
   // Update
   update: async (id, payload) => {
-    const { data } = await axios.put(`${URL}/${id}`, payload, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+    const { data } = await axios.patch(`${URL}/${id}`, payload, { headers: { "Content-Type": "application/json", ...authHeaders() } });
     return data?.appointment || data;
   },
 
