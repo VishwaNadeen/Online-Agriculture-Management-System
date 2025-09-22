@@ -106,11 +106,8 @@ export default function CourseOverview() {
               {Array.isArray(course.videoTutorials) && course.videoTutorials.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {course.videoTutorials.map((v, i) => (
-                    <a
+                    <div
                       key={`vid-${i}`}
-                      href={v.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       className="group relative rounded-2xl border border-emerald-200 bg-white overflow-hidden shadow-sm hover:shadow-lg transition"
                     >
                       <div className="relative w-full aspect-video">
@@ -122,9 +119,9 @@ export default function CourseOverview() {
                         />
                         {/* Gradient + glass overlay */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-80 group-hover:opacity-90 transition" />
-                        {/* Play button */}
+                        {/* Play button (now decorative) */}
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/90 backdrop-blur shadow-md group-hover:scale-105 transition">
+                          <span className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/90 backdrop-blur shadow-md">
                             <svg
                               className="w-7 h-7 text-emerald-700"
                               viewBox="0 0 24 24"
@@ -142,17 +139,15 @@ export default function CourseOverview() {
 
                       <div className="p-4">
                         <p className="font-semibold text-emerald-900 line-clamp-2">{v.name}</p>
-                        <div className="mt-2 flex items-center justify-between">
-                          <span className="text-xs text-gray-500 truncate">{v.url}</span>
-                          <span className="text-xs font-medium text-emerald-700 px-2 py-1 rounded-md bg-emerald-50 border border-emerald-100">
-                            Watch
-                          </span>
+                        {/* REPLACED URL WITH DATES */}
+                        <div className="mt-2 text-xs text-gray-600">
+                          Created: {fmtDate(course.createdAt)} • Last modified: {fmtDate(course.updatedAt)}
                         </div>
                       </div>
 
                       {/* Hover bottom bar */}
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-600 scale-x-0 origin-left group-hover:scale-x-100 transition" />
-                    </a>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -196,7 +191,10 @@ export default function CourseOverview() {
                           {/* Texts */}
                           <div className="min-w-0">
                             <p className="font-semibold text-emerald-900 truncate">{p.name}</p>
-                            <p className="text-xs text-gray-500 truncate">{p.url}</p>
+                            {/* REPLACED URL WITH DATES */}
+                            <div className="text-xs text-gray-600">
+                              Created: {fmtDate(course.createdAt)} • Last modified: {fmtDate(course.updatedAt)}
+                            </div>
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
                               <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                                 PDF
@@ -208,31 +206,7 @@ export default function CourseOverview() {
                           </div>
                         </div>
 
-                        <div className="flex gap-2 shrink-0">
-                          <a
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-sm hover:bg-emerald-50"
-                            href={p.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M14 3H6a2 2 0 0 0-2 2v14h2V5h8V3z" />
-                              <path d="M21 7h-8a1 1 0 0 0-1 1v13l5-2 5 2V8a1 1 0 0 0-1-1z" />
-                            </svg>
-                            View
-                          </a>
-                          <a
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700"
-                            href={p.url}
-                            download
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M12 16l4-5h-3V4h-2v7H8l4 5z" />
-                              <path d="M20 18H4v2h16v-2z" />
-                            </svg>
-                            Download
-                          </a>
-                        </div>
+                        {/* REMOVED VIEW/DOWNLOAD (Supabase links) */}
                       </li>
                     ))}
                   </ul>
