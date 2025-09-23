@@ -1,5 +1,5 @@
+// src/components/ConsultantCard.jsx
 import React from "react";
-import { useNavigate } from "react-router-dom";
 
 const LocationIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -9,10 +9,27 @@ const LocationIcon = () => (
 );
 
 export default function ConsultantCard({ consultant, onPreview }) {
-  const navigate = useNavigate();
+  const handleClick = () => {
+    if (typeof onPreview === "function") onPreview(consultant);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick();
+    }
+  };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+      aria-label={`Open actions for ${consultant?.name || "consultant"}`}
+    >
       <div className="p-6">
         <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 mb-4">
           {consultant.category}
@@ -27,38 +44,12 @@ export default function ConsultantCard({ consultant, onPreview }) {
           <span className="ml-1 text-sm">{consultant.city}</span>
         </div>
 
-        <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+        <p className="text-sm text-gray-600 mb-1 line-clamp-2">
           {consultant.about || "—"}
         </p>
 
-        <div className="flex gap-3">
-          {/* Preview button (popup) */}
-          <button
-            onClick={() => onPreview(consultant)}
-            className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
-          >
-            Preview
-          </button>
-
-          {/* Book button (redirect to appointment.jsx) */}
-          <button
-            onClick={() =>
-              navigate("/appointment", {
-                state: {
-                  person: {
-                    city: consultant.city,
-                    category: consultant.category,
-                    consultantId: consultant.id,
-                    consultantName: consultant.name,
-                  },
-                },
-              })
-            }
-            className="flex-1 bg-emerald-600 text-white py-2 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
-          >
-            Book
-          </button>
-        </div>
+        {/* subtle hint that it's clickable */}
+        <p className="mt-3 text-xs text-emerald-700/80">Click to choose: Book or View Profile</p>
       </div>
     </div>
   );

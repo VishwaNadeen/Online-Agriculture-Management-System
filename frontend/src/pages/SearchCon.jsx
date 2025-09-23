@@ -4,20 +4,14 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import ConsultantCard from "../components/ConsultantCard";
 
-// ---- If you already have a central api.js, you can use that instead
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const CONSULT_API = `${BASE}/consultants`;
 
-const TABS = { SEARCH: "search", BOOK: "book", PROFILE: "profile", MY: "my" };
+const TABS = { SEARCH: "search", PROFILE: "profile" };
 
 const SearchIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
-const CalendarIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
   </svg>
 );
 const UserIcon = () => (
@@ -25,14 +19,14 @@ const UserIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
   </svg>
 );
-const CheckCircleIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
 const XIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+const CloseCircle = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2 2-2m0 4l-2-2-2-2M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 const LocationIcon = () => (
@@ -42,6 +36,7 @@ const LocationIcon = () => (
   </svg>
 );
 
+/* ==== Filters ==== */
 const CATEGORY_OPTIONS = [
   "Crop Consultation",
   "Soil Testing",
@@ -50,33 +45,62 @@ const CATEGORY_OPTIONS = [
   "Organic Farming",
   "Livestock Consultation",
 ];
-const CITY_OPTIONS = ["Colombo", "Kandy", "Galle", "Jaffna", "Negombo", "Kurunegala"];
+
+ const DISTRICTS = [
+  "Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota",
+  "Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale",
+  "Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura",
+  "Trincomalee","Vavuniya",
+];
+
+// use districts for "city" filter
+const CITY_OPTIONS = DISTRICTS;
+
+const CATEGORY_ALIASES = {
+  soil: "Soil Testing",
+  "soil testing": "Soil Testing",
+  pest: "Pest Control",
+  "pest control": "Pest Control",
+  irrigation: "Irrigation Planning",
+  organic: "Organic Farming",
+  "organic farming": "Organic Farming",
+  livestock: "Livestock Consultation",
+  crop: "Crop Consultation",
+  "crop consultation": "Crop Consultation",
+};
+
+const SUGGESTIONS = ["Kandy", "Colombo", "Soil Testing", "Pest Control", "Organic Farming"];
+const MY_APPTS_ROUTE = "/my-appointments";
+
+/* ==== Small skeleton while loading ==== */
+function SkeletonCard() {
+  return (
+    <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
+      <div className="h-4 w-24 rounded bg-emerald-100 animate-pulse mb-3" />
+      <div className="h-5 w-48 rounded bg-gray-200 animate-pulse mb-2" />
+      <div className="h-4 w-28 rounded bg-gray-100 animate-pulse mb-4" />
+      <div className="h-4 w-full rounded bg-gray-100 animate-pulse mb-2" />
+      <div className="h-4 w-4/5 rounded bg-gray-100 animate-pulse" />
+    </div>
+  );
+}
 
 export default function SearchCon() {
   const navigate = useNavigate();
 
-  // ui state
   const [active, setActive] = useState(TABS.SEARCH);
   const [selected, setSelected] = useState(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
 
-  // filters
-  const [draft, setDraft] = useState({ category: "", city: "", q: "" });
-  const [applied, setApplied] = useState({ category: "", city: "", q: "" });
+  // this controls our popup
+  const [popupOpen, setPopupOpen] = useState(false);
 
-  // data
-  const [list, setList] = useState([]);     // consultants
+  // unified query + explicit filters
+  const [draft, setDraft] = useState({ q: "", category: "", city: "" });
+
+  const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // ESC closes preview
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && setPreviewOpen(false);
-    if (previewOpen) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [previewOpen]);
-
-  // fetch from backend
   const fetchConsultants = async (filters) => {
     try {
       setLoading(true);
@@ -84,8 +108,7 @@ export default function SearchCon() {
       const params = {};
       if (filters.category) params.category = filters.category;
       if (filters.city) params.city = filters.city;
-      if (filters.q) params.q = filters.q;
-
+      if (filters.q) params.q = String(filters.q).toLowerCase();
       const { data } = await axios.get(CONSULT_API, { params });
       const items = Array.isArray(data) ? data : data?.items || [];
       setList(items);
@@ -99,27 +122,66 @@ export default function SearchCon() {
   // initial load
   useEffect(() => {
     fetchConsultants({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setDraft((p) => ({ ...p, [name]: value }));
+  // parse quick text into category/city if exact
+  const parseFromQ = (rawInput) => {
+    const raw = (rawInput || "").trim();
+    if (!raw) return { category: "", city: "", q: "" };
+    const q = raw.toLowerCase();
+
+    const cityExact = CITY_OPTIONS.find((c) => c.toLowerCase() === q);
+    if (cityExact) return { category: "", city: cityExact, q: "" };
+
+    const alias = CATEGORY_ALIASES[q];
+    if (alias) return { category: alias, city: "", q: "" };
+
+    const catExact = CATEGORY_OPTIONS.find((c) => c.toLowerCase() === q);
+    if (catExact) return { category: catExact, city: "", q: "" };
+
+    const catPrefix = CATEGORY_OPTIONS.find((c) => c.toLowerCase().startsWith(q));
+    if (catPrefix) return { category: catPrefix, city: "", q: "" };
+
+    return { category: "", city: "", q };
   };
 
-  const onSearch = () => {
-    setApplied(draft);
-    fetchConsultants(draft);
-    setActive(TABS.SEARCH);
+  // debounce typing
+  useEffect(() => {
+    const h = setTimeout(() => {
+      const parsed = parseFromQ(draft.q);
+      const next = {
+        category: draft.category || parsed.category,
+        city: draft.city || parsed.city,
+        q: !parsed.category && !parsed.city ? draft.q : "",
+      };
+      fetchConsultants(next);
+    }, 200);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.q]);
+
+  // react to dropdowns instantly
+  useEffect(() => {
+    const parsed = parseFromQ(draft.q);
+    fetchConsultants({
+      category: draft.category || parsed.category,
+      city: draft.city || parsed.city,
+      q: !parsed.category && !parsed.city ? draft.q : "",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.category, draft.city]);
+
+  const runSearchNow = () => {
+    const parsed = parseFromQ(draft.q);
+    fetchConsultants({
+      category: draft.category || parsed.category,
+      city: draft.city || parsed.city,
+      q: !parsed.category && !parsed.city ? draft.q : "",
+    });
   };
 
-  const onClear = () => {
-    const empty = { category: "", city: "", q: "" };
-    setDraft(empty);
-    setApplied(empty);
-    fetchConsultants(empty);
-  };
-
-  // redirect to Appointment.jsx with prefill data
+  /* ==== Actions ==== */
   const goBook = (c) => {
     navigate("/appointment", {
       state: {
@@ -130,245 +192,333 @@ export default function SearchCon() {
           consultantName: c.name,
         },
       },
-      replace: false,
     });
   };
 
   const goProfile = (c) => {
     setSelected(c);
-    setPreviewOpen(false);
     setActive(TABS.PROFILE);
+    setPopupOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const tabs = [
-    { key: TABS.SEARCH, label: "Search Consultants", icon: SearchIcon },
-    { key: TABS.BOOK, label: "Book Appointment", icon: CalendarIcon },
-    { key: TABS.PROFILE, label: "Consultant Profile", icon: UserIcon },
-  ];
+  const openPopupFor = (c) => {
+    setSelected(c);
+    setPopupOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* header */}
-      
-
-      {/* left tabs */}
-      <aside className="hidden md:block fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200 overflow-y-auto z-30">
-        <div className="p-6">
-          <nav className="space-y-2">
-            {tabs.map((t) => {
-              const Icon = t.icon;
-              const isActive = active === t.key;
-              return (
+      {/* Top search header */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-200">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+            {/* Big search box */}
+            <div className="relative flex-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600">
+                <SearchIcon />
+              </span>
+              <input
+                name="q"
+                value={draft.q}
+                onChange={(e) => setDraft((d) => ({ ...d, q: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && runSearchNow()}
+                placeholder="Search by category, city, or name..."
+                className="w-full rounded-full border-2 border-emerald-200 bg-white pl-11 pr-24 py-2.5 text-gray-800 placeholder-emerald-700/60 outline-none transition focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                aria-label="Search consultants"
+              />
+              {draft.q && (
                 <button
-                  key={t.key}
-                  onClick={() => { setActive(t.key); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left font-medium transition-colors ${
-                    isActive ? "bg-emerald-100 text-emerald-700 shadow-sm" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  }`}
+                  type="button"
+                  onClick={() => setDraft((d) => ({ ...d, q: "" }))}
+                  className="absolute right-24 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  aria-label="Clear search"
                 >
-                  <Icon />
-                  <span>{t.label}</span>
+                  <CloseCircle />
                 </button>
-              );
-            })}
-          </nav>
+              )}
+              <button
+                onClick={runSearchNow}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-sm hover:bg-emerald-700"
+              >
+                Search
+              </button>
+            </div>
+
+            {/* Category select */}
+            <select
+              value={draft.category}
+              onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
+              className="rounded-full border-2 border-emerald-200 bg-white px-3 py-2 text-gray-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              aria-label="Filter by category"
+            >
+              <option value="">All Categories</option>
+              {CATEGORY_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+
+            {/* City select */}
+            <select
+              value={draft.city}
+              onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))}
+              className="rounded-full border-2 border-emerald-200 bg-white px-3 py-2 text-gray-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              aria-label="Filter by city"
+            >
+              <option value="">All Cities</option>
+              {CITY_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+
+            {/* My Appointments */}
+            <button
+              onClick={() => navigate(MY_APPTS_ROUTE)}
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-gray-900 text-white px-4 py-2 text-sm hover:bg-black"
+            >
+              My Appointments
+            </button>
+          </div>
         </div>
-      </aside>
+      </header>
 
-      {/* main */}
-      <div className="md:pl-64">
-        <main className="px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        {active === TABS.SEARCH && (
+          <div className="space-y-8">
+            {/* Title */}
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
+                Find Expert Agricultural Consultants
+              </h2>
+              <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
+                Real profiles loaded from your database.
+              </p>
+            </div>
 
-          {/* SEARCH */}
-          {active === TABS.SEARCH && (
-            <div className="space-y-8">
-              <div className="text-center">
-                <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">Find Expert Agricultural Consultants</h2>
-                <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-                  Real profiles loaded from your database.
-                </p>
+            {err && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+                {err}
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">
+                  Available Consultants {list.length ? `(${list.length})` : ""}
+                </h3>
               </div>
 
-              {/* filters */}
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter Consultants</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Specialization</label>
-                    <select
-                      name="category"
-                      value={draft.category}
-                      onChange={onChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    >
-                      <option value="">All Specializations</option>
-                      {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">City</label>
-                    <select
-                      name="city"
-                      value={draft.city}
-                      onChange={onChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    >
-                      <option value="">All Cities</option>
-                      {CITY_OPTIONS.map((ct) => <option key={ct} value={ct}>{ct}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Search</label>
-                    <input
-                      name="q"
-                      value={draft.q}
-                      onChange={onChange}
-                      placeholder="name / email"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-4 flex items-end gap-3">
-                    <button onClick={onSearch} className="bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors">
-                      Search
-                    </button>
-                    <button onClick={onClear} className="bg-gray-100 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-200 transition-colors">
-                      Clear
-                    </button>
-                    {loading && <span className="text-sm text-gray-500">Loading…</span>}
-                    {err && <span className="text-sm text-red-600">{err}</span>}
-                  </div>
+              {loading ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <SkeletonCard key={i} />
+                  ))}
                 </div>
-
-                {(applied.category || applied.city || applied.q) && (
-                  <div className="mt-4 p-3 bg-emerald-50 rounded-lg text-sm text-emerald-700">
-                    <span className="font-medium">Active filters:</span>{" "}
-                    {applied.category && <span className="inline-block bg-emerald-100 px-2 py-1 rounded-full text-xs mr-2">{applied.category}</span>}
-                    {applied.city && <span className="inline-block bg-emerald-100 px-2 py-1 rounded-full text-xs mr-2">{applied.city}</span>}
-                    {applied.q && <span className="inline-block bg-emerald-100 px-2 py-1 rounded-full text-xs">{applied.q}</span>}
-                  </div>
-                )}
-              </div>
-
-              {/* results — NOW USING ConsultantCard component */}
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900">
-                    Available Consultants {list.length ? `(${list.length})` : ""}
-                  </h3>
+              ) : list.length ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {list.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => openPopupFor(c)}
+                      className="text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-xl"
+                      aria-label={`Open actions for ${c.name}`}
+                    >
+                      {/* No preview/book buttons inside card — whole card is clickable now */}
+                      <ConsultantCard consultant={c} />
+                    </button>
+                  ))}
                 </div>
-
-                {list.length ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {list.map((c) => (
-                      <ConsultantCard
-                        key={c.id}
-                        consultant={c}
-                        onPreview={(cons) => {
-                          setSelected(cons);
-                          setPreviewOpen(true);
-                        }}
-                      />
+              ) : (
+                <div className="text-center py-16 bg-white rounded-2xl shadow-lg border border-gray-100">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                    <SearchIcon />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">No consultants found</h3>
+                  <p className="text-gray-500 mt-1 mb-4">
+                    Try another keyword or pick a suggestion below.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {SUGGESTIONS.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setDraft((d) => ({ ...d, q: s }))}
+                        className="px-3 py-1.5 rounded-full border border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 text-sm transition-colors duration-200"
+                      >
+                        {s}
+                      </button>
                     ))}
                   </div>
-                ) : (
-                  <div className="text-center py-12 bg-white rounded-2xl shadow-lg">
-                    <div className="text-gray-400 mb-4"><SearchIcon /></div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No consultants found</h3>
-                    <p className="text-gray-500 mb-4">Try adjusting your search filters</p>
-                    <button onClick={onClear} className="text-emerald-600 hover:text-emerald-700 font-medium">Clear all filters</button>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* PROFILE (read-only view after user clicks Profile in popup) */}
-          {active === TABS.PROFILE && (
-            <div className="max-w-3xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                {!selected ? (
-                  <div className="text-center">
-                    <p className="text-gray-600 mb-4">Select a consultant from Search.</p>
-                    <button onClick={() => setActive(TABS.SEARCH)} className="px-4 py-2 rounded-lg bg-emerald-600 text-white">Back to Search</button>
+        {active === TABS.PROFILE && (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+              {!selected ? (
+                <div className="text-center py-16 px-8">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-50 text-gray-400">
+                    <UserIcon />
                   </div>
-                ) : (
-                  <>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">{selected.name}</h2>
-                    <div className="flex items-center gap-3 text-gray-600 mb-6">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
-                        {selected.category}
-                      </span>
-                      <span className="flex items-center"><LocationIcon /><span className="ml-1">{selected.city}</span></span>
-                      <span>{selected.yearsExp} yrs</span>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    No consultant selected
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Select a consultant from the search results to view their profile.
+                  </p>
+                  <button
+                    onClick={() => setActive(TABS.SEARCH)}
+                    className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors duration-200"
+                  >
+                    <SearchIcon />
+                    <span className="ml-2">Back to Search</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="p-8">
+                  <div className="flex items-start gap-6 mb-8">
+                    <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                      {(selected.name || "")
+                        .split(" ")
+                        .filter(Boolean)
+                        .map((n) => n[0])
+                        .join("")}
                     </div>
-                    <p className="text-gray-700 leading-relaxed mb-6">{selected.about || "No bio"}</p>
-
-                    {!!selected.specializations?.length && (
-                      <div className="mb-6">
-                        <h4 className="font-semibold mb-2">Specializations</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {selected.specializations.map((s, i) => (
-                            <span key={i} className="px-3 py-1 rounded-full text-sm bg-blue-50 text-blue-700">{s}</span>
-                          ))}
-                        </div>
+                    <div className="flex-1">
+                      <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                        {selected.name}
+                      </h2>
+                      <div className="flex flex-wrap items-center gap-3 text-gray-600 mb-4">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
+                          {selected.category}
+                        </span>
+                        <span className="flex items-center">
+                          <LocationIcon />
+                          <span className="ml-1">{selected.city}</span>
+                        </span>
+                        <span className="text-sm bg-gray-100 px-2 py-1 rounded">
+                          {selected.yearsExp} years experience
+                        </span>
                       </div>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <button onClick={() => goBook(selected)} className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700">Book Appointment</button>
-                      <button onClick={() => setActive(TABS.SEARCH)} className="flex-1 bg-gray-100 text-gray-800 py-3 px-6 rounded-lg hover:bg-gray-200">Back to Search</button>
                     </div>
-                  </>
-                )}
-              </div>
+                  </div>
+
+                  {selected.about && (
+                    <div className="mb-8">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">About</h4>
+                      <p className="text-gray-700 leading-relaxed">{selected.about}</p>
+                    </div>
+                  )}
+
+                  {!!selected.specializations?.length && (
+                    <div className="mb-8">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">Specializations</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selected.specializations.map((s, i) => (
+                          <span
+                            key={i}
+                            className="px-3 py-1.5 rounded-full text-sm bg-blue-50 text-blue-700 border border-blue-200"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {!!selected.languages?.length && (
+                    <div className="mb-8">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">Languages</h4>
+                      <p className="text-gray-700">{selected.languages.join(", ")}</p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
+                    {/* keep profile page actions (not on cards) */}
+                    <button
+                      onClick={() => goBook(selected)}
+                      className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors duration-200 font-medium"
+                    >
+                      Book Appointment
+                    </button>
+                    <button
+                      onClick={() => setActive(TABS.SEARCH)}
+                      className="flex-1 bg-gray-100 text-gray-800 py-3 px-6 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium"
+                    >
+                      Back to Search
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </main>
-      </div>
+          </div>
+        )}
+      </main>
 
-      {/* PREVIEW POPUP (Profile | Book) */}
-      {previewOpen && selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/30 backdrop-blur-sm" onClick={() => setPreviewOpen(false)}>
-          <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-xl max-h-screen overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <button className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 z-10" onClick={() => setPreviewOpen(false)} aria-label="Close">
-              <XIcon />
-            </button>
+      {/* POPUP (opens when card is clicked) */}
+      {popupOpen && selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setPopupOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">What do you want to do?</h3>
+              <button
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                onClick={() => setPopupOpen(false)}
+                aria-label="Close"
+              >
+                <XIcon />
+              </button>
+            </div>
 
-            <div className="p-8">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center text-white text-xl font-bold">
-                  {selected.name.split(" ").map((n) => n[0]).join("")}
+            <div className="px-6 pt-5 pb-6">
+              {/* Small identity row */}
+              <div className="flex items-start gap-3 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center text-white font-semibold">
+                  {(selected.name || "")
+                    .split(" ")
+                    .filter(Boolean)
+                    .map((n) => n[0])
+                    .join("")}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-1">{selected.name}</h3>
-                  <p className="text-gray-600">{selected.category} • {selected.city} • {selected.yearsExp} years</p>
+                <div className="min-w-0">
+                  <div className="font-semibold text-gray-900">{selected.name}</div>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                      {selected.category}
+                    </span>
+                    <span className="flex items-center">
+                      <LocationIcon />
+                      <span className="ml-1">{selected.city}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-4 mb-6">
-                {selected.languages?.length ? (
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Languages</h4>
-                    <p className="text-gray-600">{selected.languages.join(", ")}</p>
-                  </div>
-                ) : null}
-                {selected.about && (
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">About</h4>
-                    <p className="text-gray-600">{selected.about}</p>
-                  </div>
-                )}
-              </div>
-
+              {/* Two big action buttons only */}
               <div className="flex flex-col sm:flex-row gap-3">
-                <button onClick={() => goBook(selected)} className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700">
+                <button
+                  onClick={() => goBook(selected)}
+                  className="flex-1 py-3 px-4 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition"
+                >
                   Book Appointment
                 </button>
-                <button onClick={() => goProfile(selected)} className="flex-1 bg-gray-100 text-gray-800 py-3 px-6 rounded-lg hover:bg-gray-200">
+                <button
+                  onClick={() => goProfile(selected)}
+                  className="flex-1 py-3 px-4 rounded-lg bg-gray-100 text-gray-800 font-medium hover:bg-gray-200 transition"
+                >
                   View Full Profile
                 </button>
               </div>
