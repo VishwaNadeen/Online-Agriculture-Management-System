@@ -27,14 +27,6 @@ import CoursesAdmin from "./pages/courseAdmin";
 import CoursesPage from "./pages/courses/coursePage";
 import CourseOverview from "./pages/courses/courseOverview";
 
-
-
-
-
-
-
-
-
 const App = () => {
  
   return (
@@ -55,15 +47,13 @@ const App = () => {
 
           //Methma
           {/*<Route path="/appointment" element={<Appointment />} 
-           <Route path="/searchcon" element={<SearchCon/>} />
-           <Route path="/card" element={<ConsultantCard />} />*/}
+          <Route path="/searchcon" element={<SearchCon/>} />
+          <Route path="/card" element={<ConsultantCard />} />*/}
 
-            <Route path="/searchcon" element={<SearchCon/>} />
-            <Route path="/appointment" element={<CreateAppointment />} />
-             <Route path="/appointments" element={<ListAppointments />} />
-             <Route path="/appointments/:id/edit" element={<EditAppointment />} />
-
-
+          <Route path="/searchcon" element={<SearchCon/>} />
+          <Route path="/appointment" element={<CreateAppointment />} />
+          <Route path="/appointments" element={<ListAppointments />} />
+          <Route path="/appointments/:id/edit" element={<EditAppointment />} />
 
           //chanaka
           <Route path="/addcourse" element={<AddCourse />} />
@@ -72,8 +62,6 @@ const App = () => {
           <Route path="/coursepage" element={<CoursesPage></CoursesPage>} />
           <Route path="/courses/:courseID" element={<CourseOverview></CourseOverview>} />
 
-          
-          
         </Routes>
       <Footer />
     </Router>
