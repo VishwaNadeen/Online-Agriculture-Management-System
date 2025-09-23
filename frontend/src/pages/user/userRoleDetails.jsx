@@ -1,9 +1,9 @@
-// src/pages/UserRoleDetails.jsx
 import React, { useMemo, useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
 
-const API_BASE = "http://localhost:4000";
+const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
 const TabBtn = ({ active, children, onClick }) => (
   <button
@@ -20,18 +20,24 @@ const TabBtn = ({ active, children, onClick }) => (
   </button>
 );
 
+const getToken = () =>
+  localStorage.getItem("auth_token") || // your current key
+  localStorage.getItem("token") ||
+  localStorage.getItem("user_token") ||
+  localStorage.getItem("authToken") ||
+  ""; // try common keys
+
 export default function UserRoleDetails() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("farmer"); // "farmer" | "consultant"
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // guard: need Step-1 to have saved a user
   useEffect(() => {
     const id = localStorage.getItem("tempUserId");
     if (!id) {
-      alert("Please complete User Registration first.");
-      navigate("/userRegistration"); // adjust if your path differs
+      toast.error("Please complete User Registration first.");
+      navigate("/userRegistration");
     }
   }, [navigate]);
 
@@ -56,7 +62,7 @@ export default function UserRoleDetails() {
     fertilizerPractices: "",
     pesticideUsage: "",
     soilType: "",
-    sustainabilityPractices: [], // chips as CSV input
+    sustainabilityPractices: [],
     preferredConsultationTopics: [],
     emergencyContact: "",
   });
@@ -91,7 +97,6 @@ export default function UserRoleDetails() {
       .filter(Boolean);
 
   const canSubmit = useMemo(() => {
-    // keep this light; backend will enforce schema anyway
     if (activeTab === "farmer") {
       return Boolean(
         farmer.farmName &&
@@ -103,7 +108,6 @@ export default function UserRoleDetails() {
           farmer.emergencyContact
       );
     }
-    // consultant
     return Boolean(
       consultant.primarySpecialization &&
         consultant.yearsOfExperience &&
@@ -118,62 +122,75 @@ export default function UserRoleDetails() {
 
     const userId = localStorage.getItem("tempUserId");
     if (!userId) {
-      alert("Missing user id. Please register again.");
+      toast.error("Missing user id. Please register again.");
       navigate("/userRegistration");
       return;
     }
 
+    const token = getToken();
+    if (!token) {
+      toast.error("You must be logged in to save details.");
+      return;
+    }
+
+    // Build payload matching backend's pickUpdatable
+    let payload;
+    if (activeTab === "farmer") {
+      payload = {
+        role: "farmer",
+        farmer: {
+          ...farmer,
+          farmSize: farmer.farmSize ? Number(farmer.farmSize) : undefined,
+          experienceYears: farmer.experienceYears
+            ? Number(farmer.experienceYears)
+            : undefined,
+          farmLocation: {
+            lat:
+              farmer.farmLocation.lat !== ""
+                ? Number(farmer.farmLocation.lat)
+                : undefined,
+            lng:
+              farmer.farmLocation.lng !== ""
+                ? Number(farmer.farmLocation.lng)
+                : undefined,
+          },
+        },
+      };
+    } else {
+      payload = {
+        role: "consultant",
+        consultant: {
+          ...consultant,
+          yearsOfExperience: consultant.yearsOfExperience
+            ? Number(consultant.yearsOfExperience)
+            : undefined,
+          coverageRadiusKm: consultant.coverageRadiusKm
+            ? Number(consultant.coverageRadiusKm)
+            : undefined,
+        },
+      };
+    }
+
     setLoading(true);
     try {
-      let payload;
-      if (activeTab === "farmer") {
-        payload = {
-          role: "farmer",
-          farmer: {
-            ...farmer,
-            farmSize: farmer.farmSize ? Number(farmer.farmSize) : undefined,
-            experienceYears: farmer.experienceYears
-              ? Number(farmer.experienceYears)
-              : undefined,
-            farmLocation: {
-              lat:
-                farmer.farmLocation.lat !== ""
-                  ? Number(farmer.farmLocation.lat)
-                  : undefined,
-              lng:
-                farmer.farmLocation.lng !== ""
-                  ? Number(farmer.farmLocation.lng)
-                  : undefined,
-            },
-          },
-        };
-      } else {
-        payload = {
-          role: "consultant",
-          consultant: {
-            ...consultant,
-            yearsOfExperience: consultant.yearsOfExperience
-              ? Number(consultant.yearsOfExperience)
-              : undefined,
-            coverageRadiusKm: consultant.coverageRadiusKm
-              ? Number(consultant.coverageRadiusKm)
-              : undefined,
-          },
-        };
-      }
+      // Correct endpoint + method + auth header (matches your backend routes)
+      await axios.patch(`${BASE}/users/${userId}`, payload, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-      await axios.put(
-        `${API_BASE}/users/${userId}/role-details`,
-        payload,
-        { headers: { "Content-Type": "application/json" } }
-      );
-
-      alert("Details saved ✅");
-      // you can route to dashboard or summary
-      navigate("/"); // change as you like
+      toast.success("Details saved ✅");
+      navigate("/"); // or wherever you want next
     } catch (error) {
       console.error(error);
-      setErr(error.response?.data?.message || "Failed to save details");
+      const msg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to save details";
+      setErr(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -204,6 +221,7 @@ export default function UserRoleDetails() {
 
         <div className="border border-emerald-100 rounded-b-xl rounded-tr-xl p-5 md:p-6 mt-0 bg-white">
           {activeTab === "farmer" ? (
+            /* --- Farmer form --- */
             <div className="space-y-4">
               {/* Basic */}
               <div className="grid md:grid-cols-2 gap-4">
@@ -457,7 +475,9 @@ export default function UserRoleDetails() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm mb-1">Sustainability Practices (comma separated)</label>
+                  <label className="block text-sm mb-1">
+                    Sustainability Practices (comma separated)
+                  </label>
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={arrToText(farmer.sustainabilityPractices)}
@@ -470,7 +490,9 @@ export default function UserRoleDetails() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm mb-1">Preferred Consultation Topics (comma separated)</label>
+                  <label className="block text-sm mb-1">
+                    Preferred Consultation Topics (comma separated)
+                  </label>
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={arrToText(farmer.preferredConsultationTopics)}
@@ -485,8 +507,8 @@ export default function UserRoleDetails() {
               </div>
             </div>
           ) : (
+            /* --- Consultant form --- */
             <div className="space-y-4">
-              {/* Consultant core */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm mb-1">Primary Specialization</label>
@@ -544,7 +566,6 @@ export default function UserRoleDetails() {
                 </div>
               </div>
 
-              {/* Tags / arrays */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm mb-1">Secondary Expertise (comma separated)</label>
@@ -654,7 +675,6 @@ export default function UserRoleDetails() {
                 </div>
               </div>
 
-              {/* More */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm mb-1">Fee Structure</label>
@@ -712,9 +732,7 @@ export default function UserRoleDetails() {
                   rows={4}
                   className="w-full border rounded-lg px-3 py-2"
                   value={consultant.bio}
-                  onChange={(e) =>
-                    setConsultant({ ...consultant, bio: e.target.value })
-                  }
+                  onChange={(e) => setConsultant({ ...consultant, bio: e.target.value })}
                 />
               </div>
             </div>
