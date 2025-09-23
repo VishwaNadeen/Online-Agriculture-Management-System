@@ -1,18 +1,65 @@
-// src/components/Navbar.jsx
 import React, { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
+
+function readAuthFromStorage() {
+  // Check localStorage then sessionStorage for common keys
+  const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
+
+  const token =
+    get("auth_token") ||
+    get("token") ||
+    get("user_token") ||
+    get("authToken") ||
+    "";
+
+  let user = null;
+  const rawUser = get("auth_user");
+  if (rawUser) {
+    try {
+      user = JSON.parse(rawUser);
+    } catch {
+      user = null;
+    }
+  }
+  return { token, user };
+}
 
 const Navbar = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
+  const [{ token, user }, setAuth] = useState(() => readAuthFromStorage());
+  const isLoggedIn = Boolean(token);
+
+  // refresh navbar when auth changes, route changes, or storage changes (other tabs)
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    setIsLoggedIn(!!token);
+    const onAuthChanged = () => setAuth(readAuthFromStorage());
+    window.addEventListener("auth-changed", onAuthChanged);
+    window.addEventListener("storage", onAuthChanged);
+    return () => {
+      window.removeEventListener("auth-changed", onAuthChanged);
+      window.removeEventListener("storage", onAuthChanged);
+    };
   }, []);
 
+  // also refresh when route changes (covers same-tab login navigations)
+  useEffect(() => {
+    setAuth(readAuthFromStorage());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    setIsLoggedIn(false);
+    // remove from both storages, regardless of where they were saved
+    const keys = ["auth_token", "token", "user_token", "authToken", "auth_user", "userId", "tempUserId"];
+    keys.forEach((k) => {
+      localStorage.removeItem(k);
+      sessionStorage.removeItem(k);
+    });
+
+    // notify listeners
+    window.dispatchEvent(new Event("auth-changed"));
+
+    navigate("/login");
   };
 
   const commonTabs = [
@@ -24,17 +71,21 @@ const Navbar = () => {
     { name: "About Us", to: "/about" },
   ];
 
-  // A small helper to keep the “tab” style consistent
+  // style helper
   const tabClasses = ({ isActive }) =>
     [
       "inline-block px-3 py-3 text-sm font-medium transition-colors",
-      // draw a bottom border like nav-tabs; negative margin keeps the border flush with navbar bottom
       "border-b-2 -mb-[1px]",
       isActive
         ? "border-green-600 text-green-700"
         : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300",
       "focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500/40 rounded-sm",
     ].join(" ");
+
+  const avatarSrc =
+    user?.profilePicture ||
+    "https://ui-avatars.com/api/?background=E6F4EA&color=166534&name=" +
+      encodeURIComponent(`${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "User");
 
   return (
     <nav className="w-full bg-white border-b border-gray-200 shadow-sm">
@@ -82,11 +133,12 @@ const Navbar = () => {
 
           {/* Profile picture at far right (only when logged in) */}
           {isLoggedIn && (
-            <NavLink to="/profile" className="shrink-0">
+            <NavLink to="/profile" className="shrink-0" title={`${user?.firstName || ""} ${user?.lastName || ""}`.trim()}>
               <img
-                src="https://via.placeholder.com/40"
+                src={avatarSrc}
                 alt="Profile"
                 className="w-10 h-10 rounded-full border border-gray-300 object-cover"
+                referrerPolicy="no-referrer"
               />
             </NavLink>
           )}

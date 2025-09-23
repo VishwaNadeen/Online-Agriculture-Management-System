@@ -1,7 +1,7 @@
-// src/pages/UserRegistration.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { toast } from "react-hot-toast";
 
 // If your backend upload endpoint differs, change this:
 const UPLOAD_URL = "http://localhost:4000/uploads/profile"; // (kept but not used now, per requirement)
@@ -37,7 +37,7 @@ export default function UserRegistration() {
     email: "",
     dateOfBirth: "",
     gender: "",
-    profilePicture: "", // will be URL after upload OR user-typed url (kept in state, but we won't use paste URL anymore)
+    profilePicture: "",
     password: "",
     address: {
       country: "",
@@ -172,7 +172,6 @@ export default function UserRegistration() {
 
   const validateEmail = (val) => {
     if (!val) return "Email is required";
-    // pragmatic email regex (user@domain.tld)
     const re = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
     if (!re.test(val)) return "Enter a valid email (e.g., name@example.com)";
     return "";
@@ -238,7 +237,7 @@ export default function UserRegistration() {
 
   // ---- profile picture: choose & preview only (NO AUTO UPLOAD) ----
   const [preview, setPreview] = useState("");
-  const [profileFile, setProfileFile] = useState(null); // CHANGED: keep the file for submit time
+  const [profileFile, setProfileFile] = useState(null);
 
   const handleProfileFile = async (e) => {
     const file = e.target.files?.[0];
@@ -250,10 +249,9 @@ export default function UserRegistration() {
     }
     setProfileFile(file);
     setPreview(URL.createObjectURL(file));
-    // CHANGED: Do NOT upload here. Only preview.
   };
 
-  // ---- required fields filled? ----
+  // ---- required fields ----
   const requiredFilled =
     form.firstName.trim() &&
     form.lastName.trim() &&
@@ -267,7 +265,6 @@ export default function UserRegistration() {
     form.address.postalCode.trim() &&
     form.address.line1.trim();
 
-  // no validation errors?
   const noErrors =
     !errors.phone &&
     !errors.email &&
@@ -275,16 +272,10 @@ export default function UserRegistration() {
     !errors.password &&
     !errors.confirmPassword;
 
-  // phone ok?
   const phoneOk = !validatePhone(phoneLocal);
-
-  // password match?
   const passwordsMatch = !validateConfirmPassword(form.password, confirmPassword);
-
-  // final gate for showing button
   const canShowSubmit = Boolean(requiredFilled && noErrors && phoneOk && passwordsMatch);
 
-  // CHANGED: handleReset clears everything, including preview/file
   const handleReset = () => {
     setForm({
       firstName: "",
@@ -317,7 +308,7 @@ export default function UserRegistration() {
     setPreview("");
     setProfileFile(null);
     setUploadError("");
-    setQuery(countryCode); // keep current code visible
+    setQuery(countryCode);
   };
 
   const handleSubmit = async (e) => {
@@ -343,18 +334,14 @@ export default function UserRegistration() {
 
     setLoading(true);
     try {
-      // CHANGED: Submit everything as multipart/form-data in ONE request
+      // Submit everything as multipart/form-data in ONE request
       const fd = new FormData();
 
-      // append the profile image file if chosen
       if (profileFile) {
-        fd.append("profile", profileFile); // field name "profile" (adjust to your backend)
+        fd.append("profile", profileFile); // field name "profile" expected by backend route
       }
 
-      // compose payload with phone including country code
       const payload = { ...form, phone: `${countryCode}${phoneLocal}` };
-
-      // we send the rest as a JSON string under "data"
       fd.append("data", JSON.stringify(payload));
 
       const res = await axios.post(
@@ -363,12 +350,21 @@ export default function UserRegistration() {
         { headers: { "Content-Type": "multipart/form-data" } }
       );
 
-      localStorage.setItem("tempUserId", res.data.userId);
-      alert("Registration saved ✅");
+      const userId = res?.data?.user?._id || res?.data?.userId;
+      const token = res?.data?.token;
+
+      if (userId) localStorage.setItem("tempUserId", userId);
+      if (token) {
+        localStorage.setItem("auth_token", token);
+        localStorage.setItem("token", token); // optional alias for other parts of app
+      }
+
+      toast.success("Registration saved ✅");
       navigate("/register-step2");
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || "Registration failed ❌");
+      const msg = err.response?.data?.message || "Registration failed ❌";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -509,7 +505,7 @@ export default function UserRegistration() {
               name="dateOfBirth"
               value={form.dateOfBirth}
               onChange={handleDOBChange}
-              max={todayISO()}             // cannot select future dates
+              max={todayISO()}
               required
               className={cls(
                 "w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500",
@@ -705,7 +701,6 @@ export default function UserRegistration() {
               </p>
               {uploading && <p className="text-xs text-emerald-700 mt-1">Uploading…</p>}
               {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
-              {/* CHANGED: Removed the "paste image URL" input per requirement */}
             </div>
           </div>
         </div>
