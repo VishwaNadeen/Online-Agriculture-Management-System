@@ -9,9 +9,10 @@ import Home from "./pages/home";
 import About from "./pages/about";
 
 //Vishwa
-import UserRegistration from "./pages/userRegistration";
-import UserRoleDetails from "./pages/userRoleDetails";
-import Login from "./pages/login";
+import UserRegistration from "./pages/user/userRegistration";
+import UserRoleDetails from "./pages/user/userRoleDetails";
+import Login from "./pages/user/login";
+import Profile from "./pages/user/profile"
 
 //Methma
 //import Appointment from "./pages/appointment";
@@ -44,6 +45,7 @@ const App = () => {
           <Route path="/signup" element={<UserRegistration />} />
           <Route path="/register-step2" element={<UserRoleDetails />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/profile" element={<Profile />} />
 
           //Methma
           {/*<Route path="/appointment" element={<Appointment />} 
