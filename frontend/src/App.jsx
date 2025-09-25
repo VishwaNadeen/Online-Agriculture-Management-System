@@ -9,7 +9,7 @@ const App = () => {
   return (
     
     <Router>
-      <Toaster position='top-right'/>
+      <Toaster position="top-right" toastOptions={{ style: { marginTop: "60px", }, }} />
         <Routes>
           <Route path="/*" element={<ClientApp />} />
           <Route path="/admin" element={<AdminApp />} />
