@@ -1,16 +1,25 @@
-// src/utils/api.js  (FRONTEND)
+// src/utils/api.js
 import axios from "axios";
 
-const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000",
-  withCredentials: true, // if you use cookies
+const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
+
+export const api = axios.create({
+  baseURL: BASE,
+  headers: { "Content-Type": "application/json" },
+  // If your backend sets/reads cookies too, uncomment:
+  // withCredentials: true,
 });
 
-// Optional: attach token from localStorage automatically
-API.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+// Attach Authorization header automatically if a token exists
+api.interceptors.request.use((config) => {
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("user_token") ||
+    localStorage.getItem("authToken");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 
-export default API;
+export default api;
