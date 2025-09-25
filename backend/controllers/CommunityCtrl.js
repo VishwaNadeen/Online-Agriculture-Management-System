@@ -1,40 +1,37 @@
-// controllers/communityCtrl.js
+// controllers/CommunityCtrl.js
 import CommunityPost from "../models/CommunityPost.js";
 
 const communityCtrl = {
-  // ========== POSTS ==========
+  // ========= POSTS =========
 
-  // CREATE a new post
+  // Create a post
   async create(req, res) {
     try {
       const { title, comment, image, rating } = req.body;
-      const safeRating =
-        typeof rating === "number" ? Math.max(1, Math.min(5, rating)) : undefined;
-
       const post = await CommunityPost.create({
         title,
         comment,
         image,
-        rating: safeRating,
+        rating: typeof rating === "number" ? Math.max(1, Math.min(5, rating)) : undefined,
       });
-
       res.status(201).json(post);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   },
 
-  // LIST all posts (newest first)
+  // List posts (likes desc, then date desc)
   async list(req, res) {
     try {
-      const posts = await CommunityPost.find().sort({ date: -1 });
+      const posts = await CommunityPost.find().sort({ likes: -1, date: -1 });
       res.json(posts);
     } catch (err) {
+      console.error("[Community:list] error:", err);
       res.status(500).json({ error: err.message });
     }
   },
 
-  // GET one post by ID (with replies)
+  // Get a post (with comments & replies)
   async get(req, res) {
     try {
       const post = await CommunityPost.findById(req.params.id);
@@ -45,25 +42,22 @@ const communityCtrl = {
     }
   },
 
-  // UPDATE a post
+  // Update a post (title/comment/image/rating)
   async update(req, res) {
     try {
       const { title, comment, image, rating } = req.body;
-      const updateDoc = {};
-      if (title !== undefined) updateDoc.title = title;
-      if (comment !== undefined) updateDoc.comment = comment;
-      if (image !== undefined) updateDoc.image = image;
+      const set = {};
+      if (title !== undefined) set.title = title;
+      if (comment !== undefined) set.comment = comment;
+      if (image !== undefined) set.image = image;
       if (rating !== undefined) {
-        updateDoc.rating =
-          typeof rating === "number" ? Math.max(1, Math.min(5, rating)) : rating;
+        set.rating = typeof rating === "number" ? Math.max(1, Math.min(5, rating)) : rating;
       }
-
       const post = await CommunityPost.findOneAndUpdate(
         { _id: req.params.id },
-        { $set: updateDoc },
+        { $set: set },
         { new: true, runValidators: true }
       );
-
       if (!post) return res.status(404).json({ error: "Post not found" });
       res.json(post);
     } catch (err) {
@@ -71,7 +65,7 @@ const communityCtrl = {
     }
   },
 
-  // DELETE a post
+  // Delete a post
   async remove(req, res) {
     try {
       const post = await CommunityPost.findByIdAndDelete(req.params.id);
@@ -82,77 +76,63 @@ const communityCtrl = {
     }
   },
 
-  // ========== REPLIES ==========
+  // ========= COMMENTS =========
 
-  // LIST replies for a post
-  async listReplies(req, res) {
+  // Add root comment
+  async addComment(req, res) {
     try {
-      const post = await CommunityPost.findById(req.params.id, { replies: 1 });
+      const { text, authorName } = req.body;
+      if (!text) return res.status(400).json({ error: "Comment text required" });
+
+      const post = await CommunityPost.findByIdAndUpdate(
+        req.params.id,
+        { $push: { comments: { text, authorName: authorName || "User" } } },
+        { new: true }
+      );
       if (!post) return res.status(404).json({ error: "Post not found" });
-      res.json(post.replies || []);
+
+      const created = post.comments[post.comments.length - 1];
+      res.status(201).json(created);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   },
 
-  // ADD a reply
-  async addReply(req, res) {
-    try {
-      const { text, repliedBy } = req.body;
-      if (!text || !repliedBy) {
-        return res.status(400).json({ error: "Both 'text' and 'repliedBy' are required" });
-      }
+  // ========= REPLIES (nested under a specific comment) =========
 
+  // Add reply to a comment
+  async addReplyToComment(req, res) {
+    try {
+      const { text, authorName } = req.body;
+      const { id, commentId } = req.params;
+      if (!text) return res.status(400).json({ error: "Reply text required" });
+
+      const post = await CommunityPost.findOneAndUpdate(
+        { _id: id, "comments._id": commentId },
+        { $push: { "comments.$.replies": { text, authorName: authorName || "User" } } },
+        { new: true }
+      );
+      if (!post) return res.status(404).json({ error: "Post or comment not found" });
+
+      const comment = post.comments.find((c) => c._id.toString() === commentId);
+      const created = comment.replies[comment.replies.length - 1];
+      res.status(201).json(created);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  },
+
+  // ========= UPVOTE =========
+
+  async upvote(req, res) {
+    try {
       const post = await CommunityPost.findOneAndUpdate(
         { _id: req.params.id },
-        { $push: { replies: { text, repliedBy } } },
-        { new: true }
+        { $inc: { likes: 1 } },
+        { new: true, projection: { likes: 1 } }
       );
-
       if (!post) return res.status(404).json({ error: "Post not found" });
-      res.status(201).json(post);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  },
-
-  // UPDATE a specific reply
-  async updateReply(req, res) {
-    try {
-      const { replyId } = req.params;
-      const { text, repliedBy } = req.body;
-
-      const setDoc = {};
-      if (text !== undefined) setDoc["replies.$.text"] = text;
-      if (repliedBy !== undefined) setDoc["replies.$.repliedBy"] = repliedBy;
-      setDoc["replies.$.date"] = new Date();
-
-      const post = await CommunityPost.findOneAndUpdate(
-        { _id: req.params.id, "replies._id": replyId },
-        { $set: setDoc },
-        { new: true }
-      );
-
-      if (!post) return res.status(404).json({ error: "Post or reply not found" });
-      res.json(post);
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  },
-
-  // DELETE a specific reply
-  async deleteReply(req, res) {
-    try {
-      const { replyId } = req.params;
-
-      const post = await CommunityPost.findOneAndUpdate(
-        { _id: req.params.id },
-        { $pull: { replies: { _id: replyId } } },
-        { new: true }
-      );
-
-      if (!post) return res.status(404).json({ error: "Post or reply not found" });
-      res.json({ ok: true });
+      res.json({ likes: post.likes });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

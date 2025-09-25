@@ -1,20 +1,23 @@
-// routes/communityRoutes.js
+// routes/CommunityRoute.js
 import { Router } from "express";
-import communityCtrl from "../controllers/CommunityCtrl.js"; // ⚠️ check filename case
+import communityCtrl from "../controllers/CommunityCtrl.js"; // ⚠️ exact filename case
 
 const router = Router();
 
-// ===== POSTS CRUD =====
-router.post("/", communityCtrl.create);     // Create a post
-router.get("/", communityCtrl.list);        // Get all posts
-router.get("/:id", communityCtrl.get);      // Get one post by ID
-router.put("/:id", communityCtrl.update);   // Update a post
-router.delete("/:id", communityCtrl.remove);// Delete a post
+// Posts CRUD
+router.post("/", communityCtrl.create);
+router.get("/", communityCtrl.list);
+router.get("/:id", communityCtrl.get);
+router.put("/:id", communityCtrl.update);
+router.delete("/:id", communityCtrl.remove);
 
-// ===== REPLIES =====
-router.get("/:id/replies", communityCtrl.listReplies);           // List replies for a post
-router.post("/:id/replies", communityCtrl.addReply);             // Add a reply
-router.put("/:id/replies/:replyId", communityCtrl.updateReply);  // Update a reply
-router.delete("/:id/replies/:replyId", communityCtrl.deleteReply);// Delete a reply
+// Comments
+router.post("/:id/comments", communityCtrl.addComment);
+
+// Replies (nested under a comment)
+router.post("/:id/comments/:commentId/replies", communityCtrl.addReplyToComment);
+
+// Upvote
+router.post("/:id/upvote", communityCtrl.upvote);
 
 export default router;

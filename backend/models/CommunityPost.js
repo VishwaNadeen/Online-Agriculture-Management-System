@@ -1,31 +1,41 @@
 // models/CommunityPost.js
 import mongoose from "mongoose";
 
-// Reply subdocument schema
+// A reply under a comment
 const ReplySchema = new mongoose.Schema(
   {
-    repliedBy: { type: String, required: true, trim: true }, // Reply දාපු කෙනාගේ නම
-    text:      { type: String, required: true, trim: true }, // Reply message එක
-    date:      { type: Date, default: Date.now }             // Reply add කරන වෙලාව
+    authorName: { type: String, required: true, trim: true },
+    text: { type: String, required: true, trim: true },
+    createdAt: { type: Date, default: Date.now },
   },
-  { _id: true } // Reply එකකටත් unique _id එකක් auto-create වෙනවා
+  { _id: true }
+);
+
+// A root comment with nested replies
+const CommentSchema = new mongoose.Schema(
+  {
+    authorName: { type: String, required: true, trim: true },
+    text: { type: String, required: true, trim: true },
+    createdAt: { type: Date, default: Date.now },
+    replies: { type: [ReplySchema], default: [] },
+  },
+  { _id: true }
 );
 
 const CommunityPostSchema = new mongoose.Schema(
   {
     title:   { type: String, required: true, trim: true },
-    comment: { type: String, required: true, trim: true },
+    comment: { type: String, required: true, trim: true }, // description
     image:   { type: String, default: "" },
-    rating:  { type: Number, min: 1, max: 5, default: 3 },
-    date:    { type: Date, default: Date.now },  // main post date
-
-    // Replies array
-    replies: [ReplySchema]
+    rating:  { type: Number, min: 1, max: 5, default: 3 }, // post rating
+    likes:   { type: Number, default: 0 },                 // upvotes
+    comments:{ type: [CommentSchema], default: [] },       // root comments
+    date:    { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-// Keep "date" auto-updated
+// keep "date" current on changes
 CommunityPostSchema.pre("save", function (next) {
   this.date = new Date();
   next();
@@ -35,8 +45,5 @@ CommunityPostSchema.pre("findOneAndUpdate", function (next) {
   next();
 });
 
-const CommunityPost =
-  mongoose.models.CommunityPost ||
+export default mongoose.models.CommunityPost ||
   mongoose.model("CommunityPost", CommunityPostSchema);
-
-export default CommunityPost;

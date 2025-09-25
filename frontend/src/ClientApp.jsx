@@ -18,6 +18,10 @@ import CreateAppointment from "./pages/appointments/CreateAppointment.jsx";
 import EditAppointment from "./pages/appointments/EditAppointment.jsx";
 import ListAppointment from "./pages/appointments/ListAppointment.jsx";
 
+//kalana
+import CommunityForum from "./pages/community/CommunityForum";
+//import CommunityPostCard from "./page/community/CommunityPostCard";
+
 // Chanaka
 import AddCourse from "./pages/addCourse";
 import UpdateCourse from "./pages/updateCourse";
@@ -45,6 +49,9 @@ export default function ClientApp() {
         <Route path="/appointment" element={<CreateAppointment />} />
         <Route path="/appointment/:id/edit" element={<EditAppointment />} />
         <Route path="/my-appointments" element={<ListAppointment />} />
+
+        {/* kalana */}
+        <Route path="/community" element={<CommunityForum />} />
 
         {/* Chanaka */}
         <Route path="/addcourse" element={<AddCourse />} />
