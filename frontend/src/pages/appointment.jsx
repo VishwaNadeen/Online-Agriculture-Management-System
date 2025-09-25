@@ -1,8 +1,12 @@
-import React, { useState } from "react";
+// src/pages/Appointment.jsx (or keep your file name AgriculturalBookingForm.jsx)
+import React, { useState, useMemo, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
+// 👇 Use the same path you mounted in app.js, e.g. app.use("/appointments", appointmentRoutes)
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
-const URL  = `${BASE}/appointments`;
+const URL  = `${BASE}/appointments`; // POST target
 
+/* ===== Options ===== */
 const CATEGORY_OPTIONS = [
   "Crop Consultation",
   "Soil Testing",
@@ -16,6 +20,7 @@ const CATEGORY_OPTIONS = [
 
 const PERIOD_OPTIONS = ["morning", "afternoon", "evening"];
 
+/* ===== Small inputs ===== */
 const Input = ({ id, label, error, className = "", ...props }) => (
   <div>
     <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">
@@ -57,27 +62,72 @@ const Select = ({ id, label, error, className = "", children, ...props }) => (
   </div>
 );
 
-export default function AgriculturalBookingForm() {
+/* ===== Helper: keep prefilled category visible even if it's not in the list ===== */
+function ensureInOptions(list, value) {
+  return value && !list.includes(value) ? [value, ...list] : list;
+}
+
+/* ===== Helper: avoid UTC -1 day shift by sending a noon ISO ===== */
+function dateOnlyToNoonISO(dateStr /* yyyy-mm-dd */) {
+  // Construct at 12:00 local time, then toISOString -> keeps the correct calendar day in UTC for most TZs
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d, 12, 0, 0); // local noon
+  return dt.toISOString();
+}
+
+export default function Appointment() {
+  const location = useLocation();
+
+  // 👇 Read prefill from navigation state or props (if you later pass props.person)
+  const prefill = useMemo(() => {
+    const fromNav = location.state?.person || {};
+    return {
+      city: fromNav.city ?? "",
+      category: fromNav.category ?? "",
+      consultantId: fromNav.consultantId ?? "",
+      consultantName: fromNav.consultantName ?? "",
+    };
+  }, [location.state]);
+
+  // If category came from DB and isn't in static list, show it at the top
+  const categoryOptions = useMemo(
+    () => ensureInOptions(CATEGORY_OPTIONS, prefill.category),
+    [prefill.category]
+  );
+
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const [submitting, setSubmitting] = useState(false);
   const [serverMsg, setServerMsg] = useState(null);
   const [errors, setErrors] = useState({});
 
-  const todayStr = new Date().toISOString().split("T")[0];
-
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     name: "",
     phone: "",
     email: "",
     state: "",
-    city: "",
+    city: prefill.city || "",
     address: "",
-    category: "",
+    category: prefill.category || "",
     appointmentDate: todayStr,
     timeMode: "period",
     appointmentTime: "morning",
     durationHours: 1,
     notes: "",
-  });
+    consultantId: prefill.consultantId || "",
+    consultantName: prefill.consultantName || "",
+  }));
+
+  // If user navigates with a different consultant afterward, update prefill fields
+  useEffect(() => {
+    setForm((p) => ({
+      ...p,
+      city: prefill.city || p.city,
+      category: prefill.category || p.category,
+      consultantId: prefill.consultantId || p.consultantId,
+      consultantName: prefill.consultantName || p.consultantName,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill.city, prefill.category, prefill.consultantId, prefill.consultantName]);
 
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -105,14 +155,16 @@ export default function AgriculturalBookingForm() {
       phone: "",
       email: "",
       state: "",
-      city: "",
+      city: prefill.city || "",
       address: "",
-      category: "",
+      category: prefill.category || "",
       appointmentDate: todayStr,
       timeMode: "period",
       appointmentTime: "morning",
       durationHours: 1,
       notes: "",
+      consultantId: prefill.consultantId || "",
+      consultantName: prefill.consultantName || "",
     });
     setErrors({});
     setServerMsg(null);
@@ -128,6 +180,12 @@ export default function AgriculturalBookingForm() {
       return;
     }
 
+    // Build payload; keep original fields + safe ISO for date
+    const payload = {
+      ...form,
+      appointmentDateISO: dateOnlyToNoonISO(form.appointmentDate), // helps backend if it stores Date
+    };
+
     setSubmitting(true);
     try {
       const token = localStorage.getItem("token"); // if your POST is protected
@@ -137,18 +195,26 @@ export default function AgriculturalBookingForm() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
 
       let data = null;
-      try { data = await res.json(); } catch (_) {}
+      try {
+        data = await res.json();
+      } catch (err) {
+  console.error("Ignored error:", err);
+}
 
       if (!res.ok) {
         const msg = data?.message || `HTTP ${res.status}`;
         throw new Error(msg);
       }
 
-      const id = data?.appointment?._id || `AGR-${Date.now().toString().slice(-6)}`;
+      const id =
+        data?.appointment?._id ||
+        data?.appointment?.appointmentId ||
+        `AGR-${Date.now().toString().slice(-6)}`;
+
       setServerMsg({
         type: "success",
         text: `Consultation scheduled successfully! Service ID: ${id}`,
@@ -170,7 +236,7 @@ export default function AgriculturalBookingForm() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-full mb-4 shadow-lg">
             <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z"/>
+              <path d="M12 2L13.09 8.26L22 9L13.09 9.74L12 16L10.91 9.74L2 9L10.91 8.26L12 2Z" />
             </svg>
           </div>
           <h2 className="text-3xl font-bold bg-gradient-to-r from-emerald-700 via-green-700 to-lime-700 bg-clip-text text-transparent mb-2">
@@ -178,6 +244,21 @@ export default function AgriculturalBookingForm() {
           </h2>
           <p className="text-emerald-600 font-medium">Professional farm services at your doorstep</p>
         </div>
+
+        {/* Prefilled consultant summary (if any) */}
+        {(form.consultantId || form.consultantName) && (
+          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-emerald-800">
+            <div className="text-sm">
+              <span className="font-semibold">Consultant:</span>{" "}
+              {form.consultantName || "Selected"}{" "}
+              {form.category ? `• ${form.category}` : ""}{" "}
+              {form.city ? `• ${form.city}` : ""}
+            </div>
+            <div className="text-xs opacity-80">
+              {form.consultantId ? `ID: ${form.consultantId}` : null}
+            </div>
+          </div>
+        )}
 
         {serverMsg && (
           <div
@@ -209,7 +290,7 @@ export default function AgriculturalBookingForm() {
           <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-6 border border-emerald-100">
             <h3 className="text-lg font-semibold text-emerald-800 mb-6 flex items-center gap-2">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
               </svg>
               Personal Information
             </h3>
@@ -254,7 +335,7 @@ export default function AgriculturalBookingForm() {
           <div className="bg-gradient-to-r from-lime-50 to-emerald-50 rounded-xl p-6 border border-lime-100">
             <h3 className="text-lg font-semibold text-lime-800 mb-6 flex items-center gap-2">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"/>
+                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
               </svg>
               Farm Location Details
             </h3>
@@ -296,7 +377,7 @@ export default function AgriculturalBookingForm() {
           <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-6 border border-green-100">
             <h3 className="text-lg font-semibold text-green-800 mb-6 flex items-center gap-2">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
             </svg>
               Service Requirements
             </h3>
@@ -311,8 +392,10 @@ export default function AgriculturalBookingForm() {
                 className="bg-white/90 border-green-200"
               >
                 <option value="">Select Agricultural Service</option>
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                {categoryOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
                 ))}
               </Select>
 
@@ -334,7 +417,7 @@ export default function AgriculturalBookingForm() {
           <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-100">
             <h3 className="text-lg font-semibold text-teal-800 mb-6 flex items-center gap-2">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
               </svg>
               Time Scheduling
             </h3>
@@ -435,7 +518,7 @@ export default function AgriculturalBookingForm() {
           <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
             <h3 className="text-lg font-semibold text-amber-800 mb-6 flex items-center gap-2">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
               </svg>
               Additional Information
             </h3>
@@ -462,6 +545,10 @@ export default function AgriculturalBookingForm() {
               <div className="text-sm text-amber-600">{form.notes.length}/1000 characters used</div>
             </div>
           </div>
+
+          {/* Hidden: pass consultant info to backend */}
+          <input type="hidden" value={form.consultantId} readOnly />
+          <input type="hidden" value={form.consultantName} readOnly />
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
