@@ -64,10 +64,10 @@ const Navbar = () => {
 
   const commonTabs = [
     { name: "Home", to: "/" },
-    { name: "Appointment", to: "/appointment" },
+    { name: "Consultant", to: "/appointment" },
     { name: "Events", to: "/events" },
-    { name: "Community Forum", to: "/community" },
-    { name: "Tutorials", to: "/tutorials" },
+    { name: "Community", to: "/community" },
+    { name: "Tutorials", to: "/coursepage" },
     { name: "About Us", to: "/about" },
   ];
 
