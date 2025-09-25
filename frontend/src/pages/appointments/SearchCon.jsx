@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import ConsultantCard from "../components/ConsultantCard";
+import ConsultantCard from "../../components/ConsultantCard";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const CONSULT_API = `${BASE}/consultants`;

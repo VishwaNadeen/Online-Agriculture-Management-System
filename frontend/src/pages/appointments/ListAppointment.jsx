@@ -41,7 +41,7 @@ export default function ListAppointment() {
     <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-3xl font-bold text-emerald-700">My Appointments</h2>
-        <Link to="/appointment" className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">+ New</Link>
+        <Link to="/SearchCon" className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">+ New</Link>
       </div>
 
       {loading && <div>Loading…</div>}

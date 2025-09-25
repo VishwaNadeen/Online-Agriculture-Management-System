@@ -32,7 +32,7 @@ export default function EditAppointment() {
   const handleUpdate = async (payload) => {
     await ApptAPI.update(id, payload);
     setServerMsg({ type: "success", text: "Appointment updated." });
-    navigate("/appointments"); // back to list
+    navigate("/my-appointments"); // back to list
   };
 
   if (loading) return <div className="p-6">Loading…</div>;

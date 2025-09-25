@@ -13,7 +13,10 @@ import Login from "./pages/user/login";
 import Profile from "./pages/user/profile";
 
 // Methma
-import Appointment from "./pages/appointment";
+import Searchcon from "./pages/appointments/SearchCon";
+import CreateAppointment from "./pages/appointments/CreateAppointment.jsx";
+import EditAppointment from "./pages/appointments/EditAppointment.jsx";
+import ListAppointment from "./pages/appointments/ListAppointment.jsx";
 
 // Chanaka
 import AddCourse from "./pages/addCourse";
@@ -38,7 +41,10 @@ export default function ClientApp() {
         <Route path="/profile" element={<Profile />} />
 
         {/* Methma */}
-        <Route path="/appointment" element={<Appointment />} />
+        <Route path="/SearchCon" element={<Searchcon />} />
+        <Route path="/appointment" element={<CreateAppointment />} />
+        <Route path="/appointment/:id/edit" element={<EditAppointment />} />
+        <Route path="/my-appointments" element={<ListAppointment />} />
 
         {/* Chanaka */}
         <Route path="/addcourse" element={<AddCourse />} />

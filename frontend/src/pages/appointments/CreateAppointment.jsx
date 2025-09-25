@@ -23,7 +23,7 @@ export default function CreateAppointment() {
     const appt = await ApptAPI.create(payload);
     setServerMsg({ type: "success", text: "Appointment created successfully." });
     // optional: redirect to list
-    navigate("/appointments");
+    navigate("/my-appointments");
     return appt;
   };
 

@@ -23,7 +23,7 @@ export default function AppointmentCard({ appt, onDelete }) {
       </div>
 
       <div className="flex gap-3 mt-4">
-        <Link to={`/appointments/${appt._id || appt.appointmentId}/edit`} className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Edit</Link>
+        <Link to={`/appointment/${appt._id || appt.appointmentId}/edit`} className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Edit</Link>
         <button onClick={() => onDelete(appt)} className="px-4 py-2 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200">Delete</button>
       </div>
     </div>
