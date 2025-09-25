@@ -20,7 +20,6 @@ import ListAppointment from "./pages/appointments/ListAppointment.jsx";
 
 //kalana
 import CommunityForum from "./pages/community/CommunityForum";
-//import CommunityPostCard from "./page/community/CommunityPostCard";
 
 // Chanaka
 import AddCourse from "./pages/addCourse";
