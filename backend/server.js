@@ -3,12 +3,12 @@ import cors from "cors"
 import "dotenv/config"
 import connectDB from "./config/mongodb.js"
 
-import connectCloudinary from "./config/cloudinary.js"
-import cloudinary, { connectCloudinary } from "./config/cloudinary.js";
-import appointmentRoutes from "./routes/AppointmentRoute.js";
-import userRoutes from "./routes/userRoute.js";
-import adminRoute from './routes/adminRoute.js';
-import courseRoutes from "./routes/courseRoute.js";
+//import connectCloudinary from "./config/cloudinary.js"
+//import cloudinary, { connectCloudinary } from "./config/cloudinary.js";
+//import appointmentRoutes from "./routes/AppointmentRoute.js";
+// import userRoutes from "./routes/userRoute.js";
+// import adminRoute from './routes/adminRoute.js';
+// import courseRoutes from "./routes/courseRoute.js";
 import eventRoutes from "./routes/EventRoute.js";
 import eventFeedbackRoutes from "./routes/EventFeedbackRoute.js";
 import eventRegistrationRoutes from "./routes/EventRegistrationRoute.js";
@@ -22,7 +22,7 @@ configDotenv();
 const app = express()
 const port = process.env.PORT || 4000
 connectDB()
-connectCloudinary()
+    //connectCloudinary()
 
 // middlewares
 app.use(express.json());
@@ -36,13 +36,13 @@ app.use(cors({
     allowedHeaders: ["Content-Type", "Authorization"], // <-- important
 }));
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+//app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // routes
-app.use("/appointments", appointmentRoutes);
-app.use("/users", userRoutes);
-app.use('/api/admin', adminRoute);
-app.use("/courses", courseRoutes);
+// app.use("/appointments", appointmentRoutes);
+// app.use("/users", userRoutes);
+// app.use('/api/admin', adminRoute);
+// app.use("/courses", courseRoutes);
 app.use("/events", eventRoutes);
 app.use("/event-feedbacks", eventFeedbackRoutes);
 app.use("/event-registrations", eventRegistrationRoutes);
