@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 
-// 👇 Use the same path you mounted in app.js, e.g. app.use("/appointments", appointmentRoutes)
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
-const URL  = `${BASE}/appointments`; // <-- CHANGED from /users to /appointments
+const URL  = `${BASE}/appointments`;
 
 const CATEGORY_OPTIONS = [
   "Crop Consultation",
