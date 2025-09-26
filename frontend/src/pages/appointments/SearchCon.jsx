@@ -1,7 +1,8 @@
 // src/pages/SearchCon/SearchCon.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; // CHANGE: add useLocation
+import { toast } from "react-hot-toast";                     // ADD: toast for login prompt
 import ConsultantCard from "../../components/ConsultantCard";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
@@ -46,7 +47,7 @@ const CATEGORY_OPTIONS = [
   "Livestock Consultation",
 ];
 
- const DISTRICTS = [
+const DISTRICTS = [
   "Ampara","Anuradhapura","Badulla","Batticaloa","Colombo","Galle","Gampaha","Hambantota",
   "Jaffna","Kalutara","Kandy","Kegalle","Kilinochchi","Kurunegala","Mannar","Matale",
   "Matara","Monaragala","Mullaitivu","Nuwara Eliya","Polonnaruwa","Puttalam","Ratnapura",
@@ -85,8 +86,24 @@ function SkeletonCard() {
   );
 }
 
+// ADD: small helper to read token from both storages & keys (matches your Login + API layer)
+const getToken = () =>
+  localStorage.getItem("token") ||
+  sessionStorage.getItem("token") ||
+  localStorage.getItem("auth_token") ||
+  sessionStorage.getItem("auth_token");
+
+// ADD: gate an action behind login; show toast + redirect to login with return path
+const requireLoginThen = (location, navigate, action) => {
+  const token = getToken();
+  if (token) return action();
+  toast.error("Please log in to continue");  // ADD
+  navigate("/login", { replace: true, state: { from: location.pathname } }); // ADD
+};
+
 export default function SearchCon() {
   const navigate = useNavigate();
+  const location = useLocation(); // ADD: so we can send { state: { from } }
 
   const [active, setActive] = useState(TABS.SEARCH);
   const [selected, setSelected] = useState(null);
@@ -182,16 +199,20 @@ export default function SearchCon() {
   };
 
   /* ==== Actions ==== */
+
+  // CHANGE: gate booking behind login
   const goBook = (c) => {
-    navigate("/appointment", {
-      state: {
-        person: {
-          city: c.city,
-          category: c.category,
-          consultantId: c.id,
-          consultantName: c.name,
+    requireLoginThen(location, navigate, () => {
+      navigate("/appointment", {
+        state: {
+          person: {
+            city: c.city,
+            category: c.category,
+            consultantId: c.id,
+            consultantName: c.name,
+          },
         },
-      },
+      });
     });
   };
 
@@ -205,6 +226,13 @@ export default function SearchCon() {
   const openPopupFor = (c) => {
     setSelected(c);
     setPopupOpen(true);
+  };
+
+  // ADD: gate "My Appointments" button behind login
+  const goMyAppointments = () => {
+    requireLoginThen(location, navigate, () => {
+      navigate(MY_APPTS_ROUTE);
+    });
   };
 
   return (
@@ -277,7 +305,7 @@ export default function SearchCon() {
 
             {/* My Appointments */}
             <button
-              onClick={() => navigate(MY_APPTS_ROUTE)}
+              onClick={goMyAppointments} // CHANGE: gate behind login
               className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-gray-900 text-white px-4 py-2 text-sm hover:bg-black"
             >
               My Appointments
@@ -443,7 +471,7 @@ export default function SearchCon() {
                   <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
                     {/* keep profile page actions (not on cards) */}
                     <button
-                      onClick={() => goBook(selected)}
+                      onClick={() => goBook(selected)} // CHANGE: gated
                       className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors duration-200 font-medium"
                     >
                       Book Appointment
@@ -510,7 +538,7 @@ export default function SearchCon() {
               {/* Two big action buttons only */}
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={() => goBook(selected)}
+                  onClick={() => goBook(selected)} // CHANGE: gated
                   className="flex-1 py-3 px-4 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition"
                 >
                   Book Appointment
