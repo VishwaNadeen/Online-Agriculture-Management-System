@@ -77,8 +77,6 @@ const create = async (req, res) => {
     const address = buildAddressFromBody(req.body);
     if (!address) return res.status(400).json({ message: "Address is required." });
 
-    // CLOUD-ONLY: do NOT derive from req.file; the route should set a URL in profilePicture.
-
     // hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -252,12 +250,41 @@ const changePassword = async (req, res) => {
   }
 };
 
+/**
+ * DELETE /users/:id
+ * - If requester is deleting their own account: require `currentPassword` in body
+ * - If requester is an admin deleting someone else's account: no password required
+ */
 const remove = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await User.findByIdAndDelete(id);
-    if (!deleted) return res.status(404).json({ message: "User not found" });
-    res.json({ message: "User deleted" });
+
+    // Must already be authenticated and authorized by middlewares
+    const requesterId = req.user?.sub || req.user?._id?.toString();
+    const requesterRole = req.user?.role;
+
+    // Load target user first (to verify password when needed)
+    const target = await User.findById(id);
+    if (!target) return res.status(404).json({ message: "User not found" });
+
+    const isSelf = requesterId && String(requesterId) === String(id);
+    const isAdmin = requesterRole === "admin";
+
+    if (isSelf && !isAdmin) {
+      // Self-deletion: require password
+      const { currentPassword } = req.body || {};
+      if (!currentPassword) {
+        return res.status(400).json({ message: "currentPassword is required to delete your account." });
+      }
+      const ok = await bcrypt.compare(currentPassword, target.password);
+      if (!ok) {
+        return res.status(401).json({ message: "Password is incorrect." });
+      }
+    }
+    // Admin deleting others -> no password required
+
+    await User.findByIdAndDelete(id);
+    return res.json({ message: "User deleted" });
   } catch (err) {
     console.error("Delete user error:", err);
     res.status(500).json({ message: "Failed to delete user", error: err.message });

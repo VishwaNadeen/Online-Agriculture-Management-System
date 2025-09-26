@@ -1,10 +1,13 @@
-import React, { useMemo, useState, useEffect } from "react";
+// src/pages/UserRoleDetails.jsx
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
+const GMAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
+/* ---------------- small ui helpers ---------------- */
 const TabBtn = ({ active, children, onClick }) => (
   <button
     type="button"
@@ -20,18 +23,288 @@ const TabBtn = ({ active, children, onClick }) => (
   </button>
 );
 
+const Field = ({ label, required, children }) => (
+  <div>
+    <label className="block text-sm mb-1">
+      {label} {required ? <span className="text-red-600">*</span> : null}
+    </label>
+    {children}
+  </div>
+);
+
+const Select = ({ value, onChange, options, placeholder = "Select...", disabled }) => (
+  <select
+    className="w-full border rounded-lg px-3 py-2 bg-white"
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    disabled={disabled}
+  >
+    <option value="">{placeholder}</option>
+    {options.map((opt) => (
+      <option key={opt} value={opt}>
+        {opt}
+      </option>
+    ))}
+  </select>
+);
+
+const MultiSelect = ({
+  value = [],
+  onChange,
+  options,
+  placeholder = "Select...",
+}) => {
+  const toggle = (val) => {
+    const exists = value.includes(val);
+    onChange(exists ? value.filter((v) => v !== val) : [...value, val]);
+  };
+  return (
+    <div className="w-full border rounded-lg px-2 py-2 bg-white">
+      <div className="flex flex-wrap gap-2 mb-2">
+        {value.map((v) => (
+          <span
+            key={v}
+            className="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100"
+          >
+            {v}
+          </span>
+        ))}
+        {value.length === 0 ? (
+          <span className="text-gray-400 text-sm">{placeholder}</span>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            className={
+              "text-sm px-2 py-1 rounded-md border " +
+              (value.includes(opt)
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50")
+            }
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ---------------- data dictionaries ---------------- */
+const FARM_TYPES = ["Organic", "Conventional", "Hydroponic", "Other"];
+const IRRIGATION_METHODS = [
+  "Drip",
+  "Sprinkler",
+  "Flood",
+  "Center Pivot",
+  "Manual",
+  "Other",
+];
+const WATER_SOURCES = [
+  "Well",
+  "River/Canal",
+  "Rainwater Harvesting",
+  "Municipal",
+  "Other",
+];
+const FERTILIZER_PRACTICES = [
+  "Organic",
+  "Synthetic",
+  "Integrated Nutrient Management",
+  "Other",
+];
+const PESTICIDE_USAGE = ["None", "Low", "Moderate", "High", "Other"];
+const SOIL_TYPES = [
+  "Sandy",
+  "Clay",
+  "Silty",
+  "Peaty",
+  "Chalky",
+  "Loamy",
+  "Other",
+];
+
+const SUSTAINABILITY_OPTIONS = [
+  "Crop Rotation",
+  "Cover Cropping",
+  "Reduced Tillage",
+  "Composting",
+  "Agroforestry",
+  "Water Conservation",
+  "Integrated Pest Management",
+];
+const CONSULT_PREF_TOPICS = [
+  "Pest Management",
+  "Soil Health",
+  "Irrigation Optimization",
+  "Fertilizer Planning",
+  "Crop Planning",
+  "Sustainability Strategy",
+];
+
+/* Consultant dictionaries */
+const CONSULTATION_TYPES = [
+  "On-site Visit",
+  "Remote Call",
+  "Soil Testing",
+  "Irrigation Design",
+  "Training/Workshops",
+  "Other",
+];
+const AVAILABLE_SERVICES = [
+  "Soil Analysis",
+  "Water Testing",
+  "Nutrient Planning",
+  "Pest & Disease Diagnosis",
+  "Yield Optimization",
+  "Other",
+];
+const SERVICE_REGIONS = [
+  "Local",
+  "District-wide",
+  "Province-wide",
+  "Nationwide",
+  "International",
+];
+const AVAILABLE_DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+const TIME_SLOTS = [
+  "08:00 - 10:00",
+  "10:00 - 12:00",
+  "12:00 - 14:00",
+  "14:00 - 16:00",
+  "16:00 - 18:00",
+];
+const FEE_STRUCTURES = ["Hourly", "Per Visit", "Negotiable", "Retainer", "Other"];
+const NOTICE_PERIODS = ["No notice", "24 hours", "48 hours", "1 week", "2 weeks", "Other"];
+const LANGUAGES = ["English", "Sinhala", "Tamil"];
+
+/* ---------------- auth helpers ---------------- */
 const getToken = () =>
-  localStorage.getItem("auth_token") || // your current key
+  localStorage.getItem("auth_token") ||
   localStorage.getItem("token") ||
   localStorage.getItem("user_token") ||
   localStorage.getItem("authToken") ||
-  ""; // try common keys
+  "";
 
+/* ---------------- Google Maps picker ---------------- */
+function loadGoogleMaps(key) {
+  return new Promise((resolve, reject) => {
+    if (window.google && window.google.maps) return resolve(window.google);
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
+      key
+    )}`;
+    script.async = true;
+    script.onerror = reject;
+    script.onload = () => resolve(window.google);
+    document.head.appendChild(script);
+  });
+}
+
+const MapPickerModal = ({ open, onClose, onPick, initialCenter = { lat: 7.8731, lng: 80.7718 } }) => {
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const divRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let map;
+    (async () => {
+      try {
+        if (!GMAPS_KEY) {
+          toast.error("Google Maps key missing. Set VITE_GOOGLE_MAPS_API_KEY.");
+          onClose();
+          return;
+        }
+        await loadGoogleMaps(GMAPS_KEY);
+        map = new window.google.maps.Map(divRef.current, {
+          center: initialCenter,
+          zoom: 7,
+        });
+        const placeMarker = (pos) => {
+          if (markerRef.current) markerRef.current.setMap(null);
+          markerRef.current = new window.google.maps.Marker({ position: pos, map });
+        };
+        map.addListener("click", (e) => {
+          const pos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+          placeMarker(pos);
+          mapRef.current = pos;
+        });
+      } catch (e) {
+        console.error(e);
+        toast.error("Failed to load Google Maps.");
+        onClose();
+      }
+    })();
+    return () => {
+      // cleanup is automatic when modal unmounts
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl border w-full max-w-3xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b">
+            <h3 className="font-semibold text-emerald-800">Choose Farm Location</h3>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-900">
+              ✕
+            </button>
+          </div>
+          <div className="w-full h-[420px]" ref={divRef} />
+          <div className="flex justify-end gap-2 px-4 py-3 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border bg-white text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!mapRef.current) {
+                  toast("Click on the map to drop a pin.", { icon: "📍" });
+                  return;
+                }
+                onPick(mapRef.current);
+              }}
+              className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+            >
+              Use This Location
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ---------------- main page ---------------- */
 export default function UserRoleDetails() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("farmer"); // "farmer" | "consultant"
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+
+  // Countries (fetched, not hardcoded)
+  const [countries, setCountries] = useState([]);
+  const [countriesLoading, setCountriesLoading] = useState(false);
 
   useEffect(() => {
     const id = localStorage.getItem("tempUserId");
@@ -40,6 +313,27 @@ export default function UserRoleDetails() {
       navigate("/userRegistration");
     }
   }, [navigate]);
+
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        setCountriesLoading(true);
+        const res = await fetch("https://restcountries.com/v3.1/all?fields=name");
+        const data = await res.json();
+        const names = (data || [])
+          .map((c) => c?.name?.common)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+        setCountries(names);
+      } catch (e) {
+        console.error(e);
+        toast.error("Failed to load countries.");
+      } finally {
+        setCountriesLoading(false);
+      }
+    };
+    fetchCountries();
+  }, []);
 
   // ====== Farmer form state ======
   const [farmer, setFarmer] = useState({
@@ -55,7 +349,7 @@ export default function UserRoleDetails() {
       line1: "",
       line2: "",
     },
-    farmLocation: { lat: "", lng: "" },
+    farmLocation: { lat: "", lng: "" }, // set by MapPicker
     experienceYears: "",
     primaryIrrigationMethod: "",
     waterSource: "",
@@ -65,6 +359,16 @@ export default function UserRoleDetails() {
     sustainabilityPractices: [],
     preferredConsultationTopics: [],
     emergencyContact: "",
+  });
+
+  // If "Other" selected in single-selects, show a free text box
+  const [other, setOther] = useState({
+    farmType: "",
+    irrigation: "",
+    waterSource: "",
+    fertilizer: "",
+    pesticide: "",
+    soilType: "",
   });
 
   // ====== Consultant form state ======
@@ -85,10 +389,19 @@ export default function UserRoleDetails() {
     noticePeriod: "",
     languages: [],
     bio: "",
-    socialLinks: [],
+    socialLinks: [], // built from the inputs below
   });
 
-  // util helpers to map comma-separated tags <-> array
+  const [social, setSocial] = useState({
+    facebook: "",
+    instagram: "",
+    linkedin: "",
+  });
+
+  // Map modal
+  const [mapOpen, setMapOpen] = useState(false);
+
+  // util helpers
   const arrToText = (arr) => (Array.isArray(arr) ? arr.join(", ") : "");
   const textToArr = (txt) =>
     txt
@@ -100,12 +413,14 @@ export default function UserRoleDetails() {
     if (activeTab === "farmer") {
       return Boolean(
         farmer.farmName &&
-          farmer.farmType &&
+          (farmer.farmType || other.farmType) &&
           farmer.farmSize &&
           farmer.farmSizeUnit &&
           farmer.farmAddress.country &&
           farmer.farmAddress.city &&
-          farmer.emergencyContact
+          farmer.emergencyContact &&
+          farmer.farmLocation.lat &&
+          farmer.farmLocation.lng
       );
     }
     return Boolean(
@@ -113,7 +428,31 @@ export default function UserRoleDetails() {
         consultant.yearsOfExperience &&
         consultant.highestQualification
     );
-  }, [activeTab, farmer, consultant]);
+  }, [activeTab, farmer, consultant, other]);
+
+  const normSocialLinks = () => {
+    const out = [];
+    const { facebook, instagram, linkedin } = social;
+    if (facebook) {
+      const f = facebook.startsWith("http")
+        ? facebook
+        : `https://www.facebook.com/${facebook.replace(/^@/, "")}`;
+      out.push(f);
+    }
+    if (instagram) {
+      const i = instagram.startsWith("http")
+        ? instagram
+        : `https://www.instagram.com/${instagram.replace(/^@/, "")}`;
+      out.push(i);
+    }
+    if (linkedin) {
+      const l = linkedin.startsWith("http")
+        ? linkedin
+        : `https://www.linkedin.com/in/${linkedin.replace(/^@/, "")}`;
+      out.push(l);
+    }
+    return out;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -136,10 +475,38 @@ export default function UserRoleDetails() {
     // Build payload matching backend's pickUpdatable
     let payload;
     if (activeTab === "farmer") {
+      const farmTypeResolved =
+        farmer.farmType === "Other" ? (other.farmType || "") : farmer.farmType;
+
+      const irrigationResolved =
+        farmer.primaryIrrigationMethod === "Other"
+          ? (other.irrigation || "")
+          : farmer.primaryIrrigationMethod;
+
+      const waterSourceResolved =
+        farmer.waterSource === "Other" ? (other.waterSource || "") : farmer.waterSource;
+
+      const fertilizerResolved =
+        farmer.fertilizerPractices === "Other"
+          ? (other.fertilizer || "")
+          : farmer.fertilizerPractices;
+
+      const pesticideResolved =
+        farmer.pesticideUsage === "Other" ? (other.pesticide || "") : farmer.pesticideUsage;
+
+      const soilTypeResolved =
+        farmer.soilType === "Other" ? (other.soilType || "") : farmer.soilType;
+
       payload = {
         role: "farmer",
         farmer: {
           ...farmer,
+          farmType: farmTypeResolved,
+          primaryIrrigationMethod: irrigationResolved,
+          waterSource: waterSourceResolved,
+          fertilizerPractices: fertilizerResolved,
+          pesticideUsage: pesticideResolved,
+          soilType: soilTypeResolved,
           farmSize: farmer.farmSize ? Number(farmer.farmSize) : undefined,
           experienceYears: farmer.experienceYears
             ? Number(farmer.experienceYears)
@@ -167,13 +534,13 @@ export default function UserRoleDetails() {
           coverageRadiusKm: consultant.coverageRadiusKm
             ? Number(consultant.coverageRadiusKm)
             : undefined,
+          socialLinks: normSocialLinks(),
         },
       };
     }
 
     setLoading(true);
     try {
-      // Correct endpoint + method + auth header (matches your backend routes)
       await axios.patch(`${BASE}/users/${userId}`, payload, {
         headers: {
           "Content-Type": "application/json",
@@ -182,7 +549,7 @@ export default function UserRoleDetails() {
       });
 
       toast.success("Details saved ✅");
-      navigate("/"); // or wherever you want next
+      navigate("/"); // or another route
     } catch (error) {
       console.error(error);
       const msg =
@@ -196,6 +563,7 @@ export default function UserRoleDetails() {
     }
   };
 
+  /* ---------------- render ---------------- */
   return (
     <div className="min-h-screen flex justify-center items-start bg-gradient-to-br from-emerald-50 via-green-50 to-lime-50 px-4 py-8">
       <form
@@ -222,33 +590,40 @@ export default function UserRoleDetails() {
         <div className="border border-emerald-100 rounded-b-xl rounded-tr-xl p-5 md:p-6 mt-0 bg-white">
           {activeTab === "farmer" ? (
             /* --- Farmer form --- */
-            <div className="space-y-4">
+            <div className="space-y-5">
               {/* Basic */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">Farm Name</label>
+                <Field label="Farm Name" required>
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={farmer.farmName}
                     onChange={(e) => setFarmer({ ...farmer, farmName: e.target.value })}
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Farm Type</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    placeholder="Organic / Conventional / Hydroponic"
+                </Field>
+
+                <Field label="Farm Type" required>
+                  <Select
                     value={farmer.farmType}
-                    onChange={(e) => setFarmer({ ...farmer, farmType: e.target.value })}
-                    required
+                    onChange={(val) => setFarmer({ ...farmer, farmType: val })}
+                    options={FARM_TYPES}
+                    placeholder="Select farm type"
                   />
-                </div>
+                  {farmer.farmType === "Other" && (
+                    <input
+                      className="mt-2 w-full border rounded-lg px-3 py-2"
+                      placeholder="Specify farm type"
+                      value={other.farmType}
+                      onChange={(e) =>
+                        setOther((o) => ({ ...o, farmType: e.target.value }))
+                      }
+                    />
+                  )}
+                </Field>
               </div>
 
               <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">Farm Size</label>
+                <Field label="Farm Size" required>
                   <input
                     type="number"
                     min="0"
@@ -257,21 +632,16 @@ export default function UserRoleDetails() {
                     onChange={(e) => setFarmer({ ...farmer, farmSize: e.target.value })}
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Unit</label>
-                  <select
-                    className="w-full border rounded-lg px-3 py-2 bg-white"
+                </Field>
+                <Field label="Unit" required>
+                  <Select
                     value={farmer.farmSizeUnit}
-                    onChange={(e) => setFarmer({ ...farmer, farmSizeUnit: e.target.value })}
-                  >
-                    <option value="perches">perches</option>
-                    <option value="acres">acres</option>
-                    <option value="hectares">hectares</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Experience (years)</label>
+                    onChange={(val) => setFarmer({ ...farmer, farmSizeUnit: val })}
+                    options={["perches", "acres", "hectares"]}
+                    placeholder="Select unit"
+                  />
+                </Field>
+                <Field label="Experience (years)">
                   <input
                     type="number"
                     min="0"
@@ -281,27 +651,27 @@ export default function UserRoleDetails() {
                       setFarmer({ ...farmer, experienceYears: e.target.value })
                     }
                   />
-                </div>
+                </Field>
               </div>
 
               {/* Farm Address */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">Country</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
+                <Field label="Country" required>
+                  <Select
                     value={farmer.farmAddress.country}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFarmer({
                         ...farmer,
-                        farmAddress: { ...farmer.farmAddress, country: e.target.value },
+                        farmAddress: { ...farmer.farmAddress, country: val },
                       })
                     }
-                    required
+                    options={countries}
+                    placeholder={countriesLoading ? "Loading..." : "Select country"}
+                    disabled={countriesLoading}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">State / Province</label>
+                </Field>
+
+                <Field label="State / Province">
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={farmer.farmAddress.stateProvince}
@@ -315,9 +685,9 @@ export default function UserRoleDetails() {
                       })
                     }
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">City</label>
+                </Field>
+
+                <Field label="City" required>
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={farmer.farmAddress.city}
@@ -329,9 +699,9 @@ export default function UserRoleDetails() {
                     }
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Postal Code</label>
+                </Field>
+
+                <Field label="Postal Code">
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={farmer.farmAddress.postalCode}
@@ -345,173 +715,208 @@ export default function UserRoleDetails() {
                       })
                     }
                   />
+                </Field>
+
+                <div className="md:col-span-2">
+                  <Field label="Address Line 1" required>
+                    <input
+                      className="w-full border rounded-lg px-3 py-2"
+                      value={farmer.farmAddress.line1}
+                      onChange={(e) =>
+                        setFarmer({
+                          ...farmer,
+                          farmAddress: { ...farmer.farmAddress, line1: e.target.value },
+                        })
+                      }
+                      required
+                    />
+                  </Field>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm mb-1">Address Line 1</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={farmer.farmAddress.line1}
-                    onChange={(e) =>
-                      setFarmer({
-                        ...farmer,
-                        farmAddress: { ...farmer.farmAddress, line1: e.target.value },
-                      })
-                    }
-                    required
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm mb-1">Address Line 2 (optional)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={farmer.farmAddress.line2}
-                    onChange={(e) =>
-                      setFarmer({
-                        ...farmer,
-                        farmAddress: { ...farmer.farmAddress, line2: e.target.value },
-                      })
-                    }
-                  />
+                  <Field label="Address Line 2 (optional)">
+                    <input
+                      className="w-full border rounded-lg px-3 py-2"
+                      value={farmer.farmAddress.line2}
+                      onChange={(e) =>
+                        setFarmer({
+                          ...farmer,
+                          farmAddress: { ...farmer.farmAddress, line2: e.target.value },
+                        })
+                      }
+                    />
+                  </Field>
                 </div>
               </div>
 
-              {/* Optional quick location inputs */}
+              {/* Choose Location (Map) */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">Latitude</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={farmer.farmLocation.lat}
-                    onChange={(e) =>
-                      setFarmer({
-                        ...farmer,
-                        farmLocation: { ...farmer.farmLocation, lat: e.target.value },
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Longitude</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={farmer.farmLocation.lng}
-                    onChange={(e) =>
-                      setFarmer({
-                        ...farmer,
-                        farmLocation: { ...farmer.farmLocation, lng: e.target.value },
-                      })
-                    }
-                  />
-                </div>
+                <Field label="Farm Location" required>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMapOpen(true)}
+                      className="px-3 py-2 rounded-lg border bg-white text-emerald-700 hover:bg-emerald-50"
+                    >
+                      Choose Location on Map
+                    </button>
+                    <div className="text-sm text-gray-600">
+                      {farmer.farmLocation.lat && farmer.farmLocation.lng
+                        ? `Lat: ${farmer.farmLocation.lat}, Lng: ${farmer.farmLocation.lng}`
+                        : "No location selected"}
+                    </div>
+                  </div>
+                </Field>
               </div>
 
-              {/* Practices / Preferences */}
+              {/* Practices / Preferences dropdowns with "Other" */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">Irrigation Method</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
+                <Field label="Irrigation Method">
+                  <Select
                     value={farmer.primaryIrrigationMethod}
-                    onChange={(e) =>
-                      setFarmer({ ...farmer, primaryIrrigationMethod: e.target.value })
+                    onChange={(val) =>
+                      setFarmer({ ...farmer, primaryIrrigationMethod: val })
                     }
+                    options={IRRIGATION_METHODS}
+                    placeholder="Select irrigation method"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Water Source</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
+                  {farmer.primaryIrrigationMethod === "Other" && (
+                    <input
+                      className="mt-2 w-full border rounded-lg px-3 py-2"
+                      placeholder="Specify irrigation method"
+                      value={other.irrigation}
+                      onChange={(e) =>
+                        setOther((o) => ({ ...o, irrigation: e.target.value }))
+                      }
+                    />
+                  )}
+                </Field>
+
+                <Field label="Water Source">
+                  <Select
                     value={farmer.waterSource}
-                    onChange={(e) =>
-                      setFarmer({ ...farmer, waterSource: e.target.value })
-                    }
+                    onChange={(val) => setFarmer({ ...farmer, waterSource: val })}
+                    options={WATER_SOURCES}
+                    placeholder="Select water source"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Fertilizer Practices</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
+                  {farmer.waterSource === "Other" && (
+                    <input
+                      className="mt-2 w-full border rounded-lg px-3 py-2"
+                      placeholder="Specify water source"
+                      value={other.waterSource}
+                      onChange={(e) =>
+                        setOther((o) => ({ ...o, waterSource: e.target.value }))
+                      }
+                    />
+                  )}
+                </Field>
+
+                <Field label="Fertilizer Practices">
+                  <Select
                     value={farmer.fertilizerPractices}
-                    onChange={(e) =>
-                      setFarmer({ ...farmer, fertilizerPractices: e.target.value })
+                    onChange={(val) =>
+                      setFarmer({ ...farmer, fertilizerPractices: val })
                     }
+                    options={FERTILIZER_PRACTICES}
+                    placeholder="Select fertilizer practice"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Pesticide Usage</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
+                  {farmer.fertilizerPractices === "Other" && (
+                    <input
+                      className="mt-2 w-full border rounded-lg px-3 py-2"
+                      placeholder="Specify fertilizer practice"
+                      value={other.fertilizer}
+                      onChange={(e) =>
+                        setOther((o) => ({ ...o, fertilizer: e.target.value }))
+                      }
+                    />
+                  )}
+                </Field>
+
+                <Field label="Pesticide Usage">
+                  <Select
                     value={farmer.pesticideUsage}
-                    onChange={(e) =>
-                      setFarmer({ ...farmer, pesticideUsage: e.target.value })
-                    }
+                    onChange={(val) => setFarmer({ ...farmer, pesticideUsage: val })}
+                    options={PESTICIDE_USAGE}
+                    placeholder="Select pesticide usage"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Soil Type</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
+                  {farmer.pesticideUsage === "Other" && (
+                    <input
+                      className="mt-2 w-full border rounded-lg px-3 py-2"
+                      placeholder="Specify pesticide usage"
+                      value={other.pesticide}
+                      onChange={(e) =>
+                        setOther((o) => ({ ...o, pesticide: e.target.value }))
+                      }
+                    />
+                  )}
+                </Field>
+
+                <Field label="Soil Type">
+                  <Select
                     value={farmer.soilType}
-                    onChange={(e) => setFarmer({ ...farmer, soilType: e.target.value })}
+                    onChange={(val) => setFarmer({ ...farmer, soilType: val })}
+                    options={SOIL_TYPES}
+                    placeholder="Select soil type"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Emergency Contact</label>
+                  {farmer.soilType === "Other" && (
+                    <input
+                      className="mt-2 w-full border rounded-lg px-3 py-2"
+                      placeholder="Specify soil type"
+                      value={other.soilType}
+                      onChange={(e) =>
+                        setOther((o) => ({ ...o, soilType: e.target.value }))
+                      }
+                    />
+                  )}
+                </Field>
+
+                <Field label="Emergency Contact" required>
                   <input
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     className="w-full border rounded-lg px-3 py-2"
-                    placeholder="Name - 07XXXXXXXX"
+                    placeholder="07XXXXXXXX"
                     value={farmer.emergencyContact}
                     onChange={(e) =>
-                      setFarmer({ ...farmer, emergencyContact: e.target.value })
+                      setFarmer({
+                        ...farmer,
+                        emergencyContact: e.target.value.replace(/\D/g, ""),
+                      })
                     }
                     required
                   />
-                </div>
+                </Field>
               </div>
 
+              {/* Multi-selects */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">
-                    Sustainability Practices (comma separated)
-                  </label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(farmer.sustainabilityPractices)}
-                    onChange={(e) =>
-                      setFarmer({
-                        ...farmer,
-                        sustainabilityPractices: textToArr(e.target.value),
-                      })
+                <Field label="Sustainability Practices">
+                  <MultiSelect
+                    value={farmer.sustainabilityPractices}
+                    onChange={(vals) =>
+                      setFarmer({ ...farmer, sustainabilityPractices: vals })
                     }
+                    options={SUSTAINABILITY_OPTIONS}
+                    placeholder="Choose items"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">
-                    Preferred Consultation Topics (comma separated)
-                  </label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(farmer.preferredConsultationTopics)}
-                    onChange={(e) =>
-                      setFarmer({
-                        ...farmer,
-                        preferredConsultationTopics: textToArr(e.target.value),
-                      })
+                </Field>
+
+                <Field label="Preferred Consultation Topics">
+                  <MultiSelect
+                    value={farmer.preferredConsultationTopics}
+                    onChange={(vals) =>
+                      setFarmer({ ...farmer, preferredConsultationTopics: vals })
                     }
+                    options={CONSULT_PREF_TOPICS}
+                    placeholder="Choose topics"
                   />
-                </div>
+                </Field>
               </div>
             </div>
           ) : (
             /* --- Consultant form --- */
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">Primary Specialization</label>
+                <Field label="Primary Specialization" required>
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={consultant.primarySpecialization}
@@ -523,9 +928,8 @@ export default function UserRoleDetails() {
                     }
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Years of Experience</label>
+                </Field>
+                <Field label="Years of Experience" required>
                   <input
                     type="number"
                     min="0"
@@ -536,9 +940,8 @@ export default function UserRoleDetails() {
                     }
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Highest Qualification</label>
+                </Field>
+                <Field label="Highest Qualification" required>
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={consultant.highestQualification}
@@ -550,9 +953,8 @@ export default function UserRoleDetails() {
                     }
                     required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Organization Name</label>
+                </Field>
+                <Field label="Organization Name">
                   <input
                     className="w-full border rounded-lg px-3 py-2"
                     value={consultant.organizationName}
@@ -563,77 +965,42 @@ export default function UserRoleDetails() {
                       })
                     }
                   />
-                </div>
+                </Field>
               </div>
 
+              {/* Multi-select groups */}
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">Secondary Expertise (comma separated)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.secondaryExpertise)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        secondaryExpertise: textToArr(e.target.value),
-                      })
+                <Field label="Consultation Types">
+                  <MultiSelect
+                    value={consultant.consultationTypes}
+                    onChange={(vals) =>
+                      setConsultant({ ...consultant, consultationTypes: vals })
                     }
+                    options={CONSULTATION_TYPES}
+                    placeholder="Choose types"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Certifications (comma separated)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.certifications)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        certifications: textToArr(e.target.value),
-                      })
+                </Field>
+                <Field label="Available Services">
+                  <MultiSelect
+                    value={consultant.availableServices}
+                    onChange={(vals) =>
+                      setConsultant({ ...consultant, availableServices: vals })
                     }
+                    options={AVAILABLE_SERVICES}
+                    placeholder="Choose services"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Consultation Types (comma separated)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.consultationTypes)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        consultationTypes: textToArr(e.target.value),
-                      })
+                </Field>
+                <Field label="Service Regions">
+                  <MultiSelect
+                    value={consultant.serviceRegions}
+                    onChange={(vals) =>
+                      setConsultant({ ...consultant, serviceRegions: vals })
                     }
+                    options={SERVICE_REGIONS}
+                    placeholder="Choose regions"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Available Services (comma separated)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.availableServices)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        availableServices: textToArr(e.target.value),
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Service Regions (comma separated)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.serviceRegions)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        serviceRegions: textToArr(e.target.value),
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Coverage Radius (km)</label>
+                </Field>
+                <Field label="Coverage (km)">
                   <input
                     type="number"
                     min="0"
@@ -646,118 +1013,137 @@ export default function UserRoleDetails() {
                       })
                     }
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Available Days (comma separated – Mon,Tue,...)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.availableDays)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        availableDays: textToArr(e.target.value),
-                      })
+                </Field>
+                <Field label="Available Days">
+                  <MultiSelect
+                    value={consultant.availableDays}
+                    onChange={(vals) =>
+                      setConsultant({ ...consultant, availableDays: vals })
                     }
+                    options={AVAILABLE_DAYS}
+                    placeholder="Choose days"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Available Time Slots (comma separated – morning,afternoon,evening)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.availableTimeSlots)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        availableTimeSlots: textToArr(e.target.value),
-                      })
+                </Field>
+                <Field label="Available Time Slots">
+                  <MultiSelect
+                    value={consultant.availableTimeSlots}
+                    onChange={(vals) =>
+                      setConsultant({ ...consultant, availableTimeSlots: vals })
                     }
+                    options={TIME_SLOTS}
+                    placeholder="Choose slots"
                   />
-                </div>
+                </Field>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm mb-1">Fee Structure</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    placeholder="Hourly / Per Visit / Negotiable"
+              {/* Fee, Notice, Languages */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <Field label="Fee Structure">
+                  <Select
                     value={consultant.feeStructure}
-                    onChange={(e) =>
-                      setConsultant({ ...consultant, feeStructure: e.target.value })
+                    onChange={(val) =>
+                      setConsultant({ ...consultant, feeStructure: val })
                     }
+                    options={FEE_STRUCTURES}
+                    placeholder="Select fee"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Notice Period</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    placeholder="24 hours / 48 hours"
+                </Field>
+                <Field label="Notice Period">
+                  <Select
                     value={consultant.noticePeriod}
-                    onChange={(e) =>
-                      setConsultant({ ...consultant, noticePeriod: e.target.value })
+                    onChange={(val) =>
+                      setConsultant({ ...consultant, noticePeriod: val })
                     }
+                    options={NOTICE_PERIODS}
+                    placeholder="Select notice"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Languages (comma separated)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.languages)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        languages: textToArr(e.target.value),
-                      })
+                </Field>
+                <Field label="Languages">
+                  <MultiSelect
+                    value={consultant.languages}
+                    onChange={(vals) =>
+                      setConsultant({ ...consultant, languages: vals })
                     }
+                    options={LANGUAGES}
+                    placeholder="Pick languages"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Social Links (comma separated URLs)</label>
-                  <input
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={arrToText(consultant.socialLinks)}
-                    onChange={(e) =>
-                      setConsultant({
-                        ...consultant,
-                        socialLinks: textToArr(e.target.value),
-                      })
-                    }
-                  />
-                </div>
+                </Field>
               </div>
 
-              <div>
-                <label className="block text-sm mb-1">Short Bio</label>
+              {/* Social links (Facebook/Instagram/LinkedIn) */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <Field label="Facebook">
+                  <input
+                    className="w-full border rounded-lg px-3 py-2"
+                    placeholder="link or @username"
+                    value={social.facebook}
+                    onChange={(e) => setSocial({ ...social, facebook: e.target.value })}
+                  />
+                </Field>
+                <Field label="Instagram">
+                  <input
+                    className="w-full border rounded-lg px-3 py-2"
+                    placeholder="link or @username"
+                    value={social.instagram}
+                    onChange={(e) => setSocial({ ...social, instagram: e.target.value })}
+                  />
+                </Field>
+                <Field label="LinkedIn">
+                  <input
+                    className="w-full border rounded-lg px-3 py-2"
+                    placeholder="link or @username"
+                    value={social.linkedin}
+                    onChange={(e) => setSocial({ ...social, linkedin: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Short Bio">
                 <textarea
                   rows={4}
                   className="w-full border rounded-lg px-3 py-2"
                   value={consultant.bio}
                   onChange={(e) => setConsultant({ ...consultant, bio: e.target.value })}
                 />
-              </div>
+              </Field>
             </div>
           )}
         </div>
 
         {err && <p className="text-red-600 text-sm mt-3">{err}</p>}
 
-        <div className="mt-6 flex gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="px-5 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200"
-          >
-            Back
-          </button>
+        {/* Centered Save button */}
+        <div className="mt-6 flex justify-center">
           <button
             type="submit"
             disabled={!canSubmit || loading}
-            className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 disabled:bg-gray-400"
+            className="px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 disabled:bg-gray-400"
           >
             {loading ? "Saving..." : "Save & Finish"}
           </button>
         </div>
       </form>
+
+      {/* Map modal */}
+      <MapPickerModal
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        onPick={(pos) => {
+          setFarmer((f) => ({ ...f, farmLocation: { lat: pos.lat, lng: pos.lng } }));
+          setMapOpen(false);
+          toast.success("Location selected");
+        }}
+        initialCenter={{
+          lat:
+            farmer.farmLocation.lat !== ""
+              ? Number(farmer.farmLocation.lat)
+              : 7.8731,
+          lng:
+            farmer.farmLocation.lng !== ""
+              ? Number(farmer.farmLocation.lng)
+              : 80.7718,
+        }}
+      />
     </div>
   );
 }
