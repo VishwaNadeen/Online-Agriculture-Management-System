@@ -148,7 +148,7 @@ export default function CoursesAdmin() {
                                     console.log("Course deleted successfully");
                                     toast.success("Course deleted successfully");
                                     setIsLoading(true);
-                                    navigate("/courseAdmin");
+                                    navigate("/admin/courses");
                                   })
                                   .catch((error) => {
                                     console.error("Error deleting course:", error);
@@ -160,7 +160,7 @@ export default function CoursesAdmin() {
                               title="Edit"
                               className="bg-emerald-700 p-[7px] text-3xl rounded-full text-amber-50 cursor-pointer hover:bg-emerald-800"
                               onClick={() => {
-                                navigate("/editcourse", {
+                                navigate("/admin/updateCourse", {
                                   state: course, // pass whole object for prefill
                                 });
                               }}
@@ -185,7 +185,7 @@ export default function CoursesAdmin() {
 
       {/* Floating Add Button */}
       <Link
-        to={"/addcourse"}
+        to={"/admin/addCourse"}
         className="fixed bottom-5 right-5 px-4 py-3 bg-amber-300 text-black rounded-full shadow-2xl border border-amber-400 hover:bg-amber-200 transition flex items-center gap-2"
       >
         <BiPlus className="text-2xl" />

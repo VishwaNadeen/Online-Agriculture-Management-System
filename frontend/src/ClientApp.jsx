@@ -22,9 +22,7 @@ import ListAppointment from "./pages/appointments/ListAppointment.jsx";
 import CommunityForum from "./pages/community/CommunityForum";
 
 // Chanaka
-import AddCourse from "./pages/addCourse";
-import UpdateCourse from "./pages/updateCourse";
-import CoursesAdmin from "./pages/courseAdmin";
+
 import CoursesPage from "./pages/courses/coursePage";
 import CourseOverview from "./pages/courses/courseOverview";
 
@@ -53,9 +51,7 @@ export default function ClientApp() {
         <Route path="/community" element={<CommunityForum />} />
 
         {/* Chanaka */}
-        <Route path="/addcourse" element={<AddCourse />} />
-        <Route path="/editcourse" element={<UpdateCourse />} />
-        <Route path="/courseAdmin" element={<CoursesAdmin />} />
+        
         <Route path="/coursepage" element={<CoursesPage />} />
         <Route path="/courses/:courseID" element={<CourseOverview />} />
 

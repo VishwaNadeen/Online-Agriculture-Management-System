@@ -1,88 +1,109 @@
-// src/pages/Admin/addCourse.jsx
+// src/pages/Admin/UpdateCourse.jsx
 import React, { useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import uploadfile from "../utils/mediaUpload";
-
-
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
-export default function AddCourse() {
+export default function UpdateCourse() {
+  const location = useLocation();
   const navigate = useNavigate();
 
-  // ===== Basic Course Fields =====
-  const [courseID, setCourseID] = useState("");
-  const [courseName, setCourseName] = useState("");
-  const [altTitles, setAltTitles] = useState(""); // comma-separated
-  const [thumbnailFile, setThumbnailFile] = useState(null); // optional course cover
-  const [thumbnailUrl, setThumbnailUrl] = useState(""); // optional if already hosted
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Agriculture");
-  const [tags, setTags] = useState(""); // comma-separated
-  const [level, setLevel] = useState("Beginner");
-  const [language, setLanguage] = useState("en");
-  const [subCategory, setSubCategory] = useState("");
+  // Expecting location.state to carry the course object
+  const c = location.state || {};
 
-  // ===== Materials =====
-  const [videoItems, setVideoItems] = useState([
-    { name: "", videoFile: null, thumbFile: null },
-  ]);
-  const [pdfItems, setPdfItems] = useState([{ name: "", file: null }]);
-  const [textItems, setTextItems] = useState([{ name: "", content: "" }]);
+  // ===== Basic Course Fields (prefilled) =====
+  const [courseID, setCourseID] = useState(c.courseID || "");
+  const [courseName, setCourseName] = useState(c.courseName || "");
+  const [altTitles, setAltTitles] = useState(Array.isArray(c.altTitles) ? c.altTitles.join(",") : (c.altTitles || ""));
+  const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState(c.thumbnail || "");
+  const [description, setDescription] = useState(c.description || "");
+  const [category, setCategory] = useState(c.category || "Agriculture");
+  const [tags, setTags] = useState(Array.isArray(c.tags) ? c.tags.join(",") : (c.tags || ""));
+  const [level, setLevel] = useState(c.level || "Beginner");
+  const [language, setLanguage] = useState(c.language || "en");
+  const [subCategory, setSubCategory] = useState(c.subCategory || "");
 
-  const [isPublished, setIsPublished] = useState(true);
-  const [isActive, setIsActive] = useState(true);
+  // ===== Materials (prefilled) =====
+  // Allow keeping existing URLs or replacing with new files
+  const [videoItems, setVideoItems] = useState(
+    (Array.isArray(c.videoTutorials) && c.videoTutorials.length
+      ? c.videoTutorials
+      : [{ name: "", url: "", thumbnail: "" }]
+    ).map(v => ({ ...v, videoFile: null, thumbFile: null }))
+  );
+
+  const [pdfItems, setPdfItems] = useState(
+    (Array.isArray(c.pdfLessons) && c.pdfLessons.length
+      ? c.pdfLessons
+      : [{ name: "", url: "" }]
+    ).map(p => ({ ...p, file: null }))
+  );
+
+  const [textItems, setTextItems] = useState(
+    (Array.isArray(c.textLessons) && c.textLessons.length
+      ? c.textLessons
+      : [{ name: "", content: "" }])
+  );
+
+  const [isPublished, setIsPublished] = useState(
+    typeof c.isPublished === "boolean" ? c.isPublished : true
+  );
+  const [isActive, setIsActive] = useState(
+    typeof c.isActive === "boolean" ? c.isActive : true
+  );
 
   // ===== Helpers =====
   const addVideoRow = () =>
-    setVideoItems((prev) => [...prev, { name: "", videoFile: null, thumbFile: null }]);
+    setVideoItems(prev => [...prev, { name: "", url: "", thumbnail: "", videoFile: null, thumbFile: null }]);
   const removeVideoRow = (idx) =>
-    setVideoItems((prev) => prev.filter((_, i) => i !== idx));
+    setVideoItems(prev => prev.filter((_, i) => i !== idx));
 
-  const addPdfRow = () => setPdfItems((prev) => [...prev, { name: "", file: null }]);
-  const removePdfRow = (idx) => setPdfItems((prev) => prev.filter((_, i) => i !== idx));
+  const addPdfRow = () =>
+    setPdfItems(prev => [...prev, { name: "", url: "", file: null }]);
+  const removePdfRow = (idx) =>
+    setPdfItems(prev => prev.filter((_, i) => i !== idx));
 
-  const addTextRow = () => setTextItems((prev) => [...prev, { name: "", content: "" }]);
-  const removeTextRow = (idx) => setTextItems((prev) => prev.filter((_, i) => i !== idx));
+  const addTextRow = () =>
+    setTextItems(prev => [...prev, { name: "", content: "" }]);
+  const removeTextRow = (idx) =>
+    setTextItems(prev => prev.filter((_, i) => i !== idx));
 
-  // ===== Validation =====
+  // ===== Validation (simple, like your add form) =====
   function validateForm() {
     if (!courseID.trim()) return "Course ID is required";
     if (!courseName.trim()) return "Course Name is required";
     if (!description.trim()) return "Description is required";
     if (!category.trim()) return "Category is required";
 
-    // Validate videos
+    // If a video row is touched, require a name (file/urls optional for update)
     for (let i = 0; i < videoItems.length; i++) {
       const v = videoItems[i];
-      if ((v.name || v.videoFile || v.thumbFile) && (!v.name || !v.videoFile || !v.thumbFile)) {
-        return `Video #${i + 1}: name, video file, and thumbnail are all required if adding a video`;
-      }
+      const touched = v.name || v.url || v.thumbnail || v.videoFile || v.thumbFile;
+      if (touched && !v.name) return `Video #${i + 1}: name is required`;
     }
-
-    // Validate pdfs
+    // PDFs: if touched, need name
     for (let i = 0; i < pdfItems.length; i++) {
       const p = pdfItems[i];
-      if ((p.name || p.file) && (!p.name || !p.file)) {
-        return `PDF #${i + 1}: name and file are required if adding a PDF`;
-      }
+      const touched = p.name || p.url || p.file;
+      if (touched && !p.name) return `PDF #${i + 1}: name is required`;
     }
-
-    // Validate text lessons
+    // Text: both fields if touched
     for (let i = 0; i < textItems.length; i++) {
       const t = textItems[i];
-      if ((t.name || t.content) && (!t.name || !t.content)) {
-        return `Text lesson #${i + 1}: name and content are required if adding a lesson`;
+      const touched = t.name || t.content;
+      if (touched && (!t.name || !t.content)) {
+        return `Text lesson #${i + 1}: name and content are required`;
       }
     }
-
     return null;
   }
 
-  // ===== Submit =====
-  async function handleCreateCourse() {
+  // ===== Submit (UPDATE) =====
+  async function handleUpdateCourse() {
     const error = validateForm();
     if (error) {
       toast.error(error);
@@ -90,62 +111,63 @@ export default function AddCourse() {
     }
 
     try {
-      toast.loading("Uploading media...", { id: "upload" });
+      toast.loading("Preparing updates...", { id: "upd" });
 
-      // Upload course thumbnail if a file selected (thumbnailUrl optional alternative)
-      let courseThumbnail = thumbnailUrl?.trim() || "";
+      // Thumbnail: keep existing URL unless a new file is chosen or user typed a new URL
+      let finalThumbnail = (thumbnailUrl || "").trim();
       if (thumbnailFile) {
-        courseThumbnail = await uploadfile(thumbnailFile);
+        finalThumbnail = await uploadfile(thumbnailFile);
       }
 
-      // Upload videos (video + thumb)
+      // Videos: if new files chosen, upload; otherwise keep existing urls
       const videoTutorials = [];
       for (const v of videoItems) {
-        if (!v.name && !v.videoFile && !v.thumbFile) continue; // skip empty row
-        const [videoUrl, thumbUrl] = await Promise.all([
-          uploadfile(v.videoFile),
-          uploadfile(v.thumbFile),
-        ]);
-        videoTutorials.push({
-          name: v.name.trim(),
-          url: videoUrl,
-          thumbnail: thumbUrl,
-        });
+        const isBlank =
+          !v.name && !v.url && !v.thumbnail && !v.videoFile && !v.thumbFile;
+        if (isBlank) continue;
+
+        let url = v.url || "";
+        let thumb = v.thumbnail || "";
+
+        if (v.videoFile) url = await uploadfile(v.videoFile);
+        if (v.thumbFile) thumb = await uploadfile(v.thumbFile);
+
+        if (v.name && url) {
+          videoTutorials.push({
+            name: v.name.trim(),
+            url,
+            thumbnail: thumb || "",
+          });
+        }
       }
 
-      // Upload PDFs
+      // PDFs: keep url unless replaced with a new file
       const pdfLessons = [];
       for (const p of pdfItems) {
-        if (!p.name && !p.file) continue;
-        const pdfUrl = await uploadfile(p.file);
-        pdfLessons.push({
-          name: p.name.trim(),
-          url: pdfUrl,
-        });
+        const isBlank = !p.name && !p.url && !p.file;
+        if (isBlank) continue;
+
+        let url = p.url || "";
+        if (p.file) url = await uploadfile(p.file);
+
+        if (p.name && url) {
+          pdfLessons.push({ name: p.name.trim(), url });
+        }
       }
 
-      // Text lessons (already in memory)
+      // Text Lessons
       const textLessons = textItems
-        .filter((t) => t.name.trim() && t.content.trim())
-        .map((t) => ({
-          name: t.name.trim(),
-          content: t.content.trim(),
-        }));
+        .filter(t => t.name && t.content)
+        .map(t => ({ name: t.name.trim(), content: t.content.trim() }));
 
       const payload = {
-        courseID: courseID.trim(),
+        courseID: courseID.trim(), // backend keeps this consistent
         courseName: courseName.trim(),
-        altTitles: altTitles
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        thumbnail: courseThumbnail,
+        altTitles: altTitles.split(",").map(s => s.trim()).filter(Boolean),
+        thumbnail: finalThumbnail,
         description: description.trim(),
         category: category.trim(),
-        tags: tags
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        tags: tags.split(",").map(s => s.trim()).filter(Boolean),
         level,
         language,
         subCategory: subCategory.trim(),
@@ -156,18 +178,16 @@ export default function AddCourse() {
         textLessons,
       };
 
-      toast.loading("Creating course...", { id: "upload" });
+      toast.loading("Updating course...", { id: "upd" });
 
-      const token = localStorage.getItem("token"); // optional
-      const res = await axios.post(`${BASE_URL}/courses`, payload, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      // No auth headers as requested
+      await axios.patch(`${BASE_URL}/courses/${courseID}`, payload);
 
-      toast.success("Course created successfully!", { id: "upload" });
-      navigate("/courseAdmin"); // change to your admin list route
+      toast.success("Course updated successfully!", { id: "upd" });
+      navigate("/admin/courses");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to create course", { id: "upload" });
+      toast.error(err?.response?.data?.message || "Failed to update course", { id: "upd" });
     }
   }
 
@@ -175,21 +195,24 @@ export default function AddCourse() {
     <div className="min-h-screen w-full bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center p-4">
       <div className="w-full max-w-5xl bg-white rounded-2xl shadow-xl p-6 md:p-8">
         <h1 className="text-2xl md:text-3xl font-bold text-emerald-800 mb-6">
-          Add New Course
+          Update Course
         </h1>
 
         {/* Basic Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Course ID */}
+          {/* Course ID (locked) */}
           <div className="flex flex-col">
             <label className="text-sm font-semibold">Course ID *</label>
             <input
               type="text"
-              placeholder="e.g. IRR101"
               value={courseID}
+              disabled
               onChange={(e) => setCourseID(e.target.value)}
-              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="border rounded-lg px-3 py-2 bg-gray-100 text-gray-600"
             />
+            <span className="text-xs text-gray-500 mt-1">
+              ID is fixed (comes from selected course).
+            </span>
           </div>
 
           {/* Course Name */}
@@ -280,7 +303,7 @@ export default function AddCourse() {
             />
           </div>
 
-          {/* Course Thumbnail (optional) */}
+          {/* Course Thumbnail */}
           <div className="flex flex-col">
             <label className="text-sm font-semibold">Course Thumbnail (file)</label>
             <input
@@ -290,7 +313,7 @@ export default function AddCourse() {
               className="border rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <span className="text-xs text-gray-500 mt-1">
-              Or paste an existing image URL below
+              Or keep/change the image URL below
             </span>
             <input
               type="url"
@@ -369,28 +392,58 @@ export default function AddCourse() {
                 }}
                 className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <input
-                type="file"
-                accept="video/*"
-                onChange={(e) => {
-                  const copy = [...videoItems];
-                  copy[idx].videoFile = e.target.files?.[0] || null;
-                  setVideoItems(copy);
-                }}
-                className="border rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const copy = [...videoItems];
-                  copy[idx].thumbFile = e.target.files?.[0] || null;
-                  setVideoItems(copy);
-                }}
-                className="border rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+              <div className="flex flex-col">
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => {
+                    const copy = [...videoItems];
+                    copy[idx].videoFile = e.target.files?.[0] || null;
+                    setVideoItems(copy);
+                  }}
+                  className="border rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                {v.url ? (
+                  <a
+                    href={v.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-emerald-700 mt-1 underline"
+                  >
+                    Current video
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-500 mt-1">No current video</span>
+                )}
+              </div>
+              <div className="flex flex-col">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const copy = [...videoItems];
+                    copy[idx].thumbFile = e.target.files?.[0] || null;
+                    setVideoItems(copy);
+                  }}
+                  className="border rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                {v.thumbnail ? (
+                  <a
+                    href={v.thumbnail}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-emerald-700 mt-1 underline"
+                  >
+                    Current thumbnail
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-500 mt-1">No current thumbnail</span>
+                )}
+              </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Video & thumbnail required</span>
+                <span className="text-xs text-gray-500">
+                  Leave files empty to keep current URLs
+                </span>
                 {videoItems.length > 1 && (
                   <button
                     onClick={() => removeVideoRow(idx)}
@@ -432,18 +485,31 @@ export default function AddCourse() {
                 }}
                 className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              <input
-                type="file"
-                accept="application/pdf"
-                onChange={(e) => {
-                  const copy = [...pdfItems];
-                  copy[idx].file = e.target.files?.[0] || null;
-                  setPdfItems(copy);
-                }}
-                className="border rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">PDF required</span>
+              <div className="flex flex-col">
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => {
+                    const copy = [...pdfItems];
+                    copy[idx].file = e.target.files?.[0] || null;
+                    setPdfItems(copy);
+                  }}
+                  className="border rounded-lg px-3 py-2 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                {p.url ? (
+                  <a
+                    href={p.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-emerald-700 mt-1 underline"
+                  >
+                    Current PDF
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-500 mt-1">No current PDF</span>
+                )}
+              </div>
+              <div className="flex items-center justify-end">
                 {pdfItems.length > 1 && (
                   <button
                     onClick={() => removePdfRow(idx)}
@@ -513,10 +579,10 @@ export default function AddCourse() {
         {/* ===== Actions ===== */}
         <div className="w-full flex justify-center gap-4 mt-8">
           <button
-            onClick={handleCreateCourse}
+            onClick={handleUpdateCourse}
             className="bg-emerald-600 text-white px-6 py-2 rounded-xl shadow-md hover:bg-emerald-700 transition"
           >
-            Create Course
+            Update Course
           </button>
           <Link
             to="/admin/courses"

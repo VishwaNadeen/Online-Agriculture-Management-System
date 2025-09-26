@@ -46,7 +46,7 @@ export default function CourseOverview() {
             <div className="relative w-full">
               <img
                 src={
-                  (course.thumbnail || "").trim() ||
+                  (course.thumbnail || "").trim() || 
                   "https://images.unsplash.com/photo-1604335399105-a0d7f1b8cc4b?q=80&w=1200&auto=format&fit=crop"
                 }
                 alt={course.courseName || "Course thumbnail"}
