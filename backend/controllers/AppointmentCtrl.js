@@ -1,4 +1,4 @@
-// controllers/AppointmentCtrl.js
+// backend/controllers/AppointmentCtrl.js
 import mongoose from "mongoose";
 import AppointmentModel from "../models/AppointmentModel.js";
 
@@ -16,6 +16,9 @@ const ALLOWED_FIELDS = [
   "durationHours",
   "notes",
   "status",
+    "consultantId",   // ADD
+  "consultantName", // ADD
+  // NOTE: userId is intentionally NOT allowed from client (we set it from JWT)
 ];
 
 /** Minimal required fields on CREATE (schema should also enforce) */
@@ -28,7 +31,9 @@ const REQUIRED_ON_CREATE = [
   "category",
   "appointmentDate",
   "appointmentTime",
+  "consultantName",
 ];
+
 
 /** Allow “period” values from UI and map them to canonical HH:mm */
 const PERIOD_TO_TIME = { morning: "09:00", afternoon: "14:00", evening: "18:00" };
@@ -98,6 +103,10 @@ function fieldErrors(err) {
 /* ===================== CREATE (POST /appointments) ===================== */
 export async function createAppointment(req, res) {
   try {
+    // ADD: make sure we have an authenticated user (route uses requireAuth, but double-safety)
+    const userId = req.user?.sub; // CHANGE: get owner from JWT's `sub`
+    if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
     const raw = pick(req.body, ALLOWED_FIELDS);
 
     // Quick presence check (schema also validates)
@@ -109,6 +118,10 @@ export async function createAppointment(req, res) {
     }
 
     const data = normalize(raw);
+
+    // ADD: force owner from token, ignore any userId from client
+    data.userId = userId; // CHANGE
+
     const doc = await AppointmentModel.create(data);
 
     return res.status(201).json({ message: "Appointment created", appointment: doc });
@@ -122,15 +135,41 @@ export async function createAppointment(req, res) {
   }
 }
 
-/* ===== READ ALL (GET /appointments) — supports ?page=&limit=&status= ===== */
+/* ===== READ MINE (GET /appointments/my) — only my appointments ===== */
+export async function listMyAppointments(req, res) {
+  try {
+    const userId = req.user?.sub; // CHANGE
+    if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+    const items = await AppointmentModel
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json(items);
+  } catch (err) {
+    console.error("❌ Error fetching my appointments:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
+/* ===== READ ALL (GET /appointments) — admin gets all; user gets only own ===== */
 export async function getAllAppointments(req, res) {
   try {
+    const role = req.user?.role; // CHANGE
     const page = Math.max(1, parseInt(req.query.page ?? "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit ?? "10", 10)));
     const skip = (page - 1) * limit;
 
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
+
+    // CHANGE: if not admin, scope to own records
+    if (role !== "admin") {
+      const userId = req.user?.sub;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+      filter.userId = userId; // CHANGE
+    }
 
     const [items, total] = await Promise.all([
       AppointmentModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
@@ -147,7 +186,7 @@ export async function getAllAppointments(req, res) {
   }
 }
 
-/* ============ READ ONE (GET /appointments/:id) ============ */
+/* ============ READ ONE (GET /appointments/:id) — only owner or admin ============ */
 export async function getAppointmentById(req, res) {
   const { id } = req.params;
 
@@ -156,7 +195,13 @@ export async function getAppointmentById(req, res) {
   }
 
   try {
-    const appointment = await AppointmentModel.findById(id);
+    const role = req.user?.role;         // CHANGE
+    const userId = req.user?.sub;        // CHANGE
+
+    // CHANGE: enforce ownership unless admin
+    const criteria = role === "admin" ? { _id: id } : { _id: id, userId };
+
+    const appointment = await AppointmentModel.findOne(criteria);
     if (!appointment) return res.status(404).json({ message: "Appointment not found" });
     return res.status(200).json({ appointment });
   } catch (err) {
@@ -165,7 +210,7 @@ export async function getAppointmentById(req, res) {
   }
 }
 
-/* ============ UPDATE (PATCH /appointments/:id) ============ */
+/* ============ UPDATE (PATCH/PUT /appointments/:id) — only owner or admin ============ */
 export async function updateAppointment(req, res) {
   const { id } = req.params;
 
@@ -180,7 +225,13 @@ export async function updateAppointment(req, res) {
   const update = normalize(updateRaw);
 
   try {
-    const appointment = await AppointmentModel.findByIdAndUpdate(id, update, {
+    const role = req.user?.role;   // CHANGE
+    const userId = req.user?.sub;  // CHANGE
+
+    // CHANGE: enforce ownership unless admin
+    const criteria = role === "admin" ? { _id: id } : { _id: id, userId };
+
+    const appointment = await AppointmentModel.findOneAndUpdate(criteria, update, {
       new: true,
       runValidators: true,
     });
@@ -196,7 +247,7 @@ export async function updateAppointment(req, res) {
   }
 }
 
-/* ============ DELETE (DELETE /appointments/:id) ============ */
+/* ============ DELETE (DELETE /appointments/:id) — only owner or admin ============ */
 export async function deleteAppointment(req, res) {
   const { id } = req.params;
 
@@ -205,8 +256,16 @@ export async function deleteAppointment(req, res) {
   }
 
   try {
-    const appointment = await AppointmentModel.findByIdAndDelete(id);
+    const role = req.user?.role;   // CHANGE
+    const userId = req.user?.sub;  // CHANGE
+
+    // CHANGE: enforce ownership unless admin
+    const criteria = role === "admin" ? { _id: id } : { _id: id, userId };
+
+    const appointment = await AppointmentModel.findOne(criteria);
     if (!appointment) return res.status(404).json({ message: "Appointment not found" });
+
+    await appointment.deleteOne();
     return res.status(200).json({ message: "Appointment deleted", appointment });
   } catch (err) {
     console.error("❌ Error deleting appointment:", err);
