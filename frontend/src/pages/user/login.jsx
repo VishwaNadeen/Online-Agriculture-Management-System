@@ -56,7 +56,7 @@ export default function Login() {
       }
 
       // 🔔 tell the app/navbar auth state changed
-      window.dispatchEvent(new Event("auth-changed"));
+      window.dispatchEvent(new CustomEvent("auth-changed", { detail: { user } })); // CHANGE
 
       toast.success("Login successful");
       navigate(from, { replace: true });
