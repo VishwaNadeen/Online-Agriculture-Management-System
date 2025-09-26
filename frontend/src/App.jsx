@@ -12,7 +12,7 @@ const App = () => {
       <Toaster position="top-right" toastOptions={{ style: { marginTop: "60px", }, }} />
         <Routes>
           <Route path="/*" element={<ClientApp />} />
-          <Route path="/admin" element={<AdminApp />} />
+          <Route path="/admin/*" element={<AdminApp />} />
         </Routes>
     </Router>
   );

@@ -10,10 +10,9 @@ import adminRoute from './routes/adminRoute.js';
 import courseRoutes from "./routes/courseRoute.js";
 import { configDotenv } from "dotenv"
 import consultantRoutes from "./routes/consultantRoutes.js";
-
+import communityRoutes from "./routes/CommunityPost.js";
 
 configDotenv();
-
 
 const app = express()
 const port = process.env.PORT || 4000
@@ -41,6 +40,7 @@ app.use("/consultants", consultantRoutes);
 app.use("/users", userRoutes);
 app.use('/api/admin', adminRoute);
 app.use("/courses", courseRoutes); 
+app.use("/community", communityRoutes);
 
 
 // api endpoints
