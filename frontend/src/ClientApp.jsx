@@ -17,6 +17,8 @@ import Searchcon from "./pages/appointments/SearchCon";
 import CreateAppointment from "./pages/appointments/CreateAppointment.jsx";
 import EditAppointment from "./pages/appointments/EditAppointment.jsx";
 import ListAppointment from "./pages/appointments/ListAppointment.jsx";
+import Dashboard from "./pages/dashboard/Dashboard";
+import MyAppointments from "./pages/appointments/MyAppointments";
 
 //kalana
 import CommunityForum from "./pages/community/CommunityForum";
@@ -46,6 +48,11 @@ export default function ClientApp() {
         <Route path="/appointment" element={<CreateAppointment />} />
         <Route path="/appointment/:id/edit" element={<EditAppointment />} />
         <Route path="/my-appointments" element={<ListAppointment />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard/consultant" element={<Dashboard />} />
+        <Route path="/dashboard/bookings" element={<Dashboard />} />
+        <Route path="/my-appointment" element={<MyAppointments />} />
+
 
         {/* kalana */}
         <Route path="/community" element={<CommunityForum />} />

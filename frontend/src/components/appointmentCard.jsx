@@ -1,13 +1,27 @@
 // src/components/AppointmentCard.jsx
 import React from "react";
+import StatusChip from "./StatusChip";
 
 /**
  * Props:
- *  - appt
- *  - onDelete(appt)
- *  - onOpen(appt)   // ADD: open details modal when card clicked
+ *  - appt (object)
+ *  - role: "farmer" | "consultant"
+ *  - onOpen(appt)        // open details modal/page
+ *  - onConfirm(appt)     // consultant: confirm
+ *  - onDecline(appt)     // consultant: decline
+ *  - onCancel(appt)      // farmer: cancel
+ *  - onDelete(appt)      // optional generic delete (admin or list cleanup)
  */
-export default function AppointmentCard({ appt, onDelete, onOpen }) {
+export default function AppointmentCard({
+  appt,
+  role,
+  onOpen,
+  onConfirm,
+  onDecline,
+  onCancel,
+  onDelete,
+}) {
+  // ---- Derived display fields ----
   const dateStr = (() => {
     const d = appt.appointmentDate || appt.appointmentDateISO;
     if (!d) return "-";
@@ -25,47 +39,66 @@ export default function AppointmentCard({ appt, onDelete, onOpen }) {
   const city = appt.city || "-";
   const status = appt.status || "pending";
 
-  // Use friendly number, hide Mongo _id
-  const apptNo = appt.appointmentId ? `#${String(appt.appointmentId).padStart(5, "0")}` : "-";
+  // Friendly number, hide Mongo _id
+  const apptNo = appt.appointmentId
+    ? `#${String(appt.appointmentId).padStart(5, "0")}`
+    : "-";
 
-  const statusClass =
-    status === "confirmed"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-      : status === "cancelled"
-      ? "bg-rose-50 text-rose-700 border-rose-200"
-      : "bg-amber-50 text-amber-700 border-amber-200";
+  // Who is the other party name
+  const otherPartyName =
+    role === "consultant"
+      ? appt?.farmer?.firstName || appt?.name || "Farmer"
+      : appt?.consultant?.firstName || appt?.consultantName || "Consultant";
+
+  // ---- Actions visibility ----
+  const canConsultantAct =
+    role === "consultant" && status === "pending" && (onConfirm || onDecline);
+  const canFarmerCancel =
+    role === "farmer" && ["pending", "confirmed"].includes(status) && onCancel;
 
   return (
     <div
       className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition hover:-translate-y-[1px] cursor-pointer"
-      onClick={() => onOpen?.(appt)} // ADD
+      onClick={() => onOpen?.(appt)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" ? onOpen?.(appt) : null)}
     >
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-lg font-semibold text-gray-900 truncate">{appt.name}</h4>
+            <h4 className="text-lg font-semibold text-gray-900 truncate">
+              {otherPartyName}
+            </h4>
             <span className="text-sm text-gray-400">•</span>
-            <span className="text-sm font-medium text-emerald-700">{appt.category}</span>
+            <span className="text-sm font-medium text-emerald-700">
+              {appt.category}
+            </span>
           </div>
 
-          {/* Consultant shown right under title if available */}
-          {appt.consultantName && (
-            <div className="mt-1 text-sm text-gray-600">Consultant: <span className="font-medium text-gray-800">{appt.consultantName}</span></div>
+          {/* Show consultant for farmer side */}
+          {role !== "consultant" && appt.consultantName && (
+            <div className="mt-1 text-sm text-gray-600">
+              Consultant:{" "}
+              <span className="font-medium text-gray-800">
+                {appt.consultantName}
+              </span>
+            </div>
           )}
         </div>
 
         <div className="text-right shrink-0">
           <div className="text-xs text-gray-500">Appointment</div>
           <div className="text-sm font-semibold text-gray-900">{apptNo}</div>
-          <span className={`inline-flex mt-1 items-center rounded-full border px-2 py-0.5 text-xs ${statusClass}`}>
-            {status}
-          </span>
+          {/* Only one status chip (remove manual pill) */}
+          <div className="mt-1">
+            <StatusChip status={status} />
+          </div>
         </div>
       </div>
 
+      {/* Grid details */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm text-gray-700">
         <div>
           <div className="text-gray-500">Date</div>
@@ -83,22 +116,84 @@ export default function AppointmentCard({ appt, onDelete, onOpen }) {
           <div className="text-gray-500">City</div>
           <div className="font-medium">{city}</div>
         </div>
+
+        {appt.notes && (
+          <div className="md:col-span-4">
+            <div className="text-gray-500">Notes</div>
+            <div className="font-medium">{appt.notes}</div>
+          </div>
+        )}
+
+        {appt.declineReason && status === "declined" && (
+          <div className="md:col-span-4">
+            <div className="text-gray-500">Decline reason</div>
+            <div className="font-medium text-rose-700">{appt.declineReason}</div>
+          </div>
+        )}
       </div>
 
-      {/* Actions row stays clickable but won't trigger onOpen when clicking buttons */}
-      <div className="flex gap-3 mt-5">
+      {/* Actions */}
+      <div className="flex flex-wrap gap-3 mt-5">
+        {/* View */}
         <button
-          onClick={(e) => { e.stopPropagation(); onOpen?.(appt); }} // ADD: open details
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen?.(appt);
+          }}
           className="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200"
         >
           View
         </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(appt); }}
-          className="px-4 py-2 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200"
-        >
-          Cancel
-        </button>
+
+        {/* Farmer cancel */}
+        {canFarmerCancel && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancel?.(appt);
+            }}
+            className="px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900"
+          >
+            Cancel
+          </button>
+        )}
+
+        {/* Consultant confirm/decline */}
+        {canConsultantAct && (
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onConfirm?.(appt);
+              }}
+              className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDecline?.(appt);
+              }}
+              className="px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700"
+            >
+              Decline
+            </button>
+          </>
+        )}
+
+        {/* Optional: generic delete */}
+        {onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(appt);
+            }}
+            className="px-4 py-2 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200"
+          >
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );
