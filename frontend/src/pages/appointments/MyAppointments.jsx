@@ -1,5 +1,8 @@
+// src/pages/appointments/MyAppointments.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import AppointmentCard from "../../components/AppointmentCard.jsx";
 import {
   Calendar,
   Clock,
@@ -22,9 +25,10 @@ const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const ENDPOINTS = {
   userBookings: `${BASE}/appointments/my`,             // GET current user's bookings
   myConsultant: `${BASE}/appointments/my-consultant`,  // GET consultant's received appointments
-  confirm: (id) => `${BASE}/appointments/${id}/confirm`,
-  decline: (id) => `${BASE}/appointments/${id}/decline`,
-  complete: (id) => `${BASE}/appointments/${id}/complete`,
+  confirm:   (id) => `${BASE}/appointments/${id}/confirm`,
+  decline:   (id) => `${BASE}/appointments/${id}/decline`,
+  complete:  (id) => `${BASE}/appointments/${id}/complete`,
+  cancel:    (id) => `${BASE}/appointments/${id}/cancel`,
 };
 
 /* =========================
@@ -114,83 +118,51 @@ const Avatar = ({ src, alt }) => (
 );
 
 /* =========================
-   User Bookings (non-consultant)
+   USER SIDE: My Bookings (uses AppointmentCard with Edit + Cancel)
 ========================= */
-function BookingCard({ appt }) {
-  return (
-    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <Avatar src={appt.consultantAvatar} alt={appt.consultantName} />
-          <div>
-            <div className="font-semibold text-gray-900">{appt.consultantName}</div>
-            <div className="text-sm text-gray-500">
-              {new Date(appt.dateISO || appt.date).toLocaleDateString()} • {appt.time} • {appt.duration} min
-            </div>
-          </div>
-        </div>
-        <span
-          className={
-            "px-2 py-1 text-xs rounded-full " +
-            (appt.status === "upcoming"
-              ? "bg-emerald-100 text-emerald-800"
-              : appt.status === "completed"
-              ? "bg-gray-100 text-gray-800"
-              : "bg-red-100 text-red-700")
-          }
-        >
-          {appt.status?.[0]?.toUpperCase() + appt.status?.slice(1)}
-        </span>
-      </div>
-      {appt.status === "completed" && typeof appt.rating === "number" && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Stars value={appt.rating} />
-            <span className="text-sm text-gray-600">{appt.rating}/5</span>
-          </div>
-          {appt.feedback && (
-            <span className="text-sm text-gray-600 italic truncate max-w-[60%]">
-              “{appt.feedback}”
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function MyBookings() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [bookings, setBookings] = useState([]);
+  const [rows, setRows] = useState([]);
   const token = getToken();
+  const navigate = useNavigate();
+
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const load = async () => {
+    try {
+      setErr("");
+      setLoading(true);
+      const { data } = await axios.get(ENDPOINTS.userBookings, { headers });
+      const items = Array.isArray(data) ? data : data?.items || [];
+      setRows(items);
+    } catch (e) {
+      setErr(e?.response?.data?.message || e.message || "Failed to load your bookings");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setErr("");
-        setLoading(true);
-        const { data } = await axios.get(ENDPOINTS.userBookings, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        const items = Array.isArray(data) ? data : data?.items || [];
-        if (mounted) setBookings(items);
-      } catch (e) {
-        if (mounted)
-          setErr(e?.response?.data?.message || e.message || "Failed to load your bookings");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // Backend uses 'confirmed', 'pending', 'declined', 'cancelled', 'completed'
-  const upcoming = bookings.filter((b) => (b.status || "").toLowerCase() === "confirmed");
-  const completed = bookings.filter((b) => (b.status || "").toLowerCase() === "completed");
+  const handleEdit = (appt) => {
+    if (!appt?._id) return;
+    navigate(`/appointment/${appt._id}/edit`, { state: { appt } });
+  };
+
+  const handleCancel = async (appt) => {
+    if (!appt?._id) return;
+    if (!window.confirm("Cancel this appointment?")) return;
+    try {
+      await axios.post(ENDPOINTS.cancel(appt._id), {}, { headers });
+      await load();
+    } catch (e) {
+      alert(e?.response?.data?.message || e.message || "Cancel failed");
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
@@ -202,47 +174,40 @@ function MyBookings() {
         </div>
       )}
 
-      {loading ? (
-        <div className="text-gray-500">Loading...</div>
-      ) : (
-        <>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">Upcoming</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              {upcoming.length ? (
-                upcoming.map((a) => <BookingCard key={a._id || a.id} appt={a} />)
-              ) : (
-                <p className="text-gray-500">No upcoming appointments.</p>
-              )}
-            </div>
-          </div>
+      {loading && <div className="text-gray-500">Loading...</div>}
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">Completed</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              {completed.length ? (
-                completed.map((a) => <BookingCard key={a._id || a.id} appt={a} />)
-              ) : (
-                <p className="text-gray-500">No completed appointments yet.</p>
-              )}
-            </div>
-          </div>
-        </>
+      {!loading && rows.length === 0 && (
+        <div className="text-gray-600 bg-white border border-gray-200 rounded-2xl p-8 text-center">
+          No appointments yet.
+        </div>
+      )}
+
+      {!loading && rows.length > 0 && (
+        <div className="grid grid-cols-1 gap-4">
+          {rows.map((a) => (
+            <AppointmentCard
+              key={a._id || a.id}
+              appt={a}
+              role="farmer"
+              onEdit={handleEdit}
+              onCancel={handleCancel}
+              onOpen={() => {}}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
 /* =========================
-   Consultant Dashboard (receives appointments)
+   CONSULTANT SIDE (receives appointments)
 ========================= */
 function CApptCard({ appointment, showComplete = false, onComplete }) {
   const isUpcoming = (appointment.status || "").toLowerCase() === "confirmed";
-  const dateStr = new Date(appointment.appointmentDate || appointment.dateISO || appointment.date || Date.now()).toLocaleDateString();
+  const dateStr = new Date(
+    appointment.appointmentDate || appointment.dateISO || appointment.date || Date.now()
+  ).toLocaleDateString();
   const timeStr = appointment.appointmentTime || appointment.time || "-";
   const duration = appointment.durationHours ?? appointment.duration ?? 60;
   const apptId = appointment.appointmentId
@@ -255,15 +220,23 @@ function CApptCard({ appointment, showComplete = false, onComplete }) {
           <Avatar src={appointment.patientAvatar} alt={appointment.name || appointment.patientName} />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="font-semibold text-gray-900 truncate max-w-[220px]">{appointment.name || appointment.patientName}</h4>
+              <h4 className="font-semibold text-gray-900 truncate max-w-[220px]">
+                {appointment.name || appointment.patientName}
+              </h4>
               {appointment.category && (
-                <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">{appointment.category}</span>
+                <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  {appointment.category}
+                </span>
               )}
               {apptId && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">{apptId}</span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                  {apptId}
+                </span>
               )}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">{dateStr} • {timeStr} • {typeof duration === "number" ? `${duration} h` : duration}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {dateStr} • {timeStr} • {typeof duration === "number" ? `${duration} h` : duration}
+            </p>
           </div>
         </div>
         <div className="text-right shrink-0">
@@ -275,7 +248,9 @@ function CApptCard({ appointment, showComplete = false, onComplete }) {
       {(appointment.email || appointment.phone || appointment.city) && (
         <div className="text-xs text-gray-500 mb-1">
           {[appointment.email, appointment.phone].filter(Boolean).join(" • ")}
-          {appointment.city && <span>{[appointment.email, appointment.phone].some(Boolean) ? " • " : ""}{appointment.city}</span>}
+          {appointment.city && (
+            <span>{[appointment.email, appointment.phone].some(Boolean) ? " • " : ""}{appointment.city}</span>
+          )}
         </div>
       )}
 
@@ -311,9 +286,7 @@ function CApptCard({ appointment, showComplete = false, onComplete }) {
               )}
             </div>
           </div>
-          {appointment.feedback && (
-            <p className="text-sm text-gray-600 italic">"{appointment.feedback}"</p>
-          )}
+          {appointment.feedback && <p className="text-sm text-gray-600 italic">"{appointment.feedback}"</p>}
         </div>
       )}
     </div>
@@ -322,30 +295,26 @@ function CApptCard({ appointment, showComplete = false, onComplete }) {
 
 function ConsultantDashboard({ user }) {
   const token = getToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   const [activeTab, setActiveTab] = useState("overview");
   const [appointments, setAppointments] = useState([]);
   const [requests, setRequests] = useState([]); // derived from 'pending'
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [noteView, setNoteView] = useState(null); // { text, name } or null
 
   // fetch helper so we can refresh after actions
   const fetchConsultantAppointments = async () => {
     try {
       setErr("");
       setLoading(true);
-      const aRes = await axios.get(ENDPOINTS.myConsultant, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const aRes = await axios.get(ENDPOINTS.myConsultant, { headers });
       const aItems = Array.isArray(aRes.data) ? aRes.data : aRes.data?.items || [];
       const reqs = aItems.filter((it) => (it.status || "").toLowerCase() === "pending");
       setAppointments(aItems);
       setRequests(reqs);
     } catch (e) {
-      setErr(
-        e?.response?.data?.message || e.message || "Failed to load consultant dashboard"
-      );
+      setErr(e?.response?.data?.message || e.message || "Failed to load consultant dashboard");
     } finally {
       setLoading(false);
     }
@@ -360,6 +329,7 @@ function ConsultantDashboard({ user }) {
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -400,14 +370,10 @@ function ConsultantDashboard({ user }) {
   const handleRequestAction = async (requestId, action) => {
     try {
       if (action === "accept") {
-        await axios.post(ENDPOINTS.confirm(requestId), {}, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        await axios.post(ENDPOINTS.confirm(requestId), {}, { headers });
       } else if (action === "decline") {
         const reason = window.prompt("Reason (optional):") || "";
-        await axios.post(ENDPOINTS.decline(requestId), { reason }, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        await axios.post(ENDPOINTS.decline(requestId), { reason }, { headers });
       }
       await fetchConsultantAppointments();
     } catch (e) {
@@ -417,9 +383,7 @@ function ConsultantDashboard({ user }) {
 
   const handleComplete = async (appointmentId) => {
     try {
-      await axios.post(ENDPOINTS.complete(appointmentId), {}, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      await axios.post(ENDPOINTS.complete(appointmentId), {}, { headers });
       await fetchConsultantAppointments();
     } catch (e) {
       setErr(e?.response?.data?.message || e.message || "Failed to mark as completed");
@@ -537,9 +501,7 @@ function ConsultantDashboard({ user }) {
                         <div className="flex items-center space-x-1 mb-1">
                           <Stars value={appointment.rating || 0} />
                         </div>
-                        {appointment.feedback && (
-                          <p className="text-xs text-gray-600">"{appointment.feedback}"</p>
-                        )}
+                        {appointment.feedback && <p className="text-xs text-gray-600">"{appointment.feedback}"</p>}
                         <p className="text-xs text-gray-500 mt-1">- {appointment.patientName}</p>
                       </div>
                     ))}
@@ -593,50 +555,57 @@ function ConsultantDashboard({ user }) {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {requests.length ? (
                   requests.map((r) => (
-                    <div key={r._id || r.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col h-full min-h-[230px]">
-                      {/* Row 1: Name + Pending */}
+                    <div
+                      key={r._id || r.id}
+                      className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col h-full min-h-[230px]"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 min-w-0">
                           <Avatar src={r.patientAvatar} alt={r.name || r.patientName} />
-                          <h4 className="font-semibold text-gray-900 truncate max-w-[220px]">{r.name || r.patientName}</h4>
+                          <h4 className="font-semibold text-gray-900 truncate max-w-[220px]">
+                            {r.name || r.patientName}
+                          </h4>
                         </div>
-                        <span className="shrink-0 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full border border-orange-200">Pending</span>
+                        <span className="shrink-0 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full border border-orange-200">
+                          Pending
+                        </span>
                       </div>
 
-                      {/* Row 2: chips and when */}
                       <div className="mt-2 flex items-center gap-2 flex-wrap text-sm">
                         {r.category && (
-                          <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">{r.category}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {r.category}
+                          </span>
                         )}
                         {r.appointmentId && (
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">#{String(r.appointmentId).padStart(5, "0")}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                            #{String(r.appointmentId).padStart(5, "0")}
+                          </span>
                         )}
-                        <span className="text-xs text-gray-500">{new Date(r.appointmentDate).toLocaleDateString()} • {r.appointmentTime}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(r.appointmentDate).toLocaleDateString()} • {r.appointmentTime}
+                        </span>
                       </div>
 
-                      {/* Row 3: optional note */}
                       {r.notes && (
                         <div className="mt-2 flex items-center justify-between gap-3">
-                          <div className="text-xs italic text-gray-600 overflow-hidden whitespace-nowrap text-ellipsis" title={r.notes}>
+                          <div
+                            className="text-xs italic text-gray-600 overflow-hidden whitespace-nowrap text-ellipsis"
+                            title={r.notes}
+                          >
                             “{r.notes}”
                           </div>
-                          <button
-                            type="button"
-                            className="text-xs text-blue-600 hover:underline shrink-0"
-                            onClick={() => setNoteView({ text: r.notes, name: r.name || r.patientName })}
-                          >
-                            View note
-                          </button>
+                          {/* could add a modal to view full note if needed */}
                         </div>
                       )}
 
-                      {/* Row 4: contact/location */}
                       <div className="mt-2 text-xs text-gray-500">
                         {[r.email, r.phone].filter(Boolean).join(" • ")}
-                        {r.city && <span>{[r.email, r.phone].some(Boolean) ? " • " : ""}{r.city}</span>}
+                        {r.city && (
+                          <span>{[r.email, r.phone].some(Boolean) ? " • " : ""}{r.city}</span>
+                        )}
                       </div>
 
-                      {/* Row 5: actions pinned to bottom */}
                       <div className="mt-auto flex gap-2 pt-3 border-t border-gray-100">
                         <button
                           className="flex-1 bg-green-600 text-white text-sm py-2 px-3 rounded-lg hover:bg-green-700"

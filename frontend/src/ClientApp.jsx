@@ -53,11 +53,13 @@ export default function ClientApp() {
         <Route path="/SearchCon" element={<Searchcon />} />
         <Route path="/appointment" element={<CreateAppointment />} />
         <Route path="/appointment/:id/edit" element={<EditAppointment />} />
-        <Route path="/my-appointments" element={<ListAppointment />} />
+      
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/consultant" element={<Dashboard />} />
         <Route path="/dashboard/bookings" element={<Dashboard />} />
-        <Route path="/appointments/me" element={<MyAppointments />} />
+       {/* <Route path="/appointments/me" element={<MyAppointments />} />
+         <Route path="/my-appointments" element={<ListAppointment />} />*/}
+         <Route path="/my-appointments" element={<MyAppointments />} />
 
         {/* kalana */}
         <Route path="/community" element={<CommunityForum />} />

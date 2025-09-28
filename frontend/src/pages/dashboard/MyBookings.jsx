@@ -1,27 +1,35 @@
-// src/pages/dashboard/MyBookings.jsx
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import API from "../../utils/api";
-import AppointmentCard from "../../components/appointmentCard";
+import AppointmentCard from "../../components/AppointmentCard";
 
 export default function MyBookings() {
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   async function load() {
     setLoading(true);
     try {
       const q = status ? `?status=${status}` : "";
-      const { data } = await API.get(`/appointments/my-bookings${q}`);
-      setRows(data || []);
+      // backend route you already have: GET /appointments/my
+      const { data } = await API.get(`/appointments/my${q}`);
+      setRows(Array.isArray(data) ? data : data?.items || []);
     } finally {
       setLoading(false);
     }
   }
-  useEffect(() => { load(); }, [status]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [status]);
 
-  const doCancel = async (appt) => {
-    if (!confirm("Cancel this appointment?")) return;
+  const onEdit = (appt) => {
+    if (!appt?._id) return;
+    navigate(`/appointment/${appt._id}/edit`, { state: { appt } });
+  };
+
+  const onCancel = async (appt) => {
+    if (!appt?._id) return;
+    if (!window.confirm("Cancel this appointment?")) return;
     await API.post(`/appointments/${appt._id}/cancel`);
     load();
   };
@@ -50,10 +58,12 @@ export default function MyBookings() {
       <div className="grid md:grid-cols-2 gap-3">
         {rows.map((r) => (
           <AppointmentCard
-            key={r._id}
+            key={r._id || r.id}
             appt={r}
             role="farmer"
-            onCancel={doCancel}
+            onEdit={onEdit}
+            onCancel={onCancel}
+            onOpen={() => {}}
           />
         ))}
       </div>

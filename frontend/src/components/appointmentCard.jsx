@@ -6,11 +6,11 @@ import StatusChip from "./StatusChip";
  * Props:
  *  - appt (object)
  *  - role: "farmer" | "consultant"
- *  - onOpen(appt)        // open details modal/page
+ *  - onOpen(appt)
  *  - onConfirm(appt)     // consultant: confirm
  *  - onDecline(appt)     // consultant: decline
  *  - onCancel(appt)      // farmer: cancel
- *  - onDownload(appt)    // download appointment as PDF
+ *  - onEdit(appt)        // farmer: edit
  */
 export default function AppointmentCard({
   appt,
@@ -19,11 +19,10 @@ export default function AppointmentCard({
   onConfirm,
   onDecline,
   onCancel,
-  onDownload,
+  onEdit,
 }) {
-  // ---- Derived display fields ----
   const dateStr = (() => {
-    const d = appt.appointmentDate || appt.appointmentDateISO;
+    const d = appt.appointmentDate || appt.appointmentDateISO || appt.dateISO || appt.date;
     if (!d) return "-";
     const dt = new Date(d);
     return dt.toLocaleDateString(undefined, {
@@ -34,27 +33,20 @@ export default function AppointmentCard({
     });
   })();
 
-  const timeStr = appt.appointmentTime || "-";
-  const duration = appt.durationHours ? `${appt.durationHours} h` : "-";
+  const timeStr = appt.appointmentTime || appt.time || "-";
+  const duration = appt.durationHours ? `${appt.durationHours} h` : appt.duration ? `${appt.duration} min` : "-";
   const city = appt.city || "-";
-  const status = appt.status || "pending";
+  const status = (appt.status || "pending").toLowerCase();
 
-  // Friendly number, hide Mongo _id
-  const apptNo = appt.appointmentId
-    ? `#${String(appt.appointmentId).padStart(5, "0")}`
-    : "-";
+  const apptNo = appt.appointmentId ? `#${String(appt.appointmentId).padStart(5, "0")}` : "-";
 
-  // Who is the other party name
   const otherPartyName =
     role === "consultant"
       ? appt?.farmer?.firstName || appt?.name || "Farmer"
       : appt?.consultant?.firstName || appt?.consultantName || "Consultant";
 
-  // ---- Actions visibility ----
-  const canConsultantAct =
-    role === "consultant" && status === "pending" && (onConfirm || onDecline);
-  const canFarmerCancel =
-    role === "farmer" && ["pending", "confirmed"].includes(status) && onCancel;
+  const canConsultantAct = role === "consultant" && status === "pending";
+  const canFarmerCancel = role === "farmer" && ["pending", "confirmed"].includes(status);
 
   return (
     <div
@@ -83,7 +75,7 @@ export default function AppointmentCard({
             )}
           </div>
 
-          {/* For farmer view, also show consultant name as meta */}
+          {/* farmer meta */}
           {role !== "consultant" && appt.consultantName && (
             <div className="mt-1 text-sm text-gray-600 truncate">
               Consultant: <span className="font-medium text-gray-800">{appt.consultantName}</span>
@@ -99,7 +91,7 @@ export default function AppointmentCard({
         </div>
       </div>
 
-      {/* Grid details */}
+      {/* Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm text-gray-700">
         <div>
           <div className="text-gray-500">Date</div>
@@ -125,70 +117,55 @@ export default function AppointmentCard({
             </div>
           </div>
         )}
-        {/* Notes and decline reason intentionally hidden */}
       </div>
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3 mt-5">
-        {/* View */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen?.(appt);
-          }}
+       {/*} <button
+          onClick={(e) => { e.stopPropagation(); onOpen?.(appt); }}
           className="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200"
         >
           View
-        </button>
+        </button>*/}
 
-        {/* Farmer cancel */}
-        {canFarmerCancel && (
+        {/* farmer: edit */}
+        {role === "farmer" && onEdit && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onCancel?.(appt);
-            }}
-            className="px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900"
+            onClick={(e) => { e.stopPropagation(); onEdit(appt); }}
+           className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+
+          >
+            Edit
+          </button>
+        )}
+
+        {/* farmer: cancel */}
+        {canFarmerCancel && onCancel && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onCancel(appt); }}
+           className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+
           >
             Cancel
           </button>
         )}
 
-        {/* Consultant confirm/decline */}
+        {/* consultant: confirm/decline */}
         {canConsultantAct && (
           <>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onConfirm?.(appt);
-              }}
+              onClick={(e) => { e.stopPropagation(); onConfirm?.(appt); }}
               className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
             >
               Confirm
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDecline?.(appt);
-              }}
+              onClick={(e) => { e.stopPropagation(); onDecline?.(appt); }}
               className="px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700"
             >
               Decline
             </button>
           </>
-        )}
-
-        {/* Download PDF */}
-        {onDownload && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDownload(appt);
-            }}
-            className="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-          >
-            Download
-          </button>
         )}
       </div>
     </div>

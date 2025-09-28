@@ -71,7 +71,8 @@ const CATEGORY_ALIASES = {
 };
 
 const SUGGESTIONS = ["Kandy", "Colombo", "Soil Testing", "Pest Control", "Organic Farming"];
-const MY_APPTS_ROUTE = "/appointments/me";
+//const MY_APPTS_ROUTE = "/appointments/me";
+const MY_APPTS_ROUTE = "/my-appointments";   // (PAGE path ✅)
 
 /* ==== Small skeleton while loading ==== */
 function SkeletonCard() {
