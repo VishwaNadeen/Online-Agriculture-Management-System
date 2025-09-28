@@ -66,7 +66,7 @@ export default function ClientApp() {
 
         {/* dilhani */}
         <Route path="/events" element={<EventPage />} />
-        <Route path="/event/:id" element={<EventDetail />} />
+        <Route path="/events/:id" element={<EventDetail />} />
         <Route path="/my-events" element={<MyEvents />} />
 
       </Routes>

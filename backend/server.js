@@ -44,7 +44,7 @@ app.use("/users", userRoutes);
 app.use('/api/admin', adminRoute);
 app.use("/courses", courseRoutes); 
 app.use("/community", communityRoutes);
-app.use("/event", eventRoutes);
+app.use("/events", eventRoutes);
 app.use("/eventregistration", eventRegistrationRoutes);
 app.use("/eventfeedback", eventFeedbackRoutes)
 

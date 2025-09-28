@@ -21,10 +21,7 @@ function readAuthFromStorage() {
   return { token, user };
 }
 
-
 //delivery term
-
-
 const CategoryBadge = ({ category }) => {
   const categoryColors = {
     'Workshop': 'bg-blue-100 text-blue-800 border-blue-200',
