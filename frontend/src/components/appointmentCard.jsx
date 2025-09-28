@@ -10,7 +10,7 @@ import StatusChip from "./StatusChip";
  *  - onConfirm(appt)     // consultant: confirm
  *  - onDecline(appt)     // consultant: decline
  *  - onCancel(appt)      // farmer: cancel
- *  - onDelete(appt)      // optional generic delete (admin or list cleanup)
+ *  - onDownload(appt)    // download appointment as PDF
  */
 export default function AppointmentCard({
   appt,
@@ -19,7 +19,7 @@ export default function AppointmentCard({
   onConfirm,
   onDecline,
   onCancel,
-  onDelete,
+  onDownload,
 }) {
   // ---- Derived display fields ----
   const dateStr = (() => {
@@ -182,16 +182,16 @@ export default function AppointmentCard({
           </>
         )}
 
-        {/* Optional: generic delete */}
-        {onDelete && (
+        {/* Download PDF */}
+        {onDownload && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onDelete(appt);
+              onDownload(appt);
             }}
-            className="px-4 py-2 rounded-lg bg-rose-100 text-rose-700 hover:bg-rose-200"
+            className="px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
           >
-            Delete
+            Download
           </button>
         )}
       </div>

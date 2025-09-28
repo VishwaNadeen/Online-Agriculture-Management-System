@@ -51,8 +51,7 @@ export default function ClientApp() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/consultant" element={<Dashboard />} />
         <Route path="/dashboard/bookings" element={<Dashboard />} />
-        <Route path="/my-appointment" element={<MyAppointments />} />
-
+        <Route path="/appointments/me" element={<MyAppointments />} />
 
         {/* kalana */}
         <Route path="/community" element={<CommunityForum />} />

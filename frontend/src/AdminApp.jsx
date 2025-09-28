@@ -5,10 +5,9 @@ import UsersAdmin from "./admin/UsersAdmin.jsx";
 import CoursesAdmin from "./admin/courseAdmin.jsx";
 import AddCourse from "./admin/addCourse.jsx";
 import UpdateCourse from "./admin/updateCourse.jsx";
+import AppointmentsAdmin from "./admin/consultantAdmin.jsx";
 
 // Replace with your real pages
-
-const AppointmentsAdmin = () => <div>Appointments page</div>;
 const CommunityAdmin = () => <div>Community page</div>;
 const SettingsAdmin = () => <div>Settings page</div>;
 
@@ -26,9 +25,10 @@ export default function AdminApp() {
         <Route path="courses" element={<CoursesAdmin></CoursesAdmin>} />
         <Route path="addCourse" element={<AddCourse></AddCourse>} />
         <Route path="updateCourse" element={<UpdateCourse></UpdateCourse>} />
-        <Route path="appointments" element={<AppointmentsAdmin />} />
+        <Route path="consultant" element={<AppointmentsAdmin />} />
         <Route path="community" element={<CommunityAdmin />} />
         <Route path="settings" element={<SettingsAdmin />} />
+
 
         {/*Catch-all fallback */}
         <Route path="*" element={<Navigate to="." replace />} />

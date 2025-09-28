@@ -26,6 +26,26 @@ export async function auth(req, res, next) {
 export { auth as requireAuth };
 export default auth; // optional, but handy
 
+// ✅ optionalAuth: do NOT require a token, but attach req.user if present
+export async function optionalAuth(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) return next();
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "dev_secret");
+    const userId = decoded.id || decoded._id || decoded.sub || decoded.userId;
+    if (!userId) return next();
+
+    const user = await User.findById(userId).lean();
+    if (user) req.user = user;
+    return next();
+  } catch (e) {
+    // ignore invalid tokens for optional flows
+    return next();
+  }
+}
+
 // ✅ add selfOrAdmin (tiny helper)
 export const selfOrAdmin = (paramName = "id") => (req, res, next) => {
   if (String(req.user?._id) === String(req.params[paramName]) || req.user?.role === "admin") {
