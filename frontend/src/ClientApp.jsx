@@ -11,6 +11,9 @@ import UserRegistration from "./pages/user/userRegistration";
 import UserRoleDetails from "./pages/user/userRoleDetails";
 import Login from "./pages/user/login";
 import Profile from "./pages/user/profile";
+import Farm from "./pages/user/farmerDetailsPage.jsx";
+import ProfileEdit from "./pages/user/profileEdit.jsx";
+import FarmEdit from "./pages/user/farmEdit.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -40,6 +43,9 @@ export default function ClientApp() {
         <Route path="/register-step2" element={<UserRoleDetails />} />
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/farm" element={<Farm />} />
+        <Route path="/profile/edit" element={<ProfileEdit />} />
+        <Route path="/farm/edit" element={<FarmEdit />} />
 
         {/* Methma */}
         <Route path="/SearchCon" element={<Searchcon />} />

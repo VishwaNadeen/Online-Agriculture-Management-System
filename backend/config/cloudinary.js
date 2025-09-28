@@ -9,4 +9,4 @@ export function connectCloudinary() {
   });
 }
 
-export default cloudinary; // optional: also export the instance
+export default cloudinary;
