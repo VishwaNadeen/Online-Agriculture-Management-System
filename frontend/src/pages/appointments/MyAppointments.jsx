@@ -24,6 +24,7 @@ const ENDPOINTS = {
   myConsultant: `${BASE}/appointments/my-consultant`,  // GET consultant's received appointments
   confirm: (id) => `${BASE}/appointments/${id}/confirm`,
   decline: (id) => `${BASE}/appointments/${id}/decline`,
+  complete: (id) => `${BASE}/appointments/${id}/complete`,
 };
 
 /* =========================
@@ -239,27 +240,44 @@ function MyBookings() {
 /* =========================
    Consultant Dashboard (receives appointments)
 ========================= */
-function CApptCard({ appointment }) {
+function CApptCard({ appointment, showComplete = false, onComplete }) {
   const isUpcoming = (appointment.status || "").toLowerCase() === "confirmed";
   const dateStr = new Date(appointment.appointmentDate || appointment.dateISO || appointment.date || Date.now()).toLocaleDateString();
   const timeStr = appointment.appointmentTime || appointment.time || "-";
   const duration = appointment.durationHours ?? appointment.duration ?? 60;
+  const apptId = appointment.appointmentId
+    ? `#${String(appointment.appointmentId).padStart(5, "0")}`
+    : null;
   return (
     <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-3">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Avatar src={appointment.patientAvatar} alt={appointment.name || appointment.patientName} />
-          <div>
-            <h4 className="font-semibold text-gray-900">{appointment.name || appointment.patientName}</h4>
-            <p className="text-sm text-gray-500">{appointment.category || appointment.type || "Consultation"}</p>
-            <p className="text-xs text-gray-500">{dateStr} • {timeStr} • {duration}{typeof duration === "number" ? "h" : ""}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="font-semibold text-gray-900 truncate max-w-[220px]">{appointment.name || appointment.patientName}</h4>
+              {appointment.category && (
+                <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">{appointment.category}</span>
+              )}
+              {apptId && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">{apptId}</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">{dateStr} • {timeStr} • {typeof duration === "number" ? `${duration} h` : duration}</p>
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-right shrink-0">
           <p className="text-sm font-medium text-gray-900">{timeStr}</p>
-          <p className="text-xs text-gray-500">{duration}{typeof duration === "number" ? " h" : ""}</p>
+          <p className="text-xs text-gray-500">{typeof duration === "number" ? `${duration} h` : duration}</p>
         </div>
       </div>
+
+      {(appointment.email || appointment.phone || appointment.city) && (
+        <div className="text-xs text-gray-500 mb-1">
+          {[appointment.email, appointment.phone].filter(Boolean).join(" • ")}
+          {appointment.city && <span>{[appointment.email, appointment.phone].some(Boolean) ? " • " : ""}{appointment.city}</span>}
+        </div>
+      )}
 
       {isUpcoming ? (
         <div className="flex items-center justify-between">
@@ -271,6 +289,15 @@ function CApptCard({ appointment }) {
             <button type="button" className="text-gray-600 hover:text-gray-800 text-sm">
               Reschedule
             </button>
+            {showComplete && (
+              <button
+                type="button"
+                className="text-emerald-600 hover:text-emerald-800 text-sm font-medium"
+                onClick={onComplete}
+              >
+                Complete
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -301,6 +328,7 @@ function ConsultantDashboard({ user }) {
   const [requests, setRequests] = useState([]); // derived from 'pending'
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [noteView, setNoteView] = useState(null); // { text, name } or null
 
   // fetch helper so we can refresh after actions
   const fetchConsultantAppointments = async () => {
@@ -358,9 +386,16 @@ function ConsultantDashboard({ user }) {
       (String(b.dateISO || b.date) + b.time).localeCompare(String(a.dateISO || a.date) + a.time)
     );
 
-  const todaysAppointments = upcomingAppointments.filter(
-    (a) => (a.dateISO || a.date)?.slice(0, 10) === todayStr
-  );
+  const todaysAppointments = upcomingAppointments.filter((a) => {
+    const d = a.appointmentDate || a.dateISO || a.date;
+    if (!d) return false;
+    try {
+      const iso = new Date(d).toISOString().slice(0, 10);
+      return iso === todayStr;
+    } catch {
+      return false;
+    }
+  });
 
   const handleRequestAction = async (requestId, action) => {
     try {
@@ -377,6 +412,17 @@ function ConsultantDashboard({ user }) {
       await fetchConsultantAppointments();
     } catch (e) {
       setErr(e?.response?.data?.message || e.message || "Failed to update request");
+    }
+  };
+
+  const handleComplete = async (appointmentId) => {
+    try {
+      await axios.post(ENDPOINTS.complete(appointmentId), {}, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      await fetchConsultantAppointments();
+    } catch (e) {
+      setErr(e?.response?.data?.message || e.message || "Failed to mark as completed");
     }
   };
 
@@ -452,8 +498,13 @@ function ConsultantDashboard({ user }) {
                   <p className="text-sm text-gray-500">{new Date().toLocaleDateString()}</p>
                 </div>
                 <div className="p-6 space-y-4">
-                  {todaysAppointments.slice(0, 3).map((appointment) => (
-                    <CApptCard key={appointment._id || appointment.id} appointment={appointment} />
+                  {todaysAppointments.map((appointment) => (
+                    <CApptCard
+                      key={appointment._id || appointment.id}
+                      appointment={appointment}
+                      showComplete
+                      onComplete={() => handleComplete(appointment._id || appointment.id)}
+                    />
                   ))}
                   {todaysAppointments.length === 0 && (
                     <p className="text-gray-500 text-center py-8">No appointments scheduled for today</p>
@@ -542,28 +593,51 @@ function ConsultantDashboard({ user }) {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {requests.length ? (
                   requests.map((r) => (
-                    <div key={r._id || r.id} className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
+                    <div key={r._id || r.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col h-full min-h-[230px]">
+                      {/* Row 1: Name + Pending */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
                           <Avatar src={r.patientAvatar} alt={r.name || r.patientName} />
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{r.name || r.patientName}</h4>
-                            <p className="text-sm text-gray-500">{r.category || r.type || "Consultation"}</p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(r.appointmentDate).toLocaleDateString()} • {r.appointmentTime}
-                            </p>
-                          </div>
+                          <h4 className="font-semibold text-gray-900 truncate max-w-[220px]">{r.name || r.patientName}</h4>
                         </div>
-                        <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">Pending</span>
+                        <span className="shrink-0 px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full border border-orange-200">Pending</span>
                       </div>
 
-                      <div className="text-sm text-gray-600 mb-3 space-y-1">
-                        {r.notes && <p>"{r.notes}"</p>}
-                        <p className="text-xs text-gray-500">{r.email} • {r.phone}</p>
-                        {r.city && <p className="text-xs text-gray-500">{r.city}</p>}
+                      {/* Row 2: chips and when */}
+                      <div className="mt-2 flex items-center gap-2 flex-wrap text-sm">
+                        {r.category && (
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">{r.category}</span>
+                        )}
+                        {r.appointmentId && (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">#{String(r.appointmentId).padStart(5, "0")}</span>
+                        )}
+                        <span className="text-xs text-gray-500">{new Date(r.appointmentDate).toLocaleDateString()} • {r.appointmentTime}</span>
                       </div>
 
-                      <div className="flex space-x-2">
+                      {/* Row 3: optional note */}
+                      {r.notes && (
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <div className="text-xs italic text-gray-600 overflow-hidden whitespace-nowrap text-ellipsis" title={r.notes}>
+                            “{r.notes}”
+                          </div>
+                          <button
+                            type="button"
+                            className="text-xs text-blue-600 hover:underline shrink-0"
+                            onClick={() => setNoteView({ text: r.notes, name: r.name || r.patientName })}
+                          >
+                            View note
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Row 4: contact/location */}
+                      <div className="mt-2 text-xs text-gray-500">
+                        {[r.email, r.phone].filter(Boolean).join(" • ")}
+                        {r.city && <span>{[r.email, r.phone].some(Boolean) ? " • " : ""}{r.city}</span>}
+                      </div>
+
+                      {/* Row 5: actions pinned to bottom */}
+                      <div className="mt-auto flex gap-2 pt-3 border-t border-gray-100">
                         <button
                           className="flex-1 bg-green-600 text-white text-sm py-2 px-3 rounded-lg hover:bg-green-700"
                           onClick={() => handleRequestAction(r._id || r.id, "accept")}

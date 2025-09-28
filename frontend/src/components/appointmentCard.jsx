@@ -71,27 +71,28 @@ export default function AppointmentCard({
             <h4 className="text-lg font-semibold text-gray-900 truncate">
               {otherPartyName}
             </h4>
-            <span className="text-sm text-gray-400">•</span>
-            <span className="text-sm font-medium text-emerald-700">
-              {appt.category}
-            </span>
+            {appt.category && (
+              <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {appt.category}
+              </span>
+            )}
+            {apptNo !== "-" && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                {apptNo}
+              </span>
+            )}
           </div>
 
-          {/* Show consultant for farmer side */}
+          {/* For farmer view, also show consultant name as meta */}
           {role !== "consultant" && appt.consultantName && (
-            <div className="mt-1 text-sm text-gray-600">
-              Consultant:{" "}
-              <span className="font-medium text-gray-800">
-                {appt.consultantName}
-              </span>
+            <div className="mt-1 text-sm text-gray-600 truncate">
+              Consultant: <span className="font-medium text-gray-800">{appt.consultantName}</span>
             </div>
           )}
         </div>
 
         <div className="text-right shrink-0">
-          <div className="text-xs text-gray-500">Appointment</div>
-          <div className="text-sm font-semibold text-gray-900">{apptNo}</div>
-          {/* Only one status chip (remove manual pill) */}
+          <div className="text-xs text-gray-500">Status</div>
           <div className="mt-1">
             <StatusChip status={status} />
           </div>
@@ -116,20 +117,15 @@ export default function AppointmentCard({
           <div className="text-gray-500">City</div>
           <div className="font-medium">{city}</div>
         </div>
-
-        {appt.notes && (
+        {(appt.email || appt.phone) && (
           <div className="md:col-span-4">
-            <div className="text-gray-500">Notes</div>
-            <div className="font-medium">{appt.notes}</div>
+            <div className="text-gray-500">Contact</div>
+            <div className="font-medium text-gray-800 truncate">
+              {[appt.email, appt.phone].filter(Boolean).join(" • ")}
+            </div>
           </div>
         )}
-
-        {appt.declineReason && status === "declined" && (
-          <div className="md:col-span-4">
-            <div className="text-gray-500">Decline reason</div>
-            <div className="font-medium text-rose-700">{appt.declineReason}</div>
-          </div>
-        )}
+        {/* Notes and decline reason intentionally hidden */}
       </div>
 
       {/* Actions */}
