@@ -1,9 +1,9 @@
 // controllers/userCtrl.js
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import User from "../models/userModel.js"; // << ensure this matches your file name
+import User from "../models/userModel.js";
 
-// ---------- helpers ----------
+/* ---------- helpers ---------- */
 const signTokenIfPossible = (user) => {
   const secret = process.env.JWT_SECRET;
   if (!secret) return null;
@@ -18,17 +18,15 @@ const buildAddressFromBody = (body) => {
   return any ? { country, stateProvince, city, postalCode, line1, line2 } : undefined;
 };
 
-// Whitelist top-level updatable fields
+// Whitelist top-level updatable fields (LOCK: email, role, profilePicture not updatable here)
 const pickUpdatable = (body) => {
   const allowedTop = [
     "firstName",
     "lastName",
     "phone",
-    "email",
     "dateOfBirth",
     "gender",
-    "profilePicture", // URL from Cloudinary (set in route)
-    "role", // "user" | "farmer" | "consultant"
+    // "email", "role", "profilePicture" are intentionally excluded on updates
   ];
 
   const out = {};
@@ -38,18 +36,11 @@ const pickUpdatable = (body) => {
   const addr = buildAddressFromBody(body);
   if (addr) out.address = addr;
 
-  // nested role sections (replace or merge—simple replace here)
+  // nested role sections
   if (body.farmer && typeof body.farmer === "object") out.farmer = body.farmer;
   if (body.consultant && typeof body.consultant === "object") out.consultant = body.consultant;
 
   return out;
-};
-
-// Hide sensitive fields when using .lean()
-const stripSensitive = (doc) => {
-  if (!doc) return doc;
-  const { password, __v, ...clean } = doc;
-  return clean;
 };
 
 // ---------- controller methods ----------
@@ -62,14 +53,13 @@ const create = async (req, res) => {
       email,
       dateOfBirth,
       gender,
-      profilePicture, // must be a URL already (Cloudinary) — set in the route
+      profilePicture, // Cloudinary URL (set in route if file uploaded)
       password,
       role,        // "user" | "farmer" | "consultant"
-      farmer,      // optional object
-      consultant,  // optional object
+      farmer,
+      consultant,
     } = req.body;
 
-    // minimal required checks (model will enforce too)
     if (!firstName || !lastName || !phone || !email || !dateOfBirth || !gender || !password) {
       return res.status(400).json({ message: "Missing required fields." });
     }
@@ -77,7 +67,6 @@ const create = async (req, res) => {
     const address = buildAddressFromBody(req.body);
     if (!address) return res.status(400).json({ message: "Address is required." });
 
-    // hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -87,7 +76,7 @@ const create = async (req, res) => {
       email: String(email).toLowerCase().trim(),
       dateOfBirth,
       gender,
-      profilePicture, // Cloudinary URL or undefined
+      profilePicture, // may be undefined if no file uploaded
       password: passwordHash,
       address,
       role: role || "user",
@@ -102,7 +91,6 @@ const create = async (req, res) => {
       user, // password hidden by schema toJSON
     });
   } catch (err) {
-    // handle duplicate keys nicely
     if (err.code === 11000) {
       const field = Object.keys(err.keyValue || {})[0] || "field";
       return res.status(409).json({ message: `Duplicate ${field}.` });
@@ -150,7 +138,6 @@ const list = async (req, res) => {
     if (role) filter.role = role;
 
     if (q) {
-      // Try text index, fallback to regex
       filter.$or = [
         { $text: { $search: q } },
         { firstName: { $regex: q, $options: "i" } },
@@ -167,12 +154,7 @@ const list = async (req, res) => {
       User.countDocuments(filter),
     ]);
 
-    res.json({
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      users, // password hidden by toJSON
-    });
+    res.json({ total, page: Number(page), limit: Number(limit), users });
   } catch (err) {
     console.error("List users error:", err);
     res.status(500).json({ message: "Failed to fetch users", error: err.message });
@@ -184,7 +166,7 @@ const get = async (req, res) => {
     const { id } = req.params;
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user); // password hidden by toJSON
+    res.json(user);
   } catch (err) {
     console.error("Get user error:", err);
     res.status(500).json({ message: "Failed to fetch user", error: err.message });
@@ -202,15 +184,19 @@ const update = async (req, res) => {
 
     const updates = pickUpdatable(req.body);
 
-    // normalize email/phone if present
-    if (updates.email) updates.email = String(updates.email).toLowerCase().trim();
+    // normalize phone if present
     if (updates.phone) updates.phone = String(updates.phone).trim();
 
-    const user = await User.findByIdAndUpdate(id, { $set: updates }, { new: true, runValidators: true });
+    const user = await User.findByIdAndUpdate(
+      id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json({ message: "User updated", user });
+    // IMPORTANT: return the plain user (matches GET shape)
+    res.json(user);
   } catch (err) {
     if (err.code === 11000) {
       const field = Object.keys(err.keyValue || {})[0] || "field";
@@ -250,20 +236,13 @@ const changePassword = async (req, res) => {
   }
 };
 
-/**
- * DELETE /users/:id
- * - If requester is deleting their own account: require `currentPassword` in body
- * - If requester is an admin deleting someone else's account: no password required
- */
 const remove = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Must already be authenticated and authorized by middlewares
     const requesterId = req.user?.sub || req.user?._id?.toString();
     const requesterRole = req.user?.role;
 
-    // Load target user first (to verify password when needed)
     const target = await User.findById(id);
     if (!target) return res.status(404).json({ message: "User not found" });
 
@@ -271,7 +250,6 @@ const remove = async (req, res) => {
     const isAdmin = requesterRole === "admin";
 
     if (isSelf && !isAdmin) {
-      // Self-deletion: require password
       const { currentPassword } = req.body || {};
       if (!currentPassword) {
         return res.status(400).json({ message: "currentPassword is required to delete your account." });
@@ -281,7 +259,6 @@ const remove = async (req, res) => {
         return res.status(401).json({ message: "Password is incorrect." });
       }
     }
-    // Admin deleting others -> no password required
 
     await User.findByIdAndDelete(id);
     return res.json({ message: "User deleted" });
@@ -291,6 +268,5 @@ const remove = async (req, res) => {
   }
 };
 
-// ---------- export in a familiar shape ----------
 const userCtrl = { create, login, list, get, update, changePassword, remove };
 export default userCtrl;

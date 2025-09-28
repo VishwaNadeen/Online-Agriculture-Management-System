@@ -35,7 +35,7 @@ const uploadBufferToCloudinary = (buffer, filename) =>
   });
 
 /* ---------------- Public Routes ---------------- */
-
+// Registration
 router.post("/userRegistration", upload.single("profile"), async (req, res) => {
   try {
     const payload = req.body?.data ? JSON.parse(req.body.data) : (req.body || {});

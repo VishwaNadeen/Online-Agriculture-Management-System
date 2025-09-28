@@ -1,14 +1,12 @@
-// src/pages/Profile.jsx
+// src/pages/profile/ProfilePage.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
 /* ---------------- utils ---------------- */
-function safeParse(json) {
-  try { return JSON.parse(json); } catch { return null; }
-}
+function safeParse(json) { try { return JSON.parse(json); } catch { return null; } }
 function readAuth() {
   const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
   const token = get("auth_token") || get("token") || get("user_token") || get("authToken") || "";
@@ -19,7 +17,7 @@ function readAuth() {
 const prettyDate = (d) => (d ? new Date(d).toLocaleDateString() : "-");
 const valueOrDash = (v) => (v === null || v === undefined || v === "" ? "-" : String(v));
 
-/* ---------------- icons (inline) ---------------- */
+/* ---------------- icons ---------------- */
 const PencilIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" {...props}>
     <path d="M16.862 3.487a1.75 1.75 0 0 1 2.476 2.476l-10.3 10.3a4 4 0 0 1-1.657.98l-3.11.889.889-3.11a4 4 0 0 1 .98-1.657l10.3-10.3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -46,13 +44,65 @@ const EyeOffIcon = (props) => (
   </svg>
 );
 
+/* ---------------- shared UI bits ---------------- */
+function CenterTabs({ active }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const tabs = [
+    { key: "profile", label: "Profile Details", to: "/profile" },
+    { key: "farm", label: "Farm Details", to: "/profile/farm" },
+  ];
+  return (
+    <div className="px-6 pt-4 bg-white">
+      <div className="w-full flex justify-center">
+        <div className="inline-flex rounded-xl border border-emerald-200 overflow-hidden shadow-sm">
+          {tabs.map((t) => {
+            const isActive = active === t.key || location.pathname === t.to;
+            return (
+              <button
+                key={t.key}
+                onClick={() => navigate(t.to)}
+                className={
+                  "px-4 sm:px-6 py-2 text-sm font-semibold transition " +
+                  (isActive
+                    ? "bg-emerald-600 text-white"
+                    : "bg-white text-emerald-700 hover:bg-emerald-50")
+                }
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <section className="mb-6 rounded-xl border border-emerald-100/70 bg-gradient-to-b from-white to-emerald-50/20 p-5 shadow-sm">
+      <h2 className="text-base sm:text-lg font-semibold text-emerald-900 mb-3">{title}</h2>
+      {children}
+    </section>
+  );
+}
+function Detail({ label, value }) {
+  return (
+    <div>
+      <dt className="font-medium text-emerald-900">{label}</dt>
+      <dd className="text-gray-700 break-words">{valueOrDash(value)}</dd>
+    </div>
+  );
+}
+
 /* ---------------- page ---------------- */
-export default function Profile() {
+export default function ProfilePage() {
   const navigate = useNavigate();
   const [{ token, userId, cachedUser }, setAuth] = useState(() => readAuth());
   const [user, setUser] = useState(cachedUser);
   const [loading, setLoading] = useState(!cachedUser);
-  const [pageErr, setPageErr] = useState("");          // only for load errors
+  const [pageErr, setPageErr] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -158,181 +208,112 @@ export default function Profile() {
     "https://ui-avatars.com/api/?background=E6F4EA&color=166534&name=" +
       encodeURIComponent(`${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "User");
 
+  const fullName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "User";
+  const address = user.address || {};
   const addressText = useMemo(() => {
-    const a = user.address || {};
-    return [a.line1, a.line2, a.city, a.stateProvince, a.country, a.postalCode].filter(Boolean).join(", ");
-  }, [user.address]);
+    return [address.line1, address.line2, address.city, address.stateProvince, address.country, address.postalCode]
+      .filter(Boolean)
+      .join(", ");
+  }, [address.line1, address.line2, address.city, address.stateProvince, address.country, address.postalCode]);
 
-  const isFarmer = user.role === "farmer";
-  const isConsultant = user.role === "consultant";
-
+  /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-lime-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <div className="relative bg-white border border-emerald-100 shadow-xl rounded-2xl overflow-hidden">
+          {/* Banner */}
           <div className="h-36 bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-500" />
 
-          {/* Header */}
-          <div className="relative px-6 -mt-16 flex items-start">
-            <img src={avatarSrc} alt="Profile" className="w-32 h-32 rounded-full ring-4 ring-white object-cover shadow-lg" />
-            <div className="ml-4 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-emerald-900 tracking-tight">
-                {user.firstName} {user.lastName}
-              </h1>
-            </div>
-            <button onClick={handleEdit} className="group ml-4 shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition" aria-label="Edit Profile" title="Edit Profile">
-              <PencilIcon className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Meta row */}
-          <div className="px-6 mt-2 mb-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 capitalize">
+          {/* Avatar + Name (centered) */}
+          <div className="px-6 -mt-16 flex flex-col items-center text-center">
+            <img
+              src={avatarSrc}
+              alt="Profile"
+              className="w-32 h-32 rounded-full ring-4 ring-white object-cover shadow-lg"
+            />
+            <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-emerald-900 tracking-tight">{fullName}</h1>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 capitalize">
                 {user.role || "user"}
               </span>
               <span className="text-xs text-gray-600">Member since {prettyDate(user.createdAt)}</span>
             </div>
+
+            {/* Edit button */}
+            <div className="mt-3">
+              <button
+                onClick={handleEdit}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition font-medium"
+                aria-label="Edit Profile"
+                title="Edit Profile"
+              >
+                <PencilIcon className="w-5 h-5" />
+                Edit Profile
+              </button>
+            </div>
           </div>
 
-          {/* Load error banner */}
+          {/* Centered tabs */}
+          <CenterTabs active="profile" />
+
+          {/* Errors */}
           {pageErr ? (
-            <div className="mx-6 mt-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-4 py-2">{pageErr}</div>
+            <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm px-4 py-2">{pageErr}</div>
           ) : null}
 
           {/* Content */}
-          <div className="px-6 pb-6 pt-2">
-            <Section title="Account">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
+          <div className="px-6 pb-8 pt-4">
+            {/* Basic details */}
+            <Section title="Basic Details">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
                 <Detail label="Email" value={user.email} />
                 <Detail label="Phone" value={user.phone} />
                 <Detail label="Date of Birth" value={prettyDate(user.dateOfBirth)} />
                 <Detail label="Gender" value={user.gender || "-"} />
-                <div className="sm:col-span-2">
-                  <Detail label="Address" value={addressText || "-"} />
-                </div>
-              </div>
+                <Detail label="Username" value={user.username || user.userName || "-"} />
+                <Detail label="Status" value={user.status || "Active"} />
+              </dl>
             </Section>
 
-            {isFarmer && <FarmerSection farmer={user.farmer} />}
-            {isConsultant && <ConsultantSection consultant={user.consultant} />}
+            {/* Address section (separate) */}
+            <Section title="Address">
+              {addressText ? (
+                <div className="text-sm text-gray-700 leading-relaxed">
+                  {address.line1 && <div>{address.line1}</div>}
+                  {address.line2 && <div>{address.line2}</div>}
+                  <div>
+                    {[address.city, address.stateProvince, address.postalCode].filter(Boolean).join(", ")}
+                  </div>
+                  <div>{address.country || ""}</div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No address provided.</div>
+              )}
+            </Section>
 
+            {/* Danger zone */}
             <div className="mt-6 flex justify-end">
-              <button onClick={onRequestDelete} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400 font-medium transition">
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400 font-medium transition"
+              >
                 <TrashIcon className="w-5 h-5" />
                 Delete Account
               </button>
             </div>
           </div>
 
+          {/* Modal */}
           {showDeleteModal && (
-            <DeleteConfirmModal loading={deleting} onCancel={() => !deleting && setShowDeleteModal(false)} onConfirm={onConfirmDelete} />
+            <DeleteConfirmModal
+              loading={deleting}
+              onCancel={() => !deleting && setShowDeleteModal(false)}
+              onConfirm={onConfirmDelete}
+            />
           )}
         </div>
       </div>
     </div>
-  );
-}
-
-/* ---------------- helpers ---------------- */
-function Section({ title, children }) {
-  return (
-    <section className="mb-6 rounded-xl border border-emerald-100/70 bg-gradient-to-b from-white to-emerald-50/20 p-5 shadow-sm">
-      <h2 className="text-base sm:text-lg font-semibold text-emerald-900 mb-3">{title}</h2>
-      {children}
-    </section>
-  );
-}
-function Detail({ label, value }) {
-  return (
-    <div>
-      <dt className="font-medium text-emerald-900">{label}</dt>
-      <dd className="text-gray-700 break-words">{valueOrDash(value)}</dd>
-    </div>
-  );
-}
-
-/* ---------------- inline variants (side-by-side) ---------------- */
-function DetailInline({ label, value }) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
-      <dt className="sm:w-56 font-medium text-emerald-900 shrink-0">{label}</dt>
-      <dd className="text-gray-700 break-words flex-1">{valueOrDash(value)}</dd>
-    </div>
-  );
-}
-function DetailArrayInline({ label, items }) {
-  const list = Array.isArray(items) ? items.filter(Boolean) : [];
-  const text = list.length ? list.join(", ") : "-";
-  return <DetailInline label={label} value={text} />;
-}
-
-/* ---------------- role sections ---------------- */
-function FarmerSection({ farmer }) {
-  if (!farmer) return null;
-
-  const farmAddr = farmer.farmAddress
-    ? [farmer.farmAddress.line1, farmer.farmAddress.line2, farmer.farmAddress.city, farmer.farmAddress.stateProvince, farmer.farmAddress.country, farmer.farmAddress.postalCode].filter(Boolean).join(", ")
-    : "-";
-
-  const loc =
-    farmer.farmLocation && (farmer.farmLocation.lat != null || farmer.farmLocation.lng != null)
-      ? `Lat: ${valueOrDash(farmer.farmLocation.lat)}, Lng: ${valueOrDash(farmer.farmLocation.lng)}`
-      : "-";
-
-  return (
-    <Section title="Farmer Details">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
-        <Detail label="Farm Name" value={farmer.farmName} />
-        <Detail label="Farm Type" value={farmer.farmType} />
-        <Detail label="Farm Size" value={farmer.farmSize != null ? `${farmer.farmSize} ${farmer.farmSizeUnit || ""}`.trim() : "-"} />
-        <Detail label="Experience (years)" value={valueOrDash(farmer.experienceYears)} />
-        <Detail label="Irrigation Method" value={farmer.primaryIrrigationMethod} />
-        <Detail label="Water Source" value={farmer.waterSource} />
-        <Detail label="Fertilizer Practices" value={farmer.fertilizerPractices} />
-        <Detail label="Pesticide Usage" value={farmer.pesticideUsage} />
-        <Detail label="Soil Type" value={farmer.soilType} />
-        <Detail label="Emergency Contact" value={farmer.emergencyContact} />
-        <div className="sm:col-span-2"><Detail label="Sustainability Practices" value={(Array.isArray(farmer.sustainabilityPractices) && farmer.sustainabilityPractices.length) ? farmer.sustainabilityPractices.join(", ") : "-"} /></div>
-        <div className="sm:col-span-2"><Detail label="Preferred Consultation Topics" value={(Array.isArray(farmer.preferredConsultationTopics) && farmer.preferredConsultationTopics.length) ? farmer.preferredConsultationTopics.join(", ") : "-"} /></div>
-        <div className="sm:col-span-2"><Detail label="Farm Address" value={farmAddr} /></div>
-        <Detail label="Farm Location" value={loc} />
-      </div>
-    </Section>
-  );
-}
-
-function ConsultantSection({ consultant }) {
-  if (!consultant) return null;
-
-  return (
-    <Section title="Consultant Details">
-      {/* Two columns on md+, label|value inline */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-5 text-sm">
-        <DetailInline label="Primary Specialization" value={consultant.primarySpecialization} />
-        <DetailInline label="Years of Experience" value={valueOrDash(consultant.yearsOfExperience)} />
-        <DetailInline label="Highest Qualification" value={consultant.highestQualification} />
-        <DetailInline label="Organization" value={consultant.organizationName} />
-        <DetailInline label="Fee Structure" value={consultant.feeStructure} />
-        <DetailInline label="Notice Period" value={consultant.noticePeriod} />
-        <DetailInline label="Coverage Radius (km)" value={valueOrDash(consultant.coverageRadiusKm)} />
-
-        {/* arrays rendered as plain text (no chips) */}
-        <DetailArrayInline label="Secondary Expertise" items={consultant.secondaryExpertise} />
-        <DetailArrayInline label="Certifications" items={consultant.certifications} />
-        <DetailArrayInline label="Consultation Types" items={consultant.consultationTypes} />
-        <DetailArrayInline label="Available Services" items={consultant.availableServices} />
-        <DetailArrayInline label="Service Regions" items={consultant.serviceRegions} />
-        <DetailArrayInline label="Available Days" items={consultant.availableDays} />
-        <DetailArrayInline label="Available Time Slots" items={consultant.availableTimeSlots} />
-        <DetailArrayInline label="Languages" items={consultant.languages} />
-
-        {/* Bio spans full width */}
-        <div className="md:col-span-2">
-          <DetailInline label="Bio" value={consultant.bio || "-"} />
-        </div>
-      </div>
-    </Section>
   );
 }
 
@@ -369,7 +350,12 @@ function DeleteConfirmModal({ loading, onCancel, onConfirm }) {
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
             />
-            <button type="button" onClick={() => setShowPw((s) => !s)} className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-emerald-700" tabIndex={-1}>
+            <button
+              type="button"
+              onClick={() => setShowPw((s) => !s)}
+              className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-emerald-700"
+              tabIndex={-1}
+            >
               {showPw ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
             </button>
           </div>
