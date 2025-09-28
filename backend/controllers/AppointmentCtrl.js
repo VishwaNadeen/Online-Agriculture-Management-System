@@ -174,9 +174,24 @@ export async function listMyAppointments(req, res) {
     const me = authUserId(req);
     if (!me) return res.status(401).json({ message: "Not authenticated" });
 
-    const { status } = req.query || {};
+    const { status, q: text } = req.query || {};
     const q = { userId: me };
     if (status) q.status = status;
+
+    // optional text search across a few fields
+    if (text && String(text).trim() !== "") {
+      const t = String(text).trim();
+      const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      q.$or = [
+        { name: re },
+        { email: re },
+        { phone: re },
+        { city: re },
+        { category: re },
+        // allow human id search; cast number to string compare via $expr
+        { $expr: { $regexMatch: { input: { $toString: "$appointmentId" }, regex: re } } },
+      ];
+    }
 
     const items = await AppointmentModel.find(q).sort({ appointmentDate: -1 }).lean();
     return res.status(200).json(items);
@@ -192,9 +207,23 @@ export async function listMyConsultantAppointments(req, res) {
     const me = authUserId(req);
     if (!me) return res.status(401).json({ message: "Not authenticated" });
 
-    const { status } = req.query || {};
+    const { status, q: text } = req.query || {};
     const q = { consultantId: me };
     if (status) q.status = status;
+
+    // optional text search across client details and category/city/appointmentId
+    if (text && String(text).trim() !== "") {
+      const t = String(text).trim();
+      const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      q.$or = [
+        { name: re },
+        { email: re },
+        { phone: re },
+        { city: re },
+        { category: re },
+        { $expr: { $regexMatch: { input: { $toString: "$appointmentId" }, regex: re } } },
+      ];
+    }
 
     const items = await AppointmentModel.find(q).sort({ appointmentDate: -1 }).lean();
     return res.status(200).json(items);

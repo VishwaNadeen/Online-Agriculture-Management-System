@@ -1,5 +1,7 @@
 // src/pages/dashboard/Dashboard.jsx
 import React, { useState, useMemo } from "react";
+import MyAppointments from "../appointments/MyAppointments";
+
 import {
   Calendar,
   Clock,
@@ -596,6 +598,7 @@ export default function Dashboard() {
   if (isConsultant && tab === "consultant") {
     return <ConsultantDashboard user={user} />;
   }
+  
 
   // Non-consultant version (keep simple placeholder)
   return (
@@ -633,4 +636,5 @@ export default function Dashboard() {
       )}
     </div>
   );
+  
 }
