@@ -11,6 +11,9 @@ import courseRoutes from "./routes/courseRoute.js";
 import { configDotenv } from "dotenv"
 import consultantRoutes from "./routes/consultantRoutes.js";
 import communityRoutes from "./routes/CommunityPost.js";
+import eventRoutes from "./routes/EventRoute.js";
+import eventFeedbackRoutes from "./routes/EventFeedbackRoute.js";
+import eventRegistrationRoutes from "./routes/EventRegistrationRoute.js";
 
 configDotenv();
 
@@ -41,7 +44,9 @@ app.use("/users", userRoutes);
 app.use('/api/admin', adminRoute);
 app.use("/courses", courseRoutes); 
 app.use("/community", communityRoutes);
-
+app.use("/events", eventRoutes);
+app.use("/eventregistration", eventRegistrationRoutes);
+app.use("/eventfeedback", eventFeedbackRoutes)
 
 // api endpoints
 app.get("/", (req, res) => {
