@@ -14,6 +14,8 @@ import Profile from "./pages/user/profile";
 import Farm from "./pages/user/farmerDetailsPage.jsx";
 import ProfileEdit from "./pages/user/profileEdit.jsx";
 import FarmEdit from "./pages/user/farmEdit.jsx";
+import Consultant from "./pages/user/ConsultantDetailsPage.jsx";
+import ConsultantEdit from "./pages/user/consultantedit.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -50,6 +52,8 @@ export default function ClientApp() {
         <Route path="/profile/farm" element={<Farm />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />
         <Route path="/farm/edit" element={<FarmEdit />} />
+        <Route path="/profile/consultant" element={<Consultant />} />
+        <Route path="/profile/consultant/edit" element={<ConsultantEdit />} />
 
         {/* Methma */}
         <Route path="/SearchCon" element={<Searchcon />} />

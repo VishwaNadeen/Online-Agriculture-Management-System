@@ -17,6 +17,16 @@ function readAuth() {
 const prettyDate = (d) => (d ? new Date(d).toLocaleDateString() : "-");
 const valueOrDash = (v) => (v === null || v === undefined || v === "" ? "-" : String(v));
 
+/* Helper: detect consultant role robustly */
+function isConsultantUser(u) {
+  if (!u) return false;
+  const role = (u.role || "").toString().toLowerCase();
+  if (role === "consultant") return true;
+  if (Array.isArray(u.roles) && u.roles.map(String).map(s => s.toLowerCase()).includes("consultant")) return true;
+  if (u.consultantProfile?.active) return true;
+  return false;
+}
+
 /* ---------------- icons ---------------- */
 const PencilIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" {...props}>
@@ -45,13 +55,17 @@ const EyeOffIcon = (props) => (
 );
 
 /* ---------------- shared UI bits ---------------- */
-function CenterTabs({ active }) {
+function CenterTabs({ active, isConsultant }) {
   const navigate = useNavigate();
   const location = useLocation();
+
   const tabs = [
     { key: "profile", label: "Profile Details", to: "/profile" },
-    { key: "farm", label: "Farm Details", to: "/profile/farm" },
+    isConsultant
+      ? { key: "consult", label: "Consultant Details", to: "/profile/consultant" }
+      : { key: "farm", label: "Farm Details", to: "/profile/farm" },
   ];
+
   return (
     <div className="px-6 pt-4 bg-white">
       <div className="w-full flex justify-center">
@@ -216,6 +230,8 @@ export default function ProfilePage() {
       .join(", ");
   }, [address.line1, address.line2, address.city, address.stateProvince, address.country, address.postalCode]);
 
+  const consultantFlag = isConsultantUser(user);
+
   /* ---------------- UI ---------------- */
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-lime-50 py-10 px-4 sm:px-6 lg:px-8">
@@ -254,7 +270,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Centered tabs */}
-          <CenterTabs active="profile" />
+          <CenterTabs active="profile" isConsultant={consultantFlag} />
 
           {/* Errors */}
           {pageErr ? (
