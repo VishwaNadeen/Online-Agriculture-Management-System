@@ -1,49 +1,33 @@
-// models/CommunityPost.js
+// backend/models/CommunityPost.js
 import mongoose from "mongoose";
 
-// A reply under a comment
-const ReplySchema = new mongoose.Schema(
-  {
-    authorName: { type: String, required: true, trim: true },
-    text: { type: String, required: true, trim: true },
-    createdAt: { type: Date, default: Date.now },
-  },
-  { _id: true }
-);
+const ReplySchema = new mongoose.Schema({
+  authorName: { type: String, trim: true },
+  text: { type: String, required: true, trim: true },
+  createdAt: { type: Date, default: Date.now },
+});
 
-// A root comment with nested replies
-const CommentSchema = new mongoose.Schema(
-  {
-    authorName: { type: String, required: true, trim: true },
-    text: { type: String, required: true, trim: true },
-    createdAt: { type: Date, default: Date.now },
-    replies: { type: [ReplySchema], default: [] },
-  },
-  { _id: true }
-);
+const CommentSchema = new mongoose.Schema({
+  authorName: { type: String, trim: true },
+  text: { type: String, required: true, trim: true },
+  createdAt: { type: Date, default: Date.now },
+  replies: { type: [ReplySchema], default: [] },
+});
 
 const CommunityPostSchema = new mongoose.Schema(
   {
-    title:   { type: String, required: true, trim: true },
-    comment: { type: String, required: true, trim: true }, // description
-    image:   { type: String, default: "" },
-    rating:  { type: Number, min: 1, max: 5, default: 3 }, // post rating
-    likes:   { type: Number, default: 0 },                 // upvotes
-    comments:{ type: [CommentSchema], default: [] },       // root comments
-    date:    { type: Date, default: Date.now },
+    title: { type: String, required: true, trim: true },
+    comment: { type: String, required: true, trim: true },
+    image: { type: String, default: "" },
+    likes: { type: Number, default: 0 },
+    dislikes: { type: Number, default: 0 },
+    authorId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    authorName: { type: String, default: "Anonymous" },
+    category: { type: String, default: "General", trim: true },
+    comments: { type: [CommentSchema], default: [] },
   },
   { timestamps: true }
 );
-
-// keep "date" current on changes
-CommunityPostSchema.pre("save", function (next) {
-  this.date = new Date();
-  next();
-});
-CommunityPostSchema.pre("findOneAndUpdate", function (next) {
-  this.set({ date: new Date() });
-  next();
-});
 
 export default mongoose.models.CommunityPost ||
   mongoose.model("CommunityPost", CommunityPostSchema);

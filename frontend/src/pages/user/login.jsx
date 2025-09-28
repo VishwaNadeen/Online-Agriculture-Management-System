@@ -40,25 +40,41 @@ export default function Login() {
       });
 
       const token = data?.token;
-      const user = data?.user;
+      const user  = data?.user;
       const store = remember ? localStorage : sessionStorage;
 
-      // store under common keys so other code can find them easily
+      // store token under common keys
       if (token) {
         store.setItem("auth_token", token);
-        store.setItem("token", token);
-      }
-      if (user) {
-        store.setItem("auth_user", JSON.stringify(user));
-        if (user._id) {
-          localStorage.setItem("userId", user._id);
-        }
+        store.setItem("token", token); // <-- Community auth checks this
       }
 
-      // 🔔 tell the app/navbar auth state changed
+      if (user) {
+        // keep your original key
+        store.setItem("auth_user", JSON.stringify(user));
+        // ALSO store under 'user' so other modules can find it
+        store.setItem("user", JSON.stringify(user));
+
+        // compute a simple display name for Community headers
+        const display =
+          `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+          user.name ||
+          user.username ||
+          (user.email && String(user.email).split("@")[0]) ||
+          "User";
+        store.setItem("userName", display); // <-- Community reads this
+
+        // optional: keep userId handy
+        if (user._id) localStorage.setItem("userId", user._id);
+
+        toast.success(`Welcome, ${display}!`);
+      } else {
+        toast.success("Login successful");
+      }
+
+      // notify rest of app
       window.dispatchEvent(new Event("auth-changed"));
 
-      toast.success("Login successful");
       navigate(from, { replace: true });
     } catch (e) {
       const msg =
