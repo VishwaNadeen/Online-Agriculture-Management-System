@@ -25,9 +25,13 @@ import ListAppointment from "./pages/appointments/ListAppointment.jsx";
 import CommunityForum from "./pages/community/CommunityForum";
 
 // Chanaka
-
 import CoursesPage from "./pages/courses/coursePage";
 import CourseOverview from "./pages/courses/courseOverview";
+
+//dilhani
+import EventPage from "./pages/event/EventsPage.jsx";
+import EventDetail from "./pages/event/EventDetail.jsx";
+import MyEvents from "./pages/event/MyEvents.jsx";
 
 export default function ClientApp() {
   return (
@@ -57,9 +61,13 @@ export default function ClientApp() {
         <Route path="/community" element={<CommunityForum />} />
 
         {/* Chanaka */}
-        
         <Route path="/coursepage" element={<CoursesPage />} />
         <Route path="/courses/:courseID" element={<CourseOverview />} />
+
+        {/* dilhani */}
+        <Route path="/events" element={<EventPage />} />
+        <Route path="/events/:id" element={<EventDetail />} />
+        <Route path="/my-events" element={<MyEvents />} />
 
       </Routes>
       <Footer />
