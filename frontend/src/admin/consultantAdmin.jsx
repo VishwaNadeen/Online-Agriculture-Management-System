@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Users,
   DollarSign,
@@ -15,57 +15,106 @@ import {
   Clock,
   Sprout,
 } from "lucide-react";
+import { ApptAPI } from "../api/appointments";
+import api from "../utils/api";
+import { ConsultantAPI } from "../api/consultants";
 
 export default function AgriAnalytics() {
   const [activeTab, setActiveTab] = useState("Today");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const dashboardData = {
-    totalRevenue: 124850,
-    totalExpenses: 35200,
-    activeFarms: 3847,
-    projectCompletion: 92,
-    revenueGrowth: 15.8,
-    expenseChange: -8.2,
-    farmsGrowth: 12.4,
-    completionChange: 8.3,
+  // live data
+  const [myAppointments, setMyAppointments] = useState([]); // assigned to me as consultant
+  const [topConsultants, setTopConsultants] = useState([]);
+  const [me, setMe] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      setLoading(true);
+      setError("");
+      try {
+        const [appts, consultantsRes, meRes] = await Promise.all([
+          ApptAPI.listAsConsultant(),
+          api.get("/consultants", { params: { limit: 5 } }).then((r) => r.data?.items || []),
+          ConsultantAPI.getMe().catch(() => null),
+        ]);
+        if (!mounted) return;
+        setMyAppointments(appts || []);
+        setTopConsultants(consultantsRes || []);
+        setMe(meRes);
+      } catch (e) {
+        if (!mounted) return;
+        setError(e?.response?.data?.message || e.message || "Failed to load data");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // helper functions: compute stats from appointments (no payments required)
+  const pickUnique = (arr, key) => {
+    const set = new Set();
+    for (const a of arr) if (a && a[key]) set.add(String(a[key]));
+    return set.size;
   };
 
-  const consultants = [
-    { id: 1, name: "Dr. Sarah Johnson", email: "sarah.johnson@agritech.com", specialty: "Crop Management", avatar: "🌾", activeFarms: 45, satisfaction: 4.9 },
-    { id: 2, name: "Michael Chen", email: "michael.chen@agritech.com", specialty: "Soil Analysis", avatar: "🌱", activeFarms: 38, satisfaction: 4.8 },
-    { id: 3, name: "Emma Rodriguez", email: "emma.rodriguez@agritech.com", specialty: "Irrigation Systems", avatar: "💧", activeFarms: 52, satisfaction: 4.9 },
-  ];
+  const dashboardData = useMemo(() => {
+    const total = myAppointments.length;
+    const confirmed = myAppointments.filter((a) => a.status === "confirmed").length;
+    const completed = myAppointments.filter((a) => a.status === "completed").length;
+    const activeFarms = pickUnique(myAppointments, "userId");
 
-  const projects = [
-    { id: 1, name: "Sustainable Farming Initiative", client: "GreenVale Farms", completion: 85, deadline: "Mar 15, 2025", consultant: "Dr. Sarah Johnson" },
-    { id: 2, name: "Soil Health Assessment", client: "Prairie Gold Agricultural", completion: 62, deadline: "Apr 8, 2025", consultant: "Michael Chen" },
-    { id: 3, name: "Smart Irrigation Setup", client: "Sunrise Orchards", completion: 90, deadline: "Feb 28, 2025", consultant: "Emma Rodriguez" },
-    { id: 4, name: "Organic Certification Process", client: "EcoHarvest Co.", completion: 45, deadline: "May 12, 2025", consultant: "Dr. Sarah Johnson" },
-  ];
+    return {
+      totalRequests: total,
+      confirmedRequests: confirmed,
+      activeFarms,
+      projectCompletion: total ? Math.round((completed / total) * 100) : 0,
+      // change deltas kept zero until we add time-window comparisons
+      requestsChange: 0,
+      confirmedChange: 0,
+      farmsChange: 0,
+      completionChange: 0,
+    };
+  }, [myAppointments]);
 
-  const appointments = [
-    { id: 1, title: "Farm Site Visit - Crop Assessment", time: "09:00 AM - 10:30 AM", client: "Meadowbrook Farm", consultant: "Dr. Sarah Johnson", type: "site-visit" },
-    { id: 2, title: "Irrigation System Planning", time: "02:00 PM - 03:30 PM", client: "Valley View Agriculture", consultant: "Emma Rodriguez", type: "consultation" },
-    { id: 3, title: "Soil Sample Analysis Review", time: "04:00 PM - 05:00 PM", client: "Golden Fields Ltd.", consultant: "Michael Chen", type: "review" },
-  ];
+  // group categories for right-side donut
+  const clientsByIndustry = useMemo(() => {
+    const by = new Map();
+    myAppointments.forEach((a) => {
+      const k = a.category || "Other";
+      by.set(k, (by.get(k) || 0) + 1);
+    });
+    // map to color palette
+    const colors = [
+      "bg-green-500",
+      "bg-yellow-500",
+      "bg-blue-500",
+      "bg-purple-500",
+      "bg-orange-500",
+    ];
+    return Array.from(by.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }));
+  }, [myAppointments]);
 
-  const clientsByIndustry = [
-    { name: "Grain Farming", value: 2847, color: "bg-green-500" },
-    { name: "Livestock", value: 1956, color: "bg-yellow-500" },
-    { name: "Horticulture", value: 1432, color: "bg-blue-500" },
-    { name: "Dairy Farming", value: 1288, color: "bg-purple-500" },
-    { name: "Organic Farms", value: 987, color: "bg-orange-500" },
-  ];
-
-  const revenueData = [
-    { day: "Mon", value: 18500 },
-    { day: "Tue", value: 22300 },
-    { day: "Wed", value: 19800 },
-    { day: "Thu", value: 25600 },
-    { day: "Fri", value: 21400 },
-    { day: "Sat", value: 16900 },
-    { day: "Sun", value: 20350 },
-  ];
+  // simple weekly bar: count appointments by weekday
+  const revenueData = useMemo(() => {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const counts = new Array(7).fill(0);
+    for (const a of myAppointments) {
+      const d = new Date(a.appointmentDate);
+      if (!isNaN(d)) counts[d.getDay()] += 1;
+    }
+    // scale to a pseudo monetary value to fit existing UI (multiply by constant)
+    return days.map((day, idx) => ({ day, value: counts[idx] * 8000 }));
+  }, [myAppointments]);
 
   // ✅ FIXED: include `icon: Icon`
   const StatCard = ({ title, value, change, icon: Icon, suffix = "" }) => {
@@ -90,6 +139,11 @@ export default function AgriAnalytics() {
 
   return (
     <div className="min-h-full">
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm border border-red-200">
+          {error}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -98,6 +152,11 @@ export default function AgriAnalytics() {
             <h1 className="text-3xl font-bold text-gray-900">AGRI ANALYTICS</h1>
           </div>
           <p className="text-gray-600">Insights for agriculture operations</p>
+          {me && (
+            <div className="mt-1 text-sm text-gray-700">
+              Welcome, <span className="font-semibold">{me.name}</span> • {me.city} • {me.specialization}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-4">
@@ -137,11 +196,11 @@ export default function AgriAnalytics() {
         ))}
       </div>
 
-      {/* Stats */}
+      {/* Stats (appointment based, no payments) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard title="Total Revenue" value={dashboardData.totalRevenue} change={dashboardData.revenueGrowth} icon={DollarSign} suffix="$" />
-        <StatCard title="Total Expenses" value={dashboardData.totalExpenses} change={dashboardData.expenseChange} icon={TrendingUp} suffix="$" />
-        <StatCard title="Active Farms" value={dashboardData.activeFarms} change={dashboardData.farmsGrowth} icon={Wheat} />
+        <StatCard title="Total Requests" value={dashboardData.totalRequests} change={dashboardData.requestsChange} icon={Users} />
+        <StatCard title="Confirmed Requests" value={dashboardData.confirmedRequests} change={dashboardData.confirmedChange} icon={TrendingUp} />
+        <StatCard title="Active Farms" value={dashboardData.activeFarms} change={dashboardData.farmsChange} icon={Wheat} />
         <StatCard title="Project Completion" value={`${dashboardData.projectCompletion}/100`} change={dashboardData.completionChange} icon={CheckCircle} />
       </div>
 
@@ -160,7 +219,7 @@ export default function AgriAnalytics() {
               <div key={idx} className="flex-1 flex flex-col items-center">
                 <div
                   className="w-full bg-green-500 rounded-t-md mb-2 transition-all duration-300 hover:bg-green-600"
-                  style={{ height: `${(item.value / 30000) * 200}px` }}
+                  style={{ height: `${Math.min(1, item.value / 30000) * 200}px` }}
                 />
                 <span className="text-xs text-gray-600">{item.day}</span>
               </div>
@@ -199,36 +258,39 @@ export default function AgriAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Project Status</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h3>
             <div className="flex items-center space-x-2">
               <Search className="w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search projects..."
+                placeholder="Search..."
                 className="text-sm border-none bg-gray-50 rounded-lg px-3 py-1 focus:outline-none focus:bg-white focus:ring-2 focus:ring-green-500"
               />
             </div>
           </div>
           <div className="space-y-4">
-            {projects.map((p) => (
-              <div key={p.id} className="border border-gray-100 rounded-lg p-4">
+            {(myAppointments || []).slice(0, 6).map((p) => (
+              <div key={p._id} className="border border-gray-100 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-gray-900 text-sm">{p.name}</h4>
-                  <span className="text-xs text-gray-500">{p.completion}%</span>
+                  <h4 className="font-medium text-gray-900 text-sm">{p.name} • {p.category}</h4>
+                  <span className="text-xs text-gray-500 capitalize">{p.status}</span>
                 </div>
-                <p className="text-sm text-gray-600 mb-2">{p.client}</p>
+                <p className="text-sm text-gray-600 mb-2">{p.city || "-"}</p>
                 <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                  <div className="bg-green-500 h-2 rounded-full transition-all duration-300" style={{ width: `${p.completion}%` }} />
+                  <div className={`h-2 rounded-full transition-all duration-300 ${p.status === "confirmed" ? "bg-green-500" : p.status === "pending" ? "bg-yellow-500" : "bg-gray-400"}`} style={{ width: `${p.status === "confirmed" ? 80 : p.status === "pending" ? 40 : 20}%` }} />
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Due: {p.deadline}</span>
+                  <span className="text-gray-600">Date: {new Date(p.appointmentDate).toLocaleDateString()}</span>
                   <div className="flex items-center space-x-2">
                     <User className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-600">{p.consultant}</span>
+                    <span className="text-gray-600">{p.email}</span>
                   </div>
                 </div>
               </div>
             ))}
+            {!loading && (myAppointments || []).length === 0 && (
+              <p className="text-sm text-gray-500">No appointments yet.</p>
+            )}
           </div>
         </div>
 
@@ -238,20 +300,23 @@ export default function AgriAnalytics() {
             <a href="/consultants" className="text-sm text-green-600 hover:text-green-700">See All</a>
           </div>
           <div className="space-y-4">
-            {consultants.map((c) => (
+            {topConsultants.map((c) => (
               <div key={c.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50">
-                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">{c.avatar}</div>
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">🌿</div>
                 <div className="flex-1">
                   <h4 className="font-medium text-gray-900">{c.name}</h4>
-                  <p className="text-sm text-gray-600">{c.email}</p>
-                  <p className="text-xs text-green-600">{c.specialty}</p>
+                  <p className="text-sm text-gray-600">{c.city}</p>
+                  <p className="text-xs text-green-600">{c.category}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-900">{c.activeFarms} farms</p>
-                  <p className="text-xs text-gray-600">★ {c.satisfaction}</p>
+                  <p className="text-sm font-semibold text-gray-900">{(c.yearsExp || 0)} yrs</p>
+                  <p className="text-xs text-gray-600">{(c.languages || []).join(", ")}</p>
                 </div>
               </div>
             ))}
+            {!loading && topConsultants.length === 0 && (
+              <p className="text-sm text-gray-500">No consultants found.</p>
+            )}
           </div>
         </div>
       </div>
@@ -263,26 +328,47 @@ export default function AgriAnalytics() {
           <a href="/appointments" className="text-sm text-green-600 hover:text-green-700">See All</a>
         </div>
         <div className="space-y-4">
-          {appointments.map((a) => (
-            <div key={a.id} className="flex items-center space-x-4 p-4 border border-gray-100 rounded-lg">
-              <div className="p-3 rounded-lg bg-green-50">
-                {a.type === "site-visit" && <MapPin className="w-5 h-5 text-green-600" />}
-                {a.type === "consultation" && <Users className="w-5 h-5 text-green-600" />}
-                {a.type === "review" && <FileText className="w-5 h-5 text-green-600" />}
-              </div>
-              <div className="flex-1">
-                <h4 className="font-medium text-gray-900">{a.title}</h4>
-                <p className="text-sm text-gray-600">{a.client}</p>
-              </div>
-              <div className="text-right">
-                <div className="flex items-center space-x-2 text-sm text-gray-600 mb-1">
-                  <Clock className="w-4 h-4" />
-                  <span>{a.time}</span>
+          {(myAppointments || [])
+            .filter((a) => {
+              const d = new Date(a.appointmentDate);
+              const now = new Date();
+              return (
+                d.getFullYear() === now.getFullYear() &&
+                d.getMonth() === now.getMonth() &&
+                d.getDate() === now.getDate()
+              );
+            })
+            .map((a) => (
+              <div key={a._id} className="flex items-center space-x-4 p-4 border border-gray-100 rounded-lg">
+                <div className="p-3 rounded-lg bg-green-50">
+                  {a.category?.toLowerCase().includes("field") && <MapPin className="w-5 h-5 text-green-600" />}
+                  {a.category?.toLowerCase().includes("soil") && <FileText className="w-5 h-5 text-green-600" />}
+                  {!a.category && <Users className="w-5 h-5 text-green-600" />}
                 </div>
-                <p className="text-xs text-green-600">{a.consultant}</p>
+                <div className="flex-1">
+                  <h4 className="font-medium text-gray-900">{a.name}</h4>
+                  <p className="text-sm text-gray-600">{a.city || "-"}</p>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 mb-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{a.appointmentTime}</span>
+                  </div>
+                  <p className="text-xs text-green-600 capitalize">{a.status}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          {!loading && (myAppointments || []).every((a) => {
+            const d = new Date(a.appointmentDate);
+            const now = new Date();
+            return !(
+              d.getFullYear() === now.getFullYear() &&
+              d.getMonth() === now.getMonth() &&
+              d.getDate() === now.getDate()
+            );
+          }) && (myAppointments || []).length === 0 && (
+            <p className="text-sm text-gray-500">No appointments today.</p>
+          )}
         </div>
       </div>
     </div>
