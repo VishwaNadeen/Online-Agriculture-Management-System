@@ -34,7 +34,7 @@ const CommunityPostSchema = new mongoose.Schema(
     authorName: { type: String, default: "Anonymous" },
     category: { type: String, default: "General", trim: true },
     comments: { type: [CommentSchema], default: [] },
-    reactions: { type: [ReactionSchema], default: [] },       // <— added for per-user toggle/swap
+    reactions: { type: [ReactionSchema], default: [] },       // track who reacted
   },
   { timestamps: true }
 );

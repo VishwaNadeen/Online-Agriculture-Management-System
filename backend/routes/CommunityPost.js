@@ -6,6 +6,25 @@ import CommunityPost from "../models/CommunityPost.js";
 
 const router = Router();
 
+/* ---------- Minimal CORS / Preflight (fixes Network Error) ---------- */
+router.use((req, res, next) => {
+  // Allow your web app origin; use * if you serve from multiple places
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-name"
+  );
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  );
+  res.header("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
+
 /* Identify user by header x-user-name; add name to req.userName */
 function identifyUser(req, _res, next) {
   const raw = (req.headers["x-user-name"] || "").toString();
@@ -104,21 +123,17 @@ async function applyReaction(req, res, type /* 'like' | 'dislike' */) {
   const post = await CommunityPost.findById(req.params.id);
   if (!post) return res.status(404).json({ message: "Not found" });
 
-  // find existing reaction from this user
   const idx = (post.reactions || []).findIndex((r) => (r.by || "").trim() === user);
   const prev = idx >= 0 ? post.reactions[idx].type : "none";
 
-  // counts
   let likes = post.likes || 0;
   let dislikes = post.dislikes || 0;
 
   if (prev === type) {
-    // toggle off
     if (type === "like") likes = Math.max(0, likes - 1);
     else dislikes = Math.max(0, dislikes - 1);
     if (idx >= 0) post.reactions.splice(idx, 1);
   } else {
-    // switching or adding
     if (prev === "like") likes = Math.max(0, likes - 1);
     if (prev === "dislike") dislikes = Math.max(0, dislikes - 1);
     if (type === "like") likes += 1;
@@ -140,7 +155,7 @@ async function applyReaction(req, res, type /* 'like' | 'dislike' */) {
 router.post("/:id/like", identifyUser, (req, res) => applyReaction(req, res, "like"));
 router.post("/:id/dislike", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
 
-/* (Optional legacy toggles kept; forward to unified logic) */
+/* Legacy toggles kept; forward to unified logic */
 router.post("/:id/like/toggle", identifyUser, (req, res) => applyReaction(req, res, "like"));
 router.post("/:id/dislike/toggle", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
 

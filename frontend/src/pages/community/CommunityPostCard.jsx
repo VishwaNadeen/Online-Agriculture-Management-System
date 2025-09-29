@@ -154,28 +154,24 @@ export default function CommunityPostCard({ post, onReacted }) {
     const tk = auth.token();
     if (tk) headers.Authorization = `Bearer ${tk}`;
 
-    // Optimistic UI update based on local state
+    // Optimistic UI update
     const prev = myReaction;
 
     const applyOptimistic = (next) => {
       if (prev === next) return;
-      // remove previous
       if (prev === "like") setLikes((n) => Math.max(0, n - 1));
       if (prev === "dislike") setDislikes((n) => Math.max(0, n - 1));
-      // add next
       if (next === "like") setLikes((n) => n + 1);
       if (next === "dislike") setDislikes((n) => n + 1);
       setMyReaction(next || "none");
       localStorage.setItem(storageKey, next || "none");
     };
 
-    // If clicking same button => toggle off
     const target = prev === type ? "none" : type;
     applyOptimistic(target);
 
     try {
       const res = await api.post(`/community/${post._id}/${type}`, {}, { headers });
-      // Server is source of truth
       setLikes(res.data.likes ?? 0);
       setDislikes(res.data.dislikes ?? 0);
       setMyReaction(res.data.myReaction || "none");
@@ -183,13 +179,11 @@ export default function CommunityPostCard({ post, onReacted }) {
       onReacted?.(post._id, res.data);
     } catch (e) {
       console.error("Reaction failed", e);
-      // revert by asking server current (fallback: reload one)
       try {
         const s = await api.get(`/community/${post._id}`);
         setLikes(s.data.likes ?? 0);
         setDislikes(s.data.dislikes ?? 0);
       } catch {}
-      // fallback local
       setMyReaction(prev);
       localStorage.setItem(storageKey, prev);
       alert("Failed to update reaction");
