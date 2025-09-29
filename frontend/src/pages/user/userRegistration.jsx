@@ -1,12 +1,13 @@
+// src/pages/UserRegistration.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-hot-toast";
+import RoleSelectModal from "../../components/roleSelect.jsx"; // <-- path from /pages to /components
 
 // If your backend upload endpoint differs, change this:
-const UPLOAD_URL = "http://localhost:4000/uploads/profile"; // (kept but not used now, per requirement)
+const UPLOAD_URL = "http://localhost:4000/uploads/profile"; // (kept but not used now)
 
-// Last-resort fallback if local file missing
 const FALLBACK_CODES = [
   { name: "Sri Lanka", dial_code: "+94", code: "LK" },
   { name: "India", dial_code: "+91", code: "IN" },
@@ -17,7 +18,6 @@ const FALLBACK_CODES = [
 
 const cls = (...arr) => arr.filter(Boolean).join(" ");
 
-// helper: YYYY-MM-DD for <input type="date" max=...>
 const todayISO = () => {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -29,7 +29,6 @@ const todayISO = () => {
 export default function UserRegistration() {
   const navigate = useNavigate();
 
-  // ---- form state ----
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -49,24 +48,22 @@ export default function UserRegistration() {
     },
     role: "user",
   });
-
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
 
-  // CHANGED: these two kept but not used for auto-upload now (requirement says do not auto upload)
+  // kept but not used for auto-upload
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
-  // ---- country codes ----
+  // country codes combobox
   const [codes, setCodes] = useState([]);
-  const [countryCode, setCountryCode] = useState("+94"); // default
-  const [query, setQuery] = useState("+94"); // shown in combobox
+  const [countryCode, setCountryCode] = useState("+94");
+  const [query, setQuery] = useState("+94");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);
   const comboRef = useRef(null);
 
-  // ---- phone / email / dob / password ----
+  // validations state
   const [phoneLocal, setPhoneLocal] = useState("");
   const [errors, setErrors] = useState({
     phone: "",
@@ -76,7 +73,10 @@ export default function UserRegistration() {
     confirmPassword: "",
   });
 
-  // load from local /public/dial-codes.json
+  // popup control
+  const [chooseRoleOpen, setChooseRoleOpen] = useState(false);
+
+  // load dial codes from /public
   useEffect(() => {
     (async () => {
       try {
@@ -85,14 +85,13 @@ export default function UserRegistration() {
           setCodes(res.data);
           return;
         }
-      } catch (err) {
-        console.error("Could not load local dial codes", err);
+      } catch {
+        // fall back
       }
       setCodes(FALLBACK_CODES);
     })();
   }, []);
 
-  // keep selection valid
   useEffect(() => {
     if (!codes.length) return;
     if (!codes.some((c) => c.dial_code === countryCode)) {
@@ -101,7 +100,6 @@ export default function UserRegistration() {
     }
   }, [codes]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // filter codes based on query
   const filteredCodes = useMemo(() => {
     if (!query) return codes;
     const q = query.toLowerCase();
@@ -135,7 +133,6 @@ export default function UserRegistration() {
       return;
     }
     if (!isOpen) return;
-
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setHighlightIndex((i) => Math.min(i + 1, filteredCodes.length - 1));
@@ -151,7 +148,6 @@ export default function UserRegistration() {
     }
   };
 
-  // click outside closes dropdown
   useEffect(() => {
     const handler = (e) => {
       if (comboRef.current && !comboRef.current.contains(e.target)) {
@@ -162,21 +158,19 @@ export default function UserRegistration() {
     return () => window.removeEventListener("click", handler);
   }, []);
 
-  // ---- validations ----
+  // validators
   const validatePhone = (val) => {
     if (!val) return "Phone is required";
     if (!/^\d+$/.test(val)) return "Only digits allowed";
     if (val.length !== 9) return "Phone must be exactly 9 digits";
     return "";
   };
-
   const validateEmail = (val) => {
     if (!val) return "Email is required";
     const re = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
     if (!re.test(val)) return "Enter a valid email (e.g., name@example.com)";
     return "";
   };
-
   const validateDOB = (val) => {
     if (!val) return "Date of birth is required";
     const today = new Date(todayISO());
@@ -184,38 +178,33 @@ export default function UserRegistration() {
     if (dob > today) return "Date of birth cannot be in the future";
     return "";
   };
-
   const validatePassword = (val) => {
     if (!val) return "Password is required";
     if (val.length < 6) return "Password must be at least 6 characters";
     return "";
   };
-
   const validateConfirmPassword = (pwd, confirm) => {
     if (!confirm) return "Please confirm your password";
     if (pwd !== confirm) return "Passwords do not match";
     return "";
   };
 
-  // --- handlers for fields with validation ---
+  // handlers with validation
   const handlePhoneChange = (e) => {
     const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
     setPhoneLocal(digits);
     setErrors((p) => ({ ...p, phone: validatePhone(digits) }));
   };
-
   const handleEmailChange = (e) => {
     const value = e.target.value.trim();
     setForm((f) => ({ ...f, email: value }));
     setErrors((p) => ({ ...p, email: validateEmail(value) }));
   };
-
   const handleDOBChange = (e) => {
     const value = e.target.value;
     setForm((f) => ({ ...f, dateOfBirth: value }));
     setErrors((p) => ({ ...p, dob: validateDOB(value) }));
   };
-
   const handlePasswordChange = (e) => {
     const pwd = e.target.value;
     setForm((f) => ({ ...f, password: pwd }));
@@ -225,7 +214,6 @@ export default function UserRegistration() {
       confirmPassword: validateConfirmPassword(pwd, confirmPassword),
     }));
   };
-
   const handleConfirmPasswordChange = (e) => {
     const confirm = e.target.value;
     setConfirmPassword(confirm);
@@ -235,11 +223,10 @@ export default function UserRegistration() {
     }));
   };
 
-  // ---- profile picture: choose & preview only (NO AUTO UPLOAD) ----
+  // profile image preview only
   const [preview, setPreview] = useState("");
   const [profileFile, setProfileFile] = useState(null);
-
-  const handleProfileFile = async (e) => {
+  const handleProfileFile = (e) => {
     const file = e.target.files?.[0];
     setUploadError("");
     if (!file) {
@@ -251,7 +238,6 @@ export default function UserRegistration() {
     setPreview(URL.createObjectURL(file));
   };
 
-  // ---- required fields ----
   const requiredFilled =
     form.firstName.trim() &&
     form.lastName.trim() &&
@@ -266,11 +252,7 @@ export default function UserRegistration() {
     form.address.line1.trim();
 
   const noErrors =
-    !errors.phone &&
-    !errors.email &&
-    !errors.dob &&
-    !errors.password &&
-    !errors.confirmPassword;
+    !errors.phone && !errors.email && !errors.dob && !errors.password && !errors.confirmPassword;
 
   const phoneOk = !validatePhone(phoneLocal);
   const passwordsMatch = !validateConfirmPassword(form.password, confirmPassword);
@@ -314,53 +296,37 @@ export default function UserRegistration() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // final validations
     const phoneErr = validatePhone(phoneLocal);
     const emailErr = validateEmail(form.email);
     const dobErr = validateDOB(form.dateOfBirth);
     const pwdErr = validatePassword(form.password);
     const cpwErr = validateConfirmPassword(form.password, confirmPassword);
 
-    const nextErrors = {
-      phone: phoneErr,
-      email: emailErr,
-      dob: dobErr,
-      password: pwdErr,
-      confirmPassword: cpwErr,
-    };
+    const nextErrors = { phone: phoneErr, email: emailErr, dob: dobErr, password: pwdErr, confirmPassword: cpwErr };
     setErrors(nextErrors);
-
     if (phoneErr || emailErr || dobErr || pwdErr || cpwErr) return;
 
     setLoading(true);
     try {
-      // Submit everything as multipart/form-data in ONE request
       const fd = new FormData();
-
-      if (profileFile) {
-        fd.append("profile", profileFile); // field name "profile" expected by backend route
-      }
-
+      if (profileFile) fd.append("profile", profileFile); // field "profile" expected by backend
       const payload = { ...form, phone: `${countryCode}${phoneLocal}` };
       fd.append("data", JSON.stringify(payload));
 
-      const res = await axios.post(
-        "http://localhost:4000/users/userRegistration",
-        fd,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
+      const res = await axios.post("http://localhost:4000/users/userRegistration", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       const userId = res?.data?.user?._id || res?.data?.userId;
       const token = res?.data?.token;
-
       if (userId) localStorage.setItem("tempUserId", userId);
       if (token) {
         localStorage.setItem("auth_token", token);
-        localStorage.setItem("token", token); // optional alias for other parts of app
+        localStorage.setItem("token", token);
       }
 
       toast.success("Registration saved ✅");
-      navigate("/register-step2");
+      setChooseRoleOpen(true); // open modal after save
     } catch (err) {
       console.error(err);
       const msg = err.response?.data?.message || "Registration failed ❌";
@@ -376,9 +342,7 @@ export default function UserRegistration() {
         onSubmit={handleSubmit}
         className="bg-white/90 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-emerald-100 max-w-2xl w-full space-y-5"
       >
-        <h2 className="text-3xl font-bold text-emerald-700 text-center">
-          User Registration
-        </h2>
+        <h2 className="text-3xl font-bold text-emerald-700 text-center">User Registration</h2>
 
         {/* First/Last Name */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -412,7 +376,6 @@ export default function UserRegistration() {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
           <div className="flex gap-2">
-            {/* Combobox */}
             <div className="relative w-48" ref={comboRef}>
               <input
                 type="text"
@@ -440,9 +403,7 @@ export default function UserRegistration() {
                         }}
                         className={cls(
                           "px-3 py-2 cursor-pointer flex justify-between text-sm",
-                          idx === highlightIndex
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "hover:bg-gray-50"
+                          idx === highlightIndex ? "bg-emerald-50 text-emerald-700" : "hover:bg-gray-50"
                         )}
                         onMouseEnter={() => setHighlightIndex(idx)}
                       >
@@ -469,9 +430,7 @@ export default function UserRegistration() {
                   errors.phone ? "border-red-500" : ""
                 )}
               />
-              {errors.phone && (
-                <p className="text-red-600 text-sm mt-1">{errors.phone}</p>
-              )}
+              {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
             </div>
           </div>
         </div>
@@ -491,9 +450,7 @@ export default function UserRegistration() {
               errors.email ? "border-red-500" : ""
             )}
           />
-          {errors.email && (
-            <p className="text-red-600 text-sm mt-1">{errors.email}</p>
-          )}
+          {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
         </div>
 
         {/* DOB & Gender */}
@@ -512,9 +469,7 @@ export default function UserRegistration() {
                 errors.dob ? "border-red-500" : ""
               )}
             />
-            {errors.dob && (
-              <p className="text-red-600 text-sm mt-1">{errors.dob}</p>
-            )}
+            {errors.dob && <p className="text-red-600 text-sm mt-1">{errors.dob}</p>}
           </div>
 
           <div>
@@ -550,9 +505,7 @@ export default function UserRegistration() {
                 errors.password ? "border-red-500" : ""
               )}
             />
-            {errors.password && (
-              <p className="text-red-600 text-sm mt-1">{errors.password}</p>
-            )}
+            {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
@@ -568,9 +521,7 @@ export default function UserRegistration() {
                 errors.confirmPassword ? "border-red-500" : ""
               )}
             />
-            {errors.confirmPassword && (
-              <p className="text-red-600 text-sm mt-1">{errors.confirmPassword}</p>
-            )}
+            {errors.confirmPassword && <p className="text-red-600 text-sm mt-1">{errors.confirmPassword}</p>}
           </div>
         </div>
 
@@ -598,10 +549,7 @@ export default function UserRegistration() {
               placeholder="State / Province"
               value={form.address.stateProvince}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  address: { ...form.address, stateProvince: e.target.value },
-                })
+                setForm({ ...form, address: { ...form.address, stateProvince: e.target.value } })
               }
               required
               className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
@@ -631,10 +579,7 @@ export default function UserRegistration() {
               placeholder="Postal Code"
               value={form.address.postalCode}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  address: { ...form.address, postalCode: e.target.value },
-                })
+                setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
               }
               required
               className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
@@ -675,11 +620,7 @@ export default function UserRegistration() {
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-full border overflow-hidden bg-gray-100 flex items-center justify-center">
               {preview ? (
-                <img
-                  src={preview}
-                  alt="Profile preview"
-                  className="w-full h-full object-cover"
-                />
+                <img src={preview} alt="Profile preview" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-xs text-gray-400">No image</span>
               )}
@@ -697,7 +638,7 @@ export default function UserRegistration() {
                            hover:file:bg-emerald-100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Choose an image to upload (JPG/PNG). It will show a preview and upload when you click Next.
+                Choose an image (JPG/PNG). It will upload with your details when you click Next.
               </p>
               {uploading && <p className="text-xs text-emerald-700 mt-1">Uploading…</p>}
               {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
@@ -730,6 +671,9 @@ export default function UserRegistration() {
           )}
         </div>
       </form>
+
+      {/* Role selection modal — handles its own navigation */}
+      <RoleSelectModal open={chooseRoleOpen} onClose={() => setChooseRoleOpen(false)} />
     </div>
   );
 }

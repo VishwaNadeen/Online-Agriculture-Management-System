@@ -26,6 +26,7 @@ const pickUpdatable = (body) => {
     "phone",
     "dateOfBirth",
     "gender",
+    "role",
     // "email", "role", "profilePicture" are intentionally excluded on updates
   ];
 
