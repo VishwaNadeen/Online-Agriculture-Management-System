@@ -46,7 +46,7 @@ export default function AdminHome() {
           </NavLink>
 
           <NavLink
-            to="community"
+            to="comments"
             className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
           >
             <FaComments /> Community
