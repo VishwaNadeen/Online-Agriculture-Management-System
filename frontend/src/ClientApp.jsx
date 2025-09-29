@@ -38,6 +38,8 @@ import EventPage from "./pages/event/EventsPage.jsx";
 import EventDetail from "./pages/event/EventDetail.jsx";
 import MyEvents from "./pages/event/MyEvents.jsx";
 
+
+
 export default function ClientApp() {
   return (
     <>
@@ -78,6 +80,7 @@ export default function ClientApp() {
         <Route path="/events" element={<EventPage />} />
         <Route path="/events/:id" element={<EventDetail />} />
         <Route path="/my-events" element={<MyEvents />} />
+       
 
       </Routes>
       <Footer />
