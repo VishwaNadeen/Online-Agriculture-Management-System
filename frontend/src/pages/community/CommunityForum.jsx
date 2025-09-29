@@ -140,6 +140,11 @@ export default function CommunityForum() {
     );
   };
 
+  // stay on same page: remove just the deleted post
+  const handleDeleted = (postId) => {
+    setAllPosts((prev) => prev.filter((p) => p._id !== postId));
+  };
+
   const onPickFile = (e) => {
     const f = e.target.files?.[0] || null;
     if (!f) {
@@ -165,8 +170,7 @@ export default function CommunityForum() {
     setFile(f);
   };
 
-  /* ===== NEW: letters-only validation for title ===== */
-  const onlyLetters = (s) => /^[\p{L}\s]+$/u.test(s); // supports all alphabets + spaces
+  const onlyLetters = (s) => /^[\p{L}\s]+$/u.test(s);
   const t = title.trim();
   const c = comment.trim();
   const invalidTitleNow = t.length > 0 && !onlyLetters(t);
@@ -284,7 +288,7 @@ export default function CommunityForum() {
                   <li key={cat}>
                     <button
                       onClick={() => setCategory(cat)}
-                      className={`w/full text-left px-4 py-3 rounded-xl transition-all duration-200 group ${
+                      className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 group ${
                         category === cat
                           ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold shadow-md transform scale-[1.02]"
                           : "text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 hover:translate-x-1"
@@ -318,7 +322,7 @@ export default function CommunityForum() {
               </div>
             </div>
 
-            {/* Composer launcher (div -> button to prevent immediate disappearance) */}
+            {/* Composer launcher (unchanged) */}
             {!composerOpen && (
               <button
                 type="button"
@@ -351,6 +355,7 @@ export default function CommunityForum() {
               </button>
             )}
 
+            {/* Composer (unchanged UI; validation already added earlier) */}
             {composerOpen && (
               <form
                 onSubmit={handleNewPost}
@@ -375,7 +380,7 @@ export default function CommunityForum() {
                       onChange={(e) => setSelectedPostCategory(e.target.value)}
                       className="w-full rounded-xl border-2 border-emerald-200 p-4 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all bg-white/80"
                     >
-                      {categories.filter(cat => cat !== "All").map((cat) => (
+                      {["Crop Issues","Pest & Disease","Irrigation & Soil","Livestock","Organic Farming","Machinery & Tools","General"].map((cat) => (
                         <option key={cat} value={cat}>
                           {cat}
                         </option>
@@ -390,7 +395,6 @@ export default function CommunityForum() {
                     value={title}
                     onChange={(e) => {
                       setTitle(e.target.value);
-                      // live-clear server-side error only; UI stays same
                       if (errors.title) setErrors((x) => ({ ...x, title: "" }));
                     }}
                     aria-invalid={!!errors.title || invalidTitleNow}
@@ -502,7 +506,12 @@ export default function CommunityForum() {
                 </div>
               ) : (
                 posts.map((post) => (
-                  <CommunityPostCard key={post._id} post={post} onReacted={handleReacted} />
+                  <CommunityPostCard
+                    key={post._id}
+                    post={post}
+                    onReacted={handleReacted}
+                    onDeleted={handleDeleted}
+                  />
                 ))
               )}
             </div>

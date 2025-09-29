@@ -41,7 +41,7 @@ router.post("/", identifyUser, upload.single("image"), async (req, res) => {
       title: title.trim(),
       comment: comment.trim(),
       authorName: req.userName,
-      authorAvatar: authorAvatar || "",
+      authorAvatar: authorAvatar || req.headers["x-user-avatar"] || "",
       image: imagePath,
       category: category || "General",
     });
@@ -146,7 +146,9 @@ router.post("/:id/dislike/toggle", identifyUser, (req, res) => applyReaction(req
 
 /* COMMENTS */
 router.post("/:id/comments", identifyUser, async (req, res) => {
-  const { text, authorAvatar } = req.body;
+  const { text } = req.body;
+  // pick avatar from body or header (so profile photos always appear)
+  const authorAvatar = req.body?.authorAvatar || req.headers["x-user-avatar"] || "";
   if (!text?.trim()) return res.status(400).json({ message: "Empty comment" });
 
   const post = await CommunityPost.findById(req.params.id);
@@ -155,7 +157,7 @@ router.post("/:id/comments", identifyUser, async (req, res) => {
   const comment = {
     text: text.trim(),
     authorName: req.userName,
-    authorAvatar: authorAvatar || "",
+    authorAvatar,
   };
 
   post.comments.push(comment);
@@ -164,7 +166,7 @@ router.post("/:id/comments", identifyUser, async (req, res) => {
   res.json(post.comments[post.comments.length - 1]);
 });
 
-/* --- NEW: Edit a comment (only by its author) --- */
+/* --- Edit a comment (only by its author) --- */
 router.put("/:id/comments/:commentId", identifyUser, async (req, res) => {
   try {
     const { text } = req.body;
@@ -191,7 +193,7 @@ router.put("/:id/comments/:commentId", identifyUser, async (req, res) => {
   }
 });
 
-/* --- NEW: Delete a comment (only by its author) --- */
+/* --- Delete a comment (only by its author) --- */
 router.delete("/:id/comments/:commentId", identifyUser, async (req, res) => {
   try {
     const post = await CommunityPost.findById(req.params.id);
@@ -215,7 +217,8 @@ router.delete("/:id/comments/:commentId", identifyUser, async (req, res) => {
 
 /* REPLIES */
 router.post("/:postId/comments/:commentId/replies", identifyUser, async (req, res) => {
-  const { text, authorAvatar } = req.body;
+  const { text } = req.body;
+  const authorAvatar = req.body?.authorAvatar || req.headers["x-user-avatar"] || "";
   if (!text?.trim()) return res.status(400).json({ message: "Empty reply" });
 
   const post = await CommunityPost.findById(req.params.postId);
@@ -227,7 +230,7 @@ router.post("/:postId/comments/:commentId/replies", identifyUser, async (req, re
   const reply = {
     text: text.trim(),
     authorName: req.userName,
-    authorAvatar: authorAvatar || "",
+    authorAvatar,
   };
 
   comment.replies.push(reply);

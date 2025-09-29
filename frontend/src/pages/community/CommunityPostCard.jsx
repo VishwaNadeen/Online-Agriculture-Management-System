@@ -39,9 +39,11 @@ const timeAgo = (d) => {
   return ts.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
+/* UPDATED: allow http(s), protocol-relative (//), data:, blob:, and /uploads */
 function resolveImageUrl(img) {
   if (!img) return "";
-  if (/^https?:\/\//i.test(img)) return img;
+  if (/^(https?:)?\/\/|^data:|^blob:/i.test(img)) return img;
+  if (img.startsWith("/")) return `${BASE}${img}`;
   const pathPart = img.startsWith("/uploads/")
     ? img
     : `/uploads/${img.replace(/^\/+/, "")}`;
@@ -89,7 +91,7 @@ const TrashIcon = ({ className = "w-5 h-5" }) => (
   </svg>
 );
 
-export default function CommunityPostCard({ post, onReacted }) {
+export default function CommunityPostCard({ post, onReacted, onDeleted }) {
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -108,6 +110,7 @@ export default function CommunityPostCard({ post, onReacted }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [deletingPost, setDeletingPost] = useState(false);
   const [toast, setToast] = useState("");
+  const [removed, setRemoved] = useState(false); // fallback if no onDeleted
 
   // --- REACTION (toggle/swap) ---
   const userScope = useMemo(() => (auth.name() || "Anonymous").trim(), []);
@@ -130,9 +133,27 @@ export default function CommunityPostCard({ post, onReacted }) {
       setCommentsLoading(true);
       try {
         const res = await api.get(`/community/${post._id}`);
-        const comments = Array.isArray(res.data?.comments)
-          ? res.data.comments
-          : [];
+        let comments = Array.isArray(res.data?.comments) ? res.data.comments : [];
+
+        // NEW: normalize avatar keys so UI can display whatever backend sends
+        comments = comments.map((c) => ({
+          ...c,
+          authorAvatar:
+            c.authorAvatar ||
+            c.userAvatar ||
+            c.avatar ||
+            c.photoURL ||
+            c.picture ||
+            c.image ||
+            c.profilePic ||
+            c.profilePicture ||
+            c?.user?.avatar ||
+            c?.user?.profilePicture ||
+            c?.author?.avatar ||
+            c?.author?.profilePicture ||
+            "",
+        }));
+
         setFull({ comments });
       } catch (e) {
         console.error("Failed to load comments", e);
@@ -154,28 +175,23 @@ export default function CommunityPostCard({ post, onReacted }) {
     const tk = auth.token();
     if (tk) headers.Authorization = `Bearer ${tk}`;
 
-    // Optimistic UI update based on local state
     const prev = myReaction;
 
     const applyOptimistic = (next) => {
       if (prev === next) return;
-      // remove previous
       if (prev === "like") setLikes((n) => Math.max(0, n - 1));
       if (prev === "dislike") setDislikes((n) => Math.max(0, n - 1));
-      // add next
       if (next === "like") setLikes((n) => n + 1);
       if (next === "dislike") setDislikes((n) => n + 1);
       setMyReaction(next || "none");
       localStorage.setItem(storageKey, next || "none");
     };
 
-    // If clicking same button => toggle off
     const target = prev === type ? "none" : type;
     applyOptimistic(target);
 
     try {
       const res = await api.post(`/community/${post._id}/${type}`, {}, { headers });
-      // Server is source of truth
       setLikes(res.data.likes ?? 0);
       setDislikes(res.data.dislikes ?? 0);
       setMyReaction(res.data.myReaction || "none");
@@ -183,13 +199,11 @@ export default function CommunityPostCard({ post, onReacted }) {
       onReacted?.(post._id, res.data);
     } catch (e) {
       console.error("Reaction failed", e);
-      // revert by asking server current (fallback: reload one)
       try {
         const s = await api.get(`/community/${post._id}`);
         setLikes(s.data.likes ?? 0);
         setDislikes(s.data.dislikes ?? 0);
       } catch {}
-      // fallback local
       setMyReaction(prev);
       localStorage.setItem(storageKey, prev);
       alert("Failed to update reaction");
@@ -240,7 +254,10 @@ export default function CommunityPostCard({ post, onReacted }) {
       const tk = auth.token();
       if (tk) headers.Authorization = `Bearer ${tk}`;
       await api.delete(`/community/${post._id}`, { headers });
-      post._deleted = true;
+
+      if (onDeleted) onDeleted(post._id);
+      else setRemoved(true);
+
       setShowConfirm(false);
       setToast("Post deleted successfully");
       setTimeout(() => setToast(""), 2000);
@@ -272,9 +289,8 @@ export default function CommunityPostCard({ post, onReacted }) {
     }
   };
 
-  if (post._deleted) return null;
+  if (removed) return null;
 
-  // resolve possible avatar fields from server
   const postAuthorAvatar =
     post.authorAvatar ||
     post.authorPhoto ||
@@ -317,7 +333,6 @@ export default function CommunityPostCard({ post, onReacted }) {
           cm._id === c._id ? { ...cm, text: updated.text, updatedAt: updated.updatedAt } : cm
         ),
       }));
-      // also keep post.comments (for count if collapsed) in sync when it exists
       if (Array.isArray(post.comments)) {
         const idx = post.comments.findIndex((cm) => cm._id === c._id);
         if (idx >= 0) post.comments[idx].text = updated.text;
@@ -405,358 +420,368 @@ export default function CommunityPostCard({ post, onReacted }) {
       <div className="rounded-2xl border border-emerald-200 bg-white/95 backdrop-blur-sm p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:transform hover:scale-[1.01] relative overflow-hidden">
         <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-emerald-50/50 to-transparent rounded-full transform translate-x-8 -translate-y-8"></div>
         <div className="relative">
-        
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-start gap-4">
-            <Avatar name={post.authorName} src={postAuthorAvatar} size="12" />
-            <div>
-              <h4 className="font-bold text-emerald-800 text-lg">
-                {post.authorName || "Anonymous"}
-              </h4>
-              <div className="flex items-center gap-2">
-                <p className="text-emerald-600/80 text-sm font-medium">{whenLine}</p>
-                {post.aiDetected && (
-                  <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 rounded-full text-xs font-medium border border-blue-200">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M9.5 2A1.5 1.5 0 0 0 8 3.5v1A1.5 1.5 0 0 0 9.5 6h1A1.5 1.5 0 0 0 12 4.5v-1A1.5 1.5 0 0 0 10.5 2h-1zM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
-                    </svg>
-                    AI Categorized
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {iAmAuthor && (
-            <div className="flex gap-2">
-              <IconButton
-                title={editingPost ? "Cancel edit" : "Edit post"}
-                onClick={() => setEditingPost((s) => !s)}
-              >
-                <PencilIcon className="h-5 w-5 text-emerald-600 hover:text-emerald-700" />
-              </IconButton>
-              <IconButton
-                title="Delete post"
-                onClick={requestDelete}
-                disabled={deletingPost}
-              >
-                <TrashIcon className="h-5 w-5 text-red-500 hover:text-red-600" />
-              </IconButton>
-            </div>
-          )}
-        </div>
-
-        {/* Content / Edit */}
-        {!editingPost ? (
-          <>
-            <div className="mb-3 flex items-start gap-3">
-              <h2 className="text-xl font-bold text-emerald-900 leading-tight">
-                {post.title}
-              </h2>
-              {post.category && (
-                <div className="flex items-center gap-1">
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold shadow-sm ${
-                    post.aiDetected 
-                      ? "bg-gradient-to-r from-blue-100 to-indigo-100 border border-blue-200 text-blue-700"
-                      : "bg-gradient-to-r from-emerald-100 to-green-100 border border-emerald-200 text-emerald-700"
-                  }`}>
-                    {post.aiDetected ? "🤖" : "🌱"} {post.category}
-                  </span>
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start gap-4">
+              <Avatar name={post.authorName} src={postAuthorAvatar} size="12" />
+              <div>
+                <h4 className="font-bold text-emerald-800 text-lg">
+                  {post.authorName || "Anonymous"}
+                </h4>
+                <div className="flex items-center gap-2">
+                  <p className="text-emerald-600/80 text-sm font-medium">{whenLine}</p>
                   {post.aiDetected && (
-                    <div className="group relative">
-                      <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                    <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 rounded-full text-xs font-medium border border-blue-200">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9.5 2A1.5 1.5 0 0 0 8 3.5v1A1.5 1.5 0 0 0 9.5 6h1A1.5 1.5 0 0 0 12 4.5v-1A1.5 1.5 0 0 0 10.5 2h-1zM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
                       </svg>
-                      <div className="invisible group-hover:visible absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
-                        Auto-categorized by AI
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-                      </div>
+                      AI Categorized
                     </div>
                   )}
                 </div>
-              )}
+              </div>
             </div>
-            <p className="mb-4 leading-relaxed text-gray-800 text-lg">{post.comment}</p>
-            {post.image && (
-              <div className="mb-4">
-                <img
-                  src={resolveImageUrl(post.image)}
-                  alt="post"
-                  className="w-full max-h-[520px] rounded-xl border-2 border-emerald-200 object-cover shadow-md"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
+
+            {iAmAuthor && (
+              <div className="flex gap-2">
+                <IconButton
+                  title={editingPost ? "Cancel edit" : "Edit post"}
+                  onClick={() => setEditingPost((s) => !s)}
+                >
+                  <PencilIcon className="h-5 w-5 text-emerald-600 hover:text-emerald-700" />
+                </IconButton>
+                <IconButton
+                  title="Delete post"
+                  onClick={requestDelete}
+                  disabled={deletingPost}
+                >
+                  <TrashIcon className="h-5 w-5 text-red-500 hover:text-red-600" />
+                </IconButton>
               </div>
             )}
-          </>
-        ) : (
-          <div className="space-y-4">
-            <input
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="w-full rounded-xl border-2 border-emerald-200 p-4 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all bg-white"
-              placeholder="Post title"
-            />
-            <textarea
-              rows={4}
-              value={editBody}
-              onChange={(e) => setEditBody(e.target.value)}
-              className="w-full rounded-xl border-2 border-emerald-200 p-4 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all bg-white"
-              placeholder="Post description"
-            />
-            <div className="flex justify-end">
-              <button
-                onClick={savePost}
-                disabled={savingPost}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold disabled:opacity-60 hover:shadow-lg transition-all transform hover:scale-[1.02]"
-              >
-                {savingPost ? "Saving..." : "💾 Save Changes"}
-              </button>
-            </div>
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="flex flex-wrap items-center gap-3 border-t-2 border-emerald-100 pt-4 text-sm">
-          <button
-            onClick={likeToggle}
-            className={`rounded-xl border-2 px-4 py-2 font-semibold transition-all transform hover:scale-105 ${
-              myReaction === "like"
-                ? "bg-gradient-to-r from-emerald-500 to-green-500 border-emerald-400 text-white shadow-lg"
-                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-            }`}
-          >
-            👍 Like <span className="ml-1 font-bold">{likes}</span>
-          </button>
-          
-          <button
-            onClick={dislikeToggle}
-            className={`rounded-xl border-2 px-4 py-2 font-semibold transition-all transform hover:scale-105 ${
-              myReaction === "dislike"
-                ? "bg-gradient-to-r from-red-500 to-red-600 border-red-400 text-white shadow-lg"
-                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-            }`}
-          >
-            👎 Unlike <span className="ml-1 font-bold">{dislikes}</span>
-          </button>
-
-          <button
-            onClick={() => setOpen((s) => !s)}
-            className="rounded-xl border-2 border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 font-semibold hover:bg-emerald-100 transition-all transform hover:scale-105"
-          >
-            💬 {open ? `Hide comments (${commentCount})` : `Comments (${commentCount})`}
-          </button>
-
-          <button
-            onClick={handleShare}
-            className="rounded-xl border-2 border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 font-semibold hover:bg-emerald-100 transition-all transform hover:scale-105"
-          >
-            🔗 Share
-          </button>
-        </div>
-
-        {/* Comments */}
-        {open && (
-          <div className="mt-6 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-green-50/30 p-5 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-16 h-16 bg-emerald-100/30 rounded-full transform -translate-x-4 -translate-y-4"></div>
-            
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v3c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L14.4 18H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-                  </svg>
-                </div>
-                <h4 className="font-bold text-emerald-800">💬 Join the Discussion</h4>
-              </div>
-
-              <textarea
-                rows={3}
-                className="w-full rounded-xl border-2 border-emerald-200 bg-white p-4 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                placeholder="🌱 Share your thoughts or ask a question..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-              />
-              <button
-                onClick={async () => {
-                  if (!auth.isLoggedIn()) {
-                    alert("Please log in to continue.");
-                    return;
-                  }
-                  const text = newComment.trim();
-                  if (!text) return;
-
-                  const optimistic = {
-                    _id: `tmp-${Date.now()}`,
-                    authorName: auth.name(),
-                    authorAvatar: auth.avatar(),
-                    text,
-                    createdAt: new Date().toISOString(),
-                    replies: [],
-                  };
-
-                  setFull((p) => ({
-                    comments: [...(p?.comments || []), optimistic],
-                  }));
-                  setNewComment("");
-
-                  try {
-                    const headers = { "x-user-name": auth.name() };
-                    const tk = auth.token();
-                    if (tk) headers.Authorization = `Bearer ${tk}`;
-                    const res = await api.post(
-                      `/community/${post._id}/comments`,
-                      {
-                        text,
-                        authorAvatar: auth.avatar(),
-                      },
-                      { headers }
-                    );
-                    const saved = { ...res.data };
-                    if (!saved.authorAvatar)
-                      saved.authorAvatar = optimistic.authorAvatar;
-
-                    setFull((p) => {
-                      const arr = (p?.comments || []).map((c) =>
-                        c._id === optimistic._id ? saved : c
-                      );
-                      return { comments: arr };
-                    });
-
-                    if (!Array.isArray(post.comments)) post.comments = [];
-                    post.comments.push(saved);
-                  } catch (e) {
-                    console.error("Failed to post comment", e);
-                    setFull((p) => ({
-                      comments: (p?.comments || []).filter(
-                        (c) => c._id !== optimistic._id
-                      ),
-                    }));
-                    alert("Failed to post comment");
-                  }
-                }}
-                disabled={!newComment.trim()}
-                className="mt-3 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-3 font-bold text-white hover:shadow-lg disabled:opacity-60 transition-all transform hover:scale-[1.02]"
-              >
-                🌱 Post Comment
-              </button>
-
-              {commentsLoading && (
-                <div className="mt-4 flex items-center gap-2 text-emerald-700">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-600 border-t-transparent"></div>
-                  <span className="text-sm font-medium">Loading comments...</span>
-                </div>
-              )}
-
-              <div className="mt-6 space-y-4">
-                {(full?.comments || []).length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="inline-flex items-center justify-center w-12 h-12 bg-emerald-100 rounded-full mb-3">
-                      <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v3c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L14.4 18H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
-                      </svg>
-                    </div>
-                    <p className="text-emerald-700 font-medium">No comments yet.</p>
-                    <p className="text-emerald-600 text-sm">Be the first to join the conversation! 🌱</p>
-                  </div>
-                ) : (
-                  (full?.comments || []).map((c) => {
-                    const commentAvatar =
-                      c.authorAvatar ||
-                      c.authorPhoto ||
-                      c.authorImage ||
-                      c.avatar ||
-                      c.profilePic ||
-                      "";
-                    const canModify = (c.authorName || "User") === auth.name();
-
-                    return (
-                      <div
-                        key={c._id}
-                        className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200"
-                      >
-                        <div className="flex items-start gap-3">
-                          <Avatar
-                            name={c.authorName}
-                            src={commentAvatar}
-                            size="10"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-emerald-800">
-                                  {c.authorName || "User"}
-                                </span>
-                                <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                                  {timeAgo(c.createdAt)}
-                                </span>
-                              </div>
-
-                              {canModify && (
-                                <div className="flex items-center gap-1">
-                                  {editingCommentId === c._id ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => saveCommentEdit(c)}
-                                        disabled={savingComment || !editingCommentText.trim()}
-                                        className="text-emerald-700 font-semibold px-3 py-1 rounded-lg border border-emerald-300 hover:bg-emerald-50 disabled:opacity-60"
-                                      >
-                                        Save
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={cancelEditComment}
-                                        className="text-gray-600 font-medium px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-50"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <IconButton
-                                        title="Edit comment"
-                                        onClick={() => startEditComment(c)}
-                                      >
-                                        <PencilIcon className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
-                                      </IconButton>
-                                      <IconButton
-                                        title="Delete comment"
-                                        onClick={() => deleteComment(c)}
-                                        disabled={deletingCommentId === c._id}
-                                      >
-                                        <TrashIcon className="h-4 w-4 text-red-500 hover:text-red-600" />
-                                      </IconButton>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            {editingCommentId === c._id ? (
-                              <textarea
-                                rows={3}
-                                className="w-full rounded-xl border-2 border-emerald-200 p-3 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all"
-                                value={editingCommentText}
-                                onChange={(e) => setEditingCommentText(e.target.value)}
-                              />
-                            ) : (
-                              <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                                {c.text}
-                              </p>
-                            )}
-                          </div>
+          {/* Content / Edit */}
+          {!editingPost ? (
+            <>
+              <div className="mb-3 flex items-start gap-3">
+                <h2 className="text-xl font-bold text-emerald-900 leading-tight">
+                  {post.title}
+                </h2>
+                {post.category && (
+                  <div className="flex items-center gap-1">
+                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold shadow-sm ${
+                      post.aiDetected
+                        ? "bg-gradient-to-r from-blue-100 to-indigo-100 border border-blue-200 text-blue-700"
+                        : "bg-gradient-to-r from-emerald-100 to-green-100 border border-emerald-200 text-emerald-700"
+                    }`}>
+                      {post.aiDetected ? "🤖" : "🌱"} {post.category}
+                    </span>
+                    {post.aiDetected && (
+                      <div className="group relative">
+                        <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                        </svg>
+                        <div className="invisible group-hover:visible absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
+                          Auto-categorized by AI
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
                         </div>
                       </div>
-                    );
-                  })
+                    )}
+                  </div>
                 )}
               </div>
+              <p className="mb-4 leading-relaxed text-gray-800 text-lg">{post.comment}</p>
+              {post.image && (
+                <div className="mb-4">
+                  <img
+                    src={resolveImageUrl(post.image)}
+                    alt="post"
+                    className="w-full max-h-[520px] rounded-xl border-2 border-emerald-200 object-cover shadow-md"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-4">
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full rounded-xl border-2 border-emerald-200 p-4 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all bg-white"
+                placeholder="Post title"
+              />
+              <textarea
+                rows={4}
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                className="w-full rounded-xl border-2 border-emerald-200 p-4 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all bg-white"
+                placeholder="Post description"
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={savePost}
+                  disabled={savingPost}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold disabled:opacity-60 hover:shadow-lg transition-all transform hover:scale-[1.02]"
+                >
+                  {savingPost ? "Saving..." : "💾 Save Changes"}
+                </button>
+              </div>
             </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-3 border-t-2 border-emerald-100 pt-4 text-sm">
+            <button
+              onClick={likeToggle}
+              className={`rounded-xl border-2 px-4 py-2 font-semibold transition-all transform hover:scale-105 ${
+                myReaction === "like"
+                  ? "bg-gradient-to-r from-emerald-500 to-green-500 border-emerald-400 text-white shadow-lg"
+                  : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+              }`}
+            >
+              👍 Like <span className="ml-1 font-bold">{likes}</span>
+            </button>
+
+            <button
+              onClick={dislikeToggle}
+              className={`rounded-xl border-2 px-4 py-2 font-semibold transition-all transform hover:scale-105 ${
+                myReaction === "dislike"
+                  ? "bg-gradient-to-r from-red-500 to-red-600 border-red-400 text-white shadow-lg"
+                  : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+              }`}
+            >
+              👎 Unlike <span className="ml-1 font-bold">{dislikes}</span>
+            </button>
+
+            <button
+              onClick={() => setOpen((s) => !s)}
+              className="rounded-xl border-2 border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 font-semibold hover:bg-emerald-100 transition-all transform hover:scale-105"
+            >
+              💬 {open ? `Hide comments (${commentCount})` : `Comments (${commentCount})`}
+            </button>
+
+            <button
+              onClick={handleShare}
+              className="rounded-xl border-2 border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 font-semibold hover:bg-emerald-100 transition-all transform hover:scale-105"
+            >
+              🔗 Share
+            </button>
           </div>
-        )}
+
+          {/* Comments */}
+          {open && (
+            <div className="mt-6 rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/50 to-green-50/30 p-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-16 h-16 bg-emerald-100/30 rounded-full transform -translate-x-4 -translate-y-4"></div>
+
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v3c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L14.4 18H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                  </div>
+                  <h4 className="font-bold text-emerald-800">💬 Join the Discussion</h4>
+                </div>
+
+                <textarea
+                  rows={3}
+                  className="w-full rounded-xl border-2 border-emerald-200 bg-white p-4 outline-none focus:ring-4 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                  placeholder="🌱 Share your thoughts or ask a question..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                />
+                <button
+                  onClick={async () => {
+                    if (!auth.isLoggedIn()) {
+                      alert("Please log in to continue.");
+                      return;
+                    }
+                    const text = newComment.trim();
+                    if (!text) return;
+
+                    const optimistic = {
+                      _id: `tmp-${Date.now()}`,
+                      authorName: auth.name(),
+                      authorAvatar: auth.avatar(), // ensure avatar immediate
+                      text,
+                      createdAt: new Date().toISOString(),
+                      replies: [],
+                    };
+
+                    setFull((p) => ({
+                      comments: [...(p?.comments || []), optimistic],
+                    }));
+                    setNewComment("");
+
+                    try {
+                      const headers = { "x-user-name": auth.name() };
+                      const tk = auth.token();
+                      if (tk) headers.Authorization = `Bearer ${tk}`;
+                      const res = await api.post(
+                        `/community/${post._id}/comments`,
+                        {
+                          text,
+                          authorAvatar: auth.avatar(),
+                        },
+                        { headers }
+                      );
+                      const saved = {
+                        ...res.data,
+                        authorAvatar:
+                          res.data?.authorAvatar || optimistic.authorAvatar,
+                      };
+
+                      setFull((p) => {
+                        const arr = (p?.comments || []).map((c) =>
+                          c._id === optimistic._id ? saved : c
+                        );
+                        return { comments: arr };
+                      });
+
+                      if (!Array.isArray(post.comments)) post.comments = [];
+                      post.comments.push(saved);
+                    } catch (e) {
+                      console.error("Failed to post comment", e);
+                      setFull((p) => ({
+                        comments: (p?.comments || []).filter(
+                          (c) => c._id !== optimistic._id
+                        ),
+                      }));
+                      alert("Failed to post comment");
+                    }
+                  }}
+                  disabled={!newComment.trim()}
+                  className="mt-3 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-3 font-bold text-white hover:shadow-lg disabled:opacity-60 transition-all transform hover:scale-[1.02]"
+                >
+                  🌱 Post Comment
+                </button>
+
+                {commentsLoading && (
+                  <div className="mt-4 flex items-center gap-2 text-emerald-700">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-600 border-t-transparent"></div>
+                    <span className="text-sm font-medium">Loading comments...</span>
+                  </div>
+                )}
+
+                <div className="mt-6 space-y-4">
+                  {(full?.comments || []).length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-emerald-100 rounded-full mb-3">
+                        <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v3c0 .6.4 1 1 1 .2 0 .5-.1.7-.3L14.4 18H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                        </svg>
+                      </div>
+                      <p className="text-emerald-700 font-medium">No comments yet.</p>
+                      <p className="text-emerald-600 text-sm">Be the first to join the conversation! 🌱</p>
+                    </div>
+                  ) : (
+                    (full?.comments || []).map((c) => {
+                      // UPDATED: much more robust avatar resolution
+                      const commentAvatar =
+                        c.authorAvatar ||
+                        c.userAvatar ||
+                        c.avatar ||
+                        c.photoURL ||
+                        c.picture ||
+                        c.image ||
+                        c.profilePic ||
+                        c.profilePicture ||
+                        c?.user?.avatar ||
+                        c?.user?.profilePicture ||
+                        c?.author?.avatar ||
+                        c?.author?.profilePicture ||
+                        "";
+
+                      const canModify = (c.authorName || "User") === auth.name();
+
+                      return (
+                        <div
+                          key={c._id}
+                          className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200"
+                        >
+                          <div className="flex items-start gap-3">
+                            <Avatar
+                              name={c.authorName}
+                              src={commentAvatar}
+                              size="10"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-emerald-800">
+                                    {c.authorName || "User"}
+                                  </span>
+                                  <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                                    {timeAgo(c.createdAt)}
+                                  </span>
+                                </div>
+
+                                {canModify && (
+                                  <div className="flex items-center gap-1">
+                                    {editingCommentId === c._id ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => saveCommentEdit(c)}
+                                          disabled={savingComment || !editingCommentText.trim()}
+                                          className="text-emerald-700 font-semibold px-3 py-1 rounded-lg border border-emerald-300 hover:bg-emerald-50 disabled:opacity-60"
+                                        >
+                                          Save
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={cancelEditComment}
+                                          className="text-gray-600 font-medium px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-50"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <IconButton
+                                          title="Edit comment"
+                                          onClick={() => startEditComment(c)}
+                                        >
+                                          <PencilIcon className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
+                                        </IconButton>
+                                        <IconButton
+                                          title="Delete comment"
+                                          onClick={() => deleteComment(c)}
+                                          disabled={deletingCommentId === c._id}
+                                        >
+                                          <TrashIcon className="h-4 w-4 text-red-500 hover:text-red-600" />
+                                        </IconButton>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {editingCommentId === c._id ? (
+                                <textarea
+                                  rows={3}
+                                  className="w-full rounded-xl border-2 border-emerald-200 p-3 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all"
+                                  value={editingCommentText}
+                                  onChange={(e) => setEditingCommentText(e.target.value)}
+                                />
+                              ) : (
+                                <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">
+                                  {c.text}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>
