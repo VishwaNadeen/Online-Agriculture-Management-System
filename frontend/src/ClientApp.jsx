@@ -14,6 +14,8 @@ import Profile from "./pages/user/profile";
 import Farm from "./pages/user/farmerDetailsPage.jsx";
 import ProfileEdit from "./pages/user/profileEdit.jsx";
 import FarmEdit from "./pages/user/farmEdit.jsx";
+import Consultant from "./pages/user/ConsultantDetailsPage.jsx";
+import ConsultantEdit from "./pages/user/consultantedit.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -27,9 +29,13 @@ import MyAppointments from "./pages/appointments/MyAppointments";
 import CommunityForum from "./pages/community/CommunityForum";
 
 // Chanaka
-
 import CoursesPage from "./pages/courses/coursePage";
 import CourseOverview from "./pages/courses/courseOverview";
+
+//dilhani
+import EventPage from "./pages/event/EventsPage.jsx";
+import EventDetail from "./pages/event/EventDetail.jsx";
+import MyEvents from "./pages/event/MyEvents.jsx";
 
 export default function ClientApp() {
   return (
@@ -48,6 +54,8 @@ export default function ClientApp() {
         <Route path="/profile/farm" element={<Farm />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />
         <Route path="/farm/edit" element={<FarmEdit />} />
+        <Route path="/profile/consultant" element={<Consultant />} />
+        <Route path="/profile/consultant/edit" element={<ConsultantEdit />} />
 
         {/* Methma */}
         <Route path="/SearchCon" element={<Searchcon />} />
@@ -65,9 +73,13 @@ export default function ClientApp() {
         <Route path="/community" element={<CommunityForum />} />
 
         {/* Chanaka */}
-        
         <Route path="/coursepage" element={<CoursesPage />} />
         <Route path="/courses/:courseID" element={<CourseOverview />} />
+
+        {/* dilhani */}
+        <Route path="/events" element={<EventPage />} />
+        <Route path="/events/:id" element={<EventDetail />} />
+        <Route path="/my-events" element={<MyEvents />} />
 
       </Routes>
       <Footer />
