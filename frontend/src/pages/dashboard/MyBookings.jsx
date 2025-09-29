@@ -1,37 +1,46 @@
+// src/pages/dashboard/MyBookings.jsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import API from "../../utils/api";
-import AppointmentCard from "../../components/AppointmentCard";
+import AppointmentCard from "../../components/appointmentCard";
+import AppointmentDetailsModal from "../../components/AppointmentDetailsModal";
 
 export default function MyBookings() {
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(null);
 
   async function load() {
     setLoading(true);
     try {
       const q = status ? `?status=${status}` : "";
-      // backend route you already have: GET /appointments/my
-      const { data } = await API.get(`/appointments/my${q}`);
-      setRows(Array.isArray(data) ? data : data?.items || []);
+      const { data } = await API.get(`/appointments/my-bookings${q}`);
+      setRows(data || []);
     } finally {
       setLoading(false);
     }
   }
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [status]);
+  useEffect(() => { load(); }, [status]);
 
-  const onEdit = (appt) => {
-    if (!appt?._id) return;
-    navigate(`/appointment/${appt._id}/edit`, { state: { appt } });
+  const doCancel = async (appt) => {
+    if (!confirm("Cancel this appointment?")) return;
+    await API.post(`/appointments/${appt._id}/cancel`);
+    await load();
+    setOpen(false);
   };
 
-  const onCancel = async (appt) => {
-    if (!appt?._id) return;
-    if (!window.confirm("Cancel this appointment?")) return;
-    await API.post(`/appointments/${appt._id}/cancel`);
-    load();
+  const doDelete = async (appt) => {
+    if (!confirm("Delete this appointment permanently?")) return;
+    await API.delete(`/appointments/${appt._id}`);
+    await load();
+    setOpen(false);
+  };
+
+  const onOpenDetails = (appt) => {
+    setActive(appt);
+    setOpen(true);
   };
 
   return (
@@ -58,15 +67,26 @@ export default function MyBookings() {
       <div className="grid md:grid-cols-2 gap-3">
         {rows.map((r) => (
           <AppointmentCard
-            key={r._id || r.id}
+            key={r._id}
             appt={r}
             role="farmer"
-            onEdit={onEdit}
-            onCancel={onCancel}
-            onOpen={() => {}}
+            onOpen={onOpenDetails}
+            onCancel={doCancel}
+            onDelete={doDelete}
           />
         ))}
       </div>
+
+      <AppointmentDetailsModal
+        open={open}
+        onClose={() => setOpen(false)}
+        appt={active || {}}
+        role="farmer"
+        onCancel={doCancel}
+        onDelete={doDelete}
+        // onEdit={(a) => navigate(`/appointment/${a._id}/edit`, { state:{ appt:a }})}
+        // onDownload={(a) => ... }
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // src/pages/dashboard/Dashboard.jsx
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import MyAppointments from "../appointments/MyAppointments";
+import API from "../../utils/api";
 
 import {
   Calendar,
@@ -35,67 +36,20 @@ function userIsConsultant(u) {
   return false;
 }
 
-/* ------------------ Mock data (replace with API later) ------------------ */
-const mockAppointments = [
-  {
-    id: 1,
-    patient: {
-      name: "Sarah Johnson",
-      avatar: "/api/placeholder/40/40",
-      phone: "+1-234-567-8901",
-    },
-    date: "2024-09-27",
-    time: "10:30 AM",
-    type: "Initial Consultation",
-    status: "upcoming",
-    duration: 60,
-    notes: "First time consultation for business strategy",
-  },
-  {
-    id: 2,
-    patient: {
-      name: "Michael Chen",
-      avatar: "/api/placeholder/40/40",
-      phone: "+1-234-567-8902",
-    },
-    date: "2024-09-27",
-    time: "02:00 PM",
-    type: "Follow-up",
-    status: "upcoming",
-    duration: 45,
-    notes: "Review implementation progress",
-  },
-  {
-    id: 3,
-    patient: {
-      name: "Emily Davis",
-      avatar: "/api/placeholder/40/40",
-      phone: "+1-234-567-8903",
-    },
-    date: "2024-09-26",
-    time: "11:00 AM",
-    type: "Strategy Session",
-    status: "completed",
-    duration: 90,
-    rating: 5,
-    feedback: "Excellent session, very helpful insights",
-  },
-  {
-    id: 4,
-    patient: {
-      name: "David Wilson",
-      avatar: "/api/placeholder/40/40",
-      phone: "+1-234-567-8904",
-    },
-    date: "2024-09-25",
-    time: "03:30 PM",
-    type: "Consultation",
-    status: "completed",
-    duration: 60,
-    rating: 4,
-    feedback: "Good advice, looking forward to next session",
-  },
-];
+/* ------------------ Small date helpers ------------------ */
+function ymdLocal(date) {
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Normalize date field from an appointment record
+function apptDate(appt) {
+  const val = appt?.appointmentDate || appt?.appointmentDateISO || appt?.dateISO || appt?.date;
+  return val ? new Date(val) : null;
+}
 
 const mockRequests = [
   {
@@ -137,7 +91,7 @@ const colorStyles = {
   },
 };
 
-const StatCard = ({ title, value, subtitle, icon:  color = "blue" }) => {
+const StatCard = ({ title, value, subtitle, icon: Icon, color = "blue" }) => {
   const cs = colorStyles[color] || colorStyles.blue;
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -185,68 +139,51 @@ const Avatar = ({ src, alt }) => (
 );
 
 /* ------------------ Cards ------------------ */
-const AppointmentCard = ({ appointment }) => {
-  const isUpcoming = appointment.status === "upcoming";
+const AppointmentCard = ({ appointment, onComplete }) => {
+  const isConfirmed = appointment.status === "confirmed";
   return (
     <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-3">
-          <Avatar
-            src={appointment.patient.avatar}
-            alt={appointment.patient.name}
-          />
+          <Avatar src={appointment.avatar || "/api/placeholder/40/40"} alt={appointment.name} />
           <div>
             <h4 className="font-semibold text-gray-900">
-              {appointment.patient.name}
+              {appointment.name}
             </h4>
-            <p className="text-sm text-gray-500">{appointment.type}</p>
+            {appointment.category && (
+              <p className="text-sm text-gray-500">{appointment.category}</p>
+            )}
           </div>
         </div>
         <div className="text-right">
-          <p className="text-sm font-medium text-gray-900">{appointment.time}</p>
-          <p className="text-xs text-gray-500">{appointment.duration} min</p>
+          <p className="text-sm font-medium text-gray-900">{appointment.appointmentTime || "-"}</p>
+          <p className="text-xs text-gray-500">{appointment.durationHours ? `${appointment.durationHours} h` : ""}</p>
         </div>
       </div>
 
-      {isUpcoming ? (
+      {isConfirmed ? (
         <div className="flex items-center justify-between">
-          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-            Upcoming
+          <span className="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs rounded-full">
+            Confirmed
           </span>
           <div className="flex space-x-2">
-            <button
-              type="button"
-              title="Call"
-              className="text-blue-600 hover:text-blue-800 text-sm"
-            >
+            <button type="button" title="Call" className="text-blue-600 hover:text-blue-800 text-sm">
               <Phone className="w-4 h-4" />
             </button>
             <button
               type="button"
-              className="text-gray-600 hover:text-gray-800 text-sm"
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700"
+              onClick={() => onComplete?.(appointment)}
             >
-              Reschedule
+              Complete
             </button>
           </div>
         </div>
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
-              Completed
-            </span>
-            <div className="flex items-center space-x-2">
-              <Stars value={appointment.rating} />
-              <span className="text-sm text-gray-600">
-                {appointment.rating}/5
-              </span>
-            </div>
+            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">{appointment.status}</span>
           </div>
-          {appointment.feedback && (
-            <p className="text-sm text-gray-600 italic">
-              "{appointment.feedback}"
-            </p>
-          )}
         </div>
       )}
     </div>
@@ -295,16 +232,33 @@ const RequestCard = ({ request, onAction }) => (
 /* ------------------ Consultant Dashboard ------------------ */
 const ConsultantDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState("overview");
-  const [appointments] = useState(mockAppointments);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
+  // Today as local yyyy-mm-dd string
+  const todayStr = ymdLocal(new Date());
 
-  // Today in local time (Asia/Colombo: +05:30). We’ll just compare yyyy-mm-dd strings.
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // load consultant appointments (confirmed + others for stats)
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const { data } = await API.get(`/appointments/my-consultant`);
+      setAppointments(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.message || "Failed to load appointments");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
 
   const stats = useMemo(() => {
     const total = appointments.length;
     const completed = appointments.filter((a) => a.status === "completed").length;
-    const upcoming = appointments.filter((a) => a.status === "upcoming").length;
+    const upcoming = appointments.filter((a) => a.status === "confirmed").length;
     const ratings = appointments.filter((a) => typeof a.rating === "number");
     const avg =
       ratings.reduce((acc, a) => acc + (a.rating || 0), 0) /
@@ -313,16 +267,46 @@ const ConsultantDashboard = ({ user }) => {
   }, [appointments]);
 
   const upcomingAppointments = appointments
-    .filter((a) => a.status === "upcoming")
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    .filter((a) => String(a.status || "").toLowerCase() === "confirmed")
+    .sort((a, b) => String(a.appointmentDate).localeCompare(String(b.appointmentDate)));
 
   const completedAppointments = appointments
-    .filter((a) => a.status === "completed")
-    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+    .filter((a) => String(a.status || "").toLowerCase() === "completed")
+    .sort((a, b) => String(b.appointmentDate).localeCompare(String(a.appointmentDate)));
 
-  const todaysAppointments = upcomingAppointments.filter(
-    (a) => a.date === todayStr
-  );
+  // Show today for both pending and confirmed
+  const todaysAppointments = appointments
+    .filter((a) => {
+      const s = String(a.status || "").toLowerCase();
+      return s === "pending" || s === "confirmed";
+    })
+    .filter((a) => {
+      const d = apptDate(a);
+      if (!d) return false;
+      return d.toDateString() === new Date().toDateString();
+    })
+    .sort((a, b) => String(a.appointmentDate).localeCompare(String(b.appointmentDate)));
+
+  // Debug (remove if noisy)
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[Dashboard] loaded:", {
+      total: appointments.length,
+      today: todaysAppointments.length,
+      todayStatuses: todaysAppointments.map((x) => x.status),
+    });
+  }
+
+  // actions
+  async function completeAppt(appt) {
+    if (!window.confirm("Mark this appointment as completed?")) return;
+    try {
+      await API.post(`/appointments/${appt._id}/complete`);
+      await load();
+    } catch (e) {
+      alert(e?.response?.data?.message || "Failed to mark completed");
+    }
+  }
 
   const handleRequestAction = (requestId, action) => {
     console.log(`${action} request ${requestId}`);
@@ -431,16 +415,23 @@ const ConsultantDashboard = ({ user }) => {
                   </p>
                 </div>
                 <div className="p-6 space-y-4">
-                  {todaysAppointments.slice(0, 3).map((appointment) => (
+                  {loading && (
+                    <p className="text-gray-500 text-center py-8">Loading…</p>
+                  )}
+                  {!loading && todaysAppointments.slice(0, 6).map((appointment) => (
                     <AppointmentCard
-                      key={appointment.id}
+                      key={appointment._id}
                       appointment={appointment}
+                      onComplete={completeAppt}
                     />
                   ))}
-                  {todaysAppointments.length === 0 && (
+                  {!loading && todaysAppointments.length === 0 && (
                     <p className="text-gray-500 text-center py-8">
                       No appointments scheduled for today
                     </p>
+                  )}
+                  {error && (
+                    <p className="text-red-600 text-sm text-center">{error}</p>
                   )}
                 </div>
               </div>
