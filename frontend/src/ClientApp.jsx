@@ -8,7 +8,9 @@ import About from "./pages/about";
 
 // Vishwa
 import UserRegistration from "./pages/user/userRegistration";
-import UserRoleDetails from "./pages/user/userRoleDetails";
+{/*import UserRoleDetails from "./pages/user/userRoleDetails";*/}
+import FarmRegistration from "./pages/user/farmRegistration.jsx";
+import ConsultantRegistration from "./pages/user/consultantRegistration.jsx";
 import Login from "./pages/user/login";
 import Profile from "./pages/user/profile";
 import Farm from "./pages/user/farmerDetailsPage.jsx";
@@ -48,7 +50,9 @@ export default function ClientApp() {
 
         {/* Vishwa */}
         <Route path="/signup" element={<UserRegistration />} />
-        <Route path="/register-step2" element={<UserRoleDetails />} />
+        <Route path="/register/farmer" element={<FarmRegistration />} />
+        <Route path="/register/consultant" element={<ConsultantRegistration />} />
+        {/*<Route path="/register-step2" element={<UserRoleDetails />} />*/}
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/farm" element={<Farm />} />
