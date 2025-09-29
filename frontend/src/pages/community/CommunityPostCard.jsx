@@ -144,8 +144,7 @@ export default function CommunityPostCard({ post, onReacted }) {
     fetchComments();
   }, [open, full, post._id]);
 
-  // Unified react handler with toggle/swap
-  const react = async (type /* 'like' | 'dislike' */) => {
+  const react = async (type) => {
     if (!auth.isLoggedIn()) {
       alert("Please log in to continue.");
       return;
@@ -154,7 +153,6 @@ export default function CommunityPostCard({ post, onReacted }) {
     const tk = auth.token();
     if (tk) headers.Authorization = `Bearer ${tk}`;
 
-    // Optimistic UI update
     const prev = myReaction;
 
     const applyOptimistic = (next) => {
@@ -193,7 +191,6 @@ export default function CommunityPostCard({ post, onReacted }) {
   const likeToggle = () => react("like");
   const dislikeToggle = () => react("dislike");
 
-  /* Save edit */
   const savePost = async () => {
     if (!iAmAuthor) return;
     if (!editTitle.trim() || !editBody.trim()) {
@@ -221,7 +218,6 @@ export default function CommunityPostCard({ post, onReacted }) {
     }
   };
 
-  /* Delete confirm + toast */
   const requestDelete = () => {
     if (!iAmAuthor) return;
     setShowConfirm(true);
@@ -246,7 +242,6 @@ export default function CommunityPostCard({ post, onReacted }) {
     }
   };
 
-  /* Share */
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/community/${post._id}`;
     try {
@@ -268,7 +263,6 @@ export default function CommunityPostCard({ post, onReacted }) {
 
   if (post._deleted) return null;
 
-  // resolve possible avatar fields from server
   const postAuthorAvatar =
     post.authorAvatar ||
     post.authorPhoto ||

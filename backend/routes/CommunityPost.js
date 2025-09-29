@@ -6,25 +6,6 @@ import CommunityPost from "../models/CommunityPost.js";
 
 const router = Router();
 
-/* ---------- Minimal CORS / Preflight (fixes Network Error) ---------- */
-router.use((req, res, next) => {
-  // Allow your web app origin; use * if you serve from multiple places
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-user-name"
-  );
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-  );
-  res.header("Access-Control-Allow-Credentials", "true");
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-  next();
-});
-
 /* Identify user by header x-user-name; add name to req.userName */
 function identifyUser(req, _res, next) {
   const raw = (req.headers["x-user-name"] || "").toString();
@@ -50,7 +31,14 @@ const upload = multer({ storage });
 /* CREATE post */
 router.post("/", identifyUser, upload.single("image"), async (req, res) => {
   try {
-    const { title, comment, authorAvatar, category } = req.body;
+    const { title, comment, authorAvatar } = req.body;
+    // ---- category: ensure the selected category persists ----
+    const categoryRaw = req.body.category;
+    const category =
+      typeof categoryRaw === "string" && categoryRaw.trim()
+        ? categoryRaw.trim()
+        : "General";
+
     if (!title?.trim() || !comment?.trim()) {
       return res.status(400).json({ message: "Title and comment required" });
     }
@@ -62,7 +50,7 @@ router.post("/", identifyUser, upload.single("image"), async (req, res) => {
       authorName: req.userName,
       authorAvatar: authorAvatar || "",
       image: imagePath,
-      category: category || "General",
+      category, // <-- persist the chosen category
     });
 
     res.status(201).json(post);
@@ -151,11 +139,9 @@ async function applyReaction(req, res, type /* 'like' | 'dislike' */) {
   return res.json({ likes, dislikes, myReaction });
 }
 
-/* LIKE / DISLIKE endpoints now toggle/swap */
 router.post("/:id/like", identifyUser, (req, res) => applyReaction(req, res, "like"));
 router.post("/:id/dislike", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
 
-/* Legacy toggles kept; forward to unified logic */
 router.post("/:id/like/toggle", identifyUser, (req, res) => applyReaction(req, res, "like"));
 router.post("/:id/dislike/toggle", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
 

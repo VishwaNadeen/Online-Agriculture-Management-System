@@ -37,6 +37,26 @@ const auth = {
       sessionStorage.getItem("userName") ||
       "User";
   },
+  avatar: () => {
+    try {
+      const s =
+        localStorage.getItem("user") ||
+        sessionStorage.getItem("user") ||
+        localStorage.getItem("currentUser") ||
+        sessionStorage.getItem("currentUser");
+      if (s) {
+        const u = JSON.parse(s);
+        if (u.profilePicture) return u.profilePicture;
+        if (u?.avatar?.url) return u.avatar.url;
+        if (u?.photoURL) return u.photoURL;
+      }
+    } catch {}
+    return (
+      localStorage.getItem("userAvatar") ||
+      sessionStorage.getItem("userAvatar") ||
+      ""
+    );
+  },
   require: () => {
     if (!auth.isLoggedIn()) {
       alert("Please log in to create a post.");
@@ -161,6 +181,8 @@ export default function CommunityForum() {
         headers["x-user-name"] = auth.name();
       }
 
+      const authorAvatar = auth.avatar();
+
       let res;
       if (file) {
         const fd = new FormData();
@@ -168,11 +190,12 @@ export default function CommunityForum() {
         fd.append("comment", c);
         fd.append("category", selectedPostCategory);
         fd.append("image", file);
+        fd.append("authorAvatar", authorAvatar);
         res = await api.post("/community", fd, { headers });
       } else {
         res = await api.post(
           "/community",
-          { title: t, comment: c, category: selectedPostCategory },
+          { title: t, comment: c, category: selectedPostCategory, authorAvatar },
           { headers }
         );
       }
