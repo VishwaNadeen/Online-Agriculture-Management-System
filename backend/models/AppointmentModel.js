@@ -18,14 +18,14 @@ const Counter =
  * --------------------------------------------- */
 const EventSchema = new Schema(
   {
-    at: { type: Date, default: Date.now }, // when it happened
-    byUser: { type: Schema.Types.ObjectId, ref: "User" }, // who did it
+    at: { type: Date, default: Date.now },
+    byUser: { type: Schema.Types.ObjectId, ref: "User" },
     action: {
       type: String,
       enum: ["created", "confirmed", "declined", "cancelled", "completed", "reschedule_proposed"],
       required: true,
     },
-    note: { type: String, trim: true }, // e.g., decline reason, reschedule note
+    note: { type: String, trim: true },
   },
   { _id: false }
 );
@@ -35,31 +35,23 @@ const EventSchema = new Schema(
  * --------------------------------------------- */
 const AppointmentSchema = new Schema(
   {
-    // Pretty display ID (auto-incremented)
     appointmentId: { type: Number, unique: true, index: true },
 
-    // Who booked (farmer / normal user)
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
 
-    // Who will consult — using User model (consultant role)
-    // If your project keeps a separate "Consultant" collection, you can switch ref back,
-    // but since consultants log in as users, this keeps ownership & permissions simple.
     consultantId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    consultantName: { type: String, trim: true }, // optional denormalized display name
+    consultantName: { type: String, trim: true },
 
-    // Contact + meta
-    name: { type: String, required: true, trim: true },  // booking user's name
+    name: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
-    email: { type: String, required: true, trim: true },
+    email: { type: String, required: true, trim: true, lowercase: true },
     state: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
     address: { type: String, trim: true },
     category: { type: String, required: true, trim: true },
 
-    // Time (store as Date in UTC; render in local on FE)
     appointmentDate: { type: Date, required: true, index: true },
 
-    // Additional time details you already had
     appointmentTime: {
       type: String,
       required: true,
@@ -68,10 +60,8 @@ const AppointmentSchema = new Schema(
     timeMode: { type: String, enum: ["period", "exact"], default: "period" },
     durationHours: { type: Number, min: 1, default: 1 },
 
-    // Notes from user
     notes: { type: String, maxlength: 1000 },
 
-    // Status lifecycle
     status: {
       type: String,
       enum: ["pending", "confirmed", "declined", "cancelled", "completed"],
@@ -79,17 +69,15 @@ const AppointmentSchema = new Schema(
       index: true,
     },
 
-    // If declined, keep a reason (optional)
     declineReason: { type: String, trim: true, default: "" },
 
-    // Event history (audit trail)
     events: { type: [EventSchema], default: [] },
   },
   { timestamps: true }
 );
 
 /* ---------------------------------------------
- * Indexes to speed up common dashboard queries
+ * Indexes
  * --------------------------------------------- */
 AppointmentSchema.index({ consultantId: 1, appointmentDate: -1 });
 AppointmentSchema.index({ userId: 1, appointmentDate: -1 });
@@ -108,7 +96,6 @@ AppointmentSchema.pre("save", async function (next) {
     );
     this.appointmentId = counter.seq;
 
-    // also push a "created" event on first save (optional but useful)
     this.events.push({
       action: "created",
       byUser: this.userId,

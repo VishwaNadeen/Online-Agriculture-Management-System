@@ -77,8 +77,9 @@ export default function ConsultantAppointments() {
   const confirmAppt = async (appt) => {
     if (!window.confirm("Confirm this appointment?")) return;
     try {
-      await API.post(`/appointments/${appt._id}/confirm`);
-      toast.success("Appointment confirmed");
+      const res = await API.post(`/appointments/${appt._id}/confirm`);
+      const sent = !!res?.data?.emailSent;
+      toast.success(sent ? "Appointment confirmed. Email sent to client." : "Appointment confirmed. Email not sent.");
       setRefreshKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.response?.data?.message || "Failed to confirm");
@@ -88,8 +89,9 @@ export default function ConsultantAppointments() {
   const declineAppt = async (appt) => {
     const reason = window.prompt("Reason (optional):") || "";
     try {
-      await API.post(`/appointments/${appt._id}/decline`, { reason });
-      toast.success("Appointment declined");
+      const res = await API.post(`/appointments/${appt._id}/decline`, { reason });
+      const sent = !!res?.data?.emailSent;
+      toast.success(sent ? "Appointment declined. Email sent to client." : "Appointment declined. Email not sent.");
       setRefreshKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.response?.data?.message || "Failed to decline");

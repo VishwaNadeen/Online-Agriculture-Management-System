@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import AppointmentCard from "../../components/AppointmentCard.jsx";
+import AppointmentCard from "../../components/appointmentCard.jsx";
 import {
   Calendar,
   Clock,
@@ -165,7 +165,7 @@ function MyBookings() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="max-w-6xl mx-auto px-4 py-6 min-h-[70vh] pb-10">
       <h1 className="text-2xl font-bold text-gray-900 mb-4">My Appointments</h1>
 
       {err && (
@@ -177,7 +177,7 @@ function MyBookings() {
       {loading && <div className="text-gray-500">Loading...</div>}
 
       {!loading && rows.length === 0 && (
-        <div className="text-gray-600 bg-white border border-gray-200 rounded-2xl p-8 text-center">
+        <div className="text-gray-600 bg-white border border-gray-200 rounded-2xl p-8 text-center mb-8">
           No appointments yet.
         </div>
       )}

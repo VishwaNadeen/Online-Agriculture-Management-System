@@ -5,7 +5,6 @@ import AppointmentForm from "./AppointmentForm.jsx";
 import { ApptAPI } from "../../api/appointments.js";
 
 function to24h(t) {
-  // accepts "2:30 PM" | "14:30" | "14.30" etc. -> "14:30"
   if (!t) return "";
   const s = String(t).trim().replace(".", ":");
   const ampm = s.match(/am|pm/i)?.[0]?.toLowerCase();
@@ -29,25 +28,22 @@ export default function CreateAppointment() {
     return {
       city: p.city || "",
       category: p.category || "",
-      consultantId: p.consultantId || p._id || "", // 🔹 NEW: try _id fallback
+      consultantId: p.consultantId || p._id || "",
       consultantName: p.consultantName || p.name || "",
     };
   }, [location.state]);
 
   const handleCreate = async (payload) => {
     try {
-      // 🔹 NEW: normalize to what backend expects
       const phone =
         (payload.phone && String(payload.phone).trim()) ||
         `${payload.mobileCountry || ""}${String(payload.mobileNumber || "").replace(/\D/g, "")}`;
 
-      // Use period values as-is; convert only exact time inputs
-      const timeValue = payload.timeMode === "period"
-        ? payload.appointmentTime // e.g., "morning" | "afternoon" | "evening" (backend maps to HH:mm)
-        : to24h(payload.appointmentTime);
+      const timeValue =
+        payload.timeMode === "period" ? payload.appointmentTime : to24h(payload.appointmentTime);
+
       const dateISO = (() => {
         if (!payload.appointmentDate) return "";
-        // if payload.appointmentDate is "2025-09-27", combine with time (default 09:00)
         const datePart = String(payload.appointmentDate).slice(0, 10);
         const timePart = (payload.timeMode === "period" ? "09:00" : timeValue) || "09:00";
         const iso = new Date(`${datePart}T${timePart}:00`);
@@ -62,19 +58,31 @@ export default function CreateAppointment() {
         city: payload.city || "",
         address: payload.address || "",
         category: payload.category || "",
-        consultantId: payload.consultantId || prefill.consultantId || "", // keep if your API requires it
-        appointmentDate: dateISO,      // send ISO (most controllers prefer this)
-        appointmentTime: timeValue,    // keep separate too; backend validates/normalizes
+        consultantId: payload.consultantId || prefill.consultantId || "",
+        consultantName: payload.consultantName || prefill.consultantName || "",
+        appointmentDate: dateISO,
+        appointmentTime: timeValue, // period or HH:mm
         notes: payload.notes || payload.reason || "",
+        durationHours: payload.durationHours || 1,
       };
 
-      // remove empty keys (prevents “invalid data” if controller is strict)
+      // Strip empty keys
       Object.keys(body).forEach((k) => {
         if (body[k] === "" || body[k] === undefined || body[k] === null) delete body[k];
       });
 
-      // minimal client-side guard for most common 400s
-      const required = ["name", "email", "phone", "city", "category", "appointmentDate"];
+      // Match backend required set (avoid 400s/422s)
+      const required = [
+        "name",
+        "email",
+        "phone",
+        "state",
+        "city",
+        "category",
+        "appointmentDate",
+        "appointmentTime",
+        "consultantId",
+      ];
       for (const k of required) {
         if (!body[k]) throw new Error(`Missing required field: ${k}`);
       }
