@@ -32,9 +32,15 @@ const upload = multer({ storage });
 router.post("/", identifyUser, upload.single("image"), async (req, res) => {
   try {
     const { title, comment, authorAvatar, category } = req.body;
+
     if (!title?.trim() || !comment?.trim()) {
       return res.status(400).json({ message: "Title and comment required" });
     }
+    // NEW: block titles starting with a number
+    if (/^\s*\d/.test(title.trim())) {
+      return res.status(400).json({ message: "Title cannot start with a number." });
+    }
+
     const imagePath = req.file ? `/uploads/${req.file.filename}` : (req.body.image || "");
 
     const post = await CommunityPost.create({
@@ -70,6 +76,11 @@ router.get("/:id", async (req, res) => {
 router.put("/:id", identifyUser, async (req, res) => {
   try {
     const { title, comment, image } = req.body;
+
+    if (title !== undefined && /^\s*\d/.test(String(title).trim())) {
+      return res.status(400).json({ message: "Title cannot start with a number." });
+    }
+
     const set = {};
     if (title !== undefined) set.title = String(title).trim();
     if (comment !== undefined) set.comment = String(comment).trim();
@@ -147,7 +158,6 @@ router.post("/:id/dislike/toggle", identifyUser, (req, res) => applyReaction(req
 /* COMMENTS */
 router.post("/:id/comments", identifyUser, async (req, res) => {
   const { text } = req.body;
-  // pick avatar from body or header (so profile photos always appear)
   const authorAvatar = req.body?.authorAvatar || req.headers["x-user-avatar"] || "";
   if (!text?.trim()) return res.status(400).json({ message: "Empty comment" });
 
@@ -206,7 +216,7 @@ router.delete("/:id/comments/:commentId", identifyUser, async (req, res) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    comment.deleteOne(); // remove the subdocument
+    comment.deleteOne();
     await post.save();
     res.json({ ok: true });
   } catch (err) {
