@@ -46,14 +46,23 @@ const auth = {
         sessionStorage.getItem("currentUser");
       if (s) {
         const u = JSON.parse(s);
-        if (u.profilePicture) return u.profilePicture;
-        if (u?.avatar?.url) return u.avatar.url;
-        if (u?.photoURL) return u.photoURL;
+        const pic =
+          u.profilePicture ||
+          u.avatar ||
+          u.photoURL ||
+          u.picture ||
+          u.image ||
+          u.photo ||
+          u?.profile?.avatar ||
+          "";
+        if (pic) return pic;
       }
     } catch {}
     return (
       localStorage.getItem("userAvatar") ||
       sessionStorage.getItem("userAvatar") ||
+      localStorage.getItem("profilePicture") ||
+      sessionStorage.getItem("profilePicture") ||
       ""
     );
   },
@@ -156,16 +165,25 @@ export default function CommunityForum() {
     setFile(f);
   };
 
+  /* ===== NEW: letters-only validation for title ===== */
+  const onlyLetters = (s) => /^[\p{L}\s]+$/u.test(s); // supports all alphabets + spaces
+  const t = title.trim();
+  const c = comment.trim();
+  const invalidTitleNow = t.length > 0 && !onlyLetters(t);
+  const canShare = !!t && !!c && !invalidTitleNow && !errors.file && !submitting;
+
   const handleNewPost = async (e) => {
     e.preventDefault();
     if (!auth.require()) return;
 
-    const t = title.trim();
-    const c = comment.trim();
-
     const nextErr = {
-      title: t.length < 3 ? "Title must be at least 3 characters." : "",
-      comment: c.length < 5 ? "Description must be at least 5 characters." : "",
+      title:
+        !t
+          ? "Title is required."
+          : !onlyLetters(t)
+          ? "Title must contain letters only (no numbers or symbols)."
+          : "",
+      comment: !c ? "Description is required." : "",
       file: errors.file || "",
     };
     setErrors(nextErr);
@@ -179,9 +197,9 @@ export default function CommunityForum() {
       if (token) {
         headers.Authorization = `Bearer ${token}`;
         headers["x-user-name"] = auth.name();
+      } else {
+        headers["x-user-name"] = auth.name();
       }
-
-      const authorAvatar = auth.avatar();
 
       let res;
       if (file) {
@@ -190,14 +208,18 @@ export default function CommunityForum() {
         fd.append("comment", c);
         fd.append("category", selectedPostCategory);
         fd.append("image", file);
-        fd.append("authorAvatar", authorAvatar);
+        const av = auth.avatar();
+        if (av) fd.append("authorAvatar", av);
         res = await api.post("/community", fd, { headers });
       } else {
-        res = await api.post(
-          "/community",
-          { title: t, comment: c, category: selectedPostCategory, authorAvatar },
-          { headers }
-        );
+        const body = {
+          title: t,
+          comment: c,
+          category: selectedPostCategory,
+        };
+        const av = auth.avatar();
+        if (av) body.authorAvatar = av;
+        res = await api.post("/community", body, { headers });
       }
 
       setAllPosts((prev) => [res.data, ...prev]);
@@ -247,7 +269,7 @@ export default function CommunityForum() {
                 </div>
                 <h2 className="text-xl font-bold text-emerald-800 tracking-tight">Categories</h2>
               </div>
-              
+
               <ul className="space-y-1">
                 {[
                   "All",
@@ -262,7 +284,7 @@ export default function CommunityForum() {
                   <li key={cat}>
                     <button
                       onClick={() => setCategory(cat)}
-                      className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 group ${
+                      className={`w/full text-left px-4 py-3 rounded-xl transition-all duration-200 group ${
                         category === cat
                           ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold shadow-md transform scale-[1.02]"
                           : "text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 hover:translate-x-1"
@@ -285,29 +307,29 @@ export default function CommunityForum() {
 
           {/* Main Feed */}
           <div>
+            {/* Header */}
             <div className="text-center mb-10 relative">
               <div className="relative">
-                <div className="inline-flex items-center gap-3 mb-4">
-                  <div className="p-3 bg-gradient-to-br from-emerald-600 to-green-600 rounded-2xl shadow-lg">
-                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                  </div>
-                  <h1 className="text-5xl font-black bg-gradient-to-r from-emerald-700 via-green-700 to-lime-700 bg-clip-text text-transparent tracking-tight">
-                    Green Grow
-                  </h1>
-                </div>
                 <div className="bg-gradient-to-r from-emerald-100 to-green-100 rounded-full px-6 py-2 inline-block border border-emerald-200 shadow-sm">
-                  <p className="text-emerald-800 font-medium text-lg">🌱 Community Forum - Stories & Questions from Farmers 🌾</p>
+                  <p className="text-emerald-800 font-medium text-lg">
+                    🌱 Community Forum - Questions from Farmers & Consultants🌾
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Composer */}
+            {/* Composer launcher (div -> button to prevent immediate disappearance) */}
             {!composerOpen && (
-              <div
-                className="rounded-2xl border border-emerald-200 bg-white/95 backdrop-blur-sm shadow-lg hover:shadow-xl px-6 py-4 cursor-pointer transition-all duration-300 hover:transform hover:scale-[1.01] mb-6"
+              <button
+                type="button"
+                className="w-full text-left rounded-2xl border border-emerald-200 bg-white/95 backdrop-blur-sm shadow-lg hover:shadow-xl px-6 py-4 cursor-pointer transition-all duration-300 hover:transform hover:scale-[1.01] mb-6"
                 onClick={() => setComposerOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setComposerOpen(true);
+                  }
+                }}
               >
                 <div className="flex items-center gap-4">
                   <div className="h-12 w-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-lg">
@@ -326,7 +348,7 @@ export default function CommunityForum() {
                     </svg>
                   </div>
                 </div>
-              </div>
+              </button>
             )}
 
             {composerOpen && (
@@ -366,17 +388,28 @@ export default function CommunityForum() {
                     className="w-full rounded-xl border-2 border-emerald-200 p-4 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all bg-white/80"
                     placeholder="🌱 What's your post about?"
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    aria-invalid={!!errors.title}
+                    onChange={(e) => {
+                      setTitle(e.target.value);
+                      // live-clear server-side error only; UI stays same
+                      if (errors.title) setErrors((x) => ({ ...x, title: "" }));
+                    }}
+                    aria-invalid={!!errors.title || invalidTitleNow}
                   />
-                  {errors.title && <p className="text-sm text-red-600 mt-1 pl-2">{errors.title}</p>}
+                  {(errors.title || invalidTitleNow) && (
+                    <p className="text-sm text-red-600 mt-1 pl-2">
+                      {errors.title || "Title must contain letters only (no numbers or symbols)."}
+                    </p>
+                  )}
 
                   <textarea
                     rows={4}
                     className="w-full rounded-xl border-2 border-emerald-200 p-4 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all mt-4 bg-white/80"
                     placeholder="🌾 Share your farming experience, ask questions, or tell your story..."
                     value={comment}
-                    onChange={(e) => setComment(e.target.value)}
+                    onChange={(e) => {
+                      setComment(e.target.value);
+                      if (errors.comment) setErrors((x) => ({ ...x, comment: "" }));
+                    }}
                     aria-invalid={!!errors.comment}
                   />
                   {errors.comment && <p className="text-sm text-red-600 mt-1 pl-2">{errors.comment}</p>}
@@ -437,7 +470,7 @@ export default function CommunityForum() {
                     </button>
                     <button
                       type="submit"
-                      disabled={submitting}
+                      disabled={!canShare}
                       className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold shadow-lg hover:shadow-xl disabled:opacity-60 disabled:hover:shadow-lg transition-all transform hover:scale-[1.02]"
                     >
                       {submitting ? (

@@ -144,7 +144,8 @@ export default function CommunityPostCard({ post, onReacted }) {
     fetchComments();
   }, [open, full, post._id]);
 
-  const react = async (type) => {
+  // Unified react handler with toggle/swap
+  const react = async (type /* 'like' | 'dislike' */) => {
     if (!auth.isLoggedIn()) {
       alert("Please log in to continue.");
       return;
@@ -153,23 +154,28 @@ export default function CommunityPostCard({ post, onReacted }) {
     const tk = auth.token();
     if (tk) headers.Authorization = `Bearer ${tk}`;
 
+    // Optimistic UI update based on local state
     const prev = myReaction;
 
     const applyOptimistic = (next) => {
       if (prev === next) return;
+      // remove previous
       if (prev === "like") setLikes((n) => Math.max(0, n - 1));
       if (prev === "dislike") setDislikes((n) => Math.max(0, n - 1));
+      // add next
       if (next === "like") setLikes((n) => n + 1);
       if (next === "dislike") setDislikes((n) => n + 1);
       setMyReaction(next || "none");
       localStorage.setItem(storageKey, next || "none");
     };
 
+    // If clicking same button => toggle off
     const target = prev === type ? "none" : type;
     applyOptimistic(target);
 
     try {
       const res = await api.post(`/community/${post._id}/${type}`, {}, { headers });
+      // Server is source of truth
       setLikes(res.data.likes ?? 0);
       setDislikes(res.data.dislikes ?? 0);
       setMyReaction(res.data.myReaction || "none");
@@ -177,11 +183,13 @@ export default function CommunityPostCard({ post, onReacted }) {
       onReacted?.(post._id, res.data);
     } catch (e) {
       console.error("Reaction failed", e);
+      // revert by asking server current (fallback: reload one)
       try {
         const s = await api.get(`/community/${post._id}`);
         setLikes(s.data.likes ?? 0);
         setDislikes(s.data.dislikes ?? 0);
       } catch {}
+      // fallback local
       setMyReaction(prev);
       localStorage.setItem(storageKey, prev);
       alert("Failed to update reaction");
@@ -191,6 +199,7 @@ export default function CommunityPostCard({ post, onReacted }) {
   const likeToggle = () => react("like");
   const dislikeToggle = () => react("dislike");
 
+  /* Save edit */
   const savePost = async () => {
     if (!iAmAuthor) return;
     if (!editTitle.trim() || !editBody.trim()) {
@@ -218,6 +227,7 @@ export default function CommunityPostCard({ post, onReacted }) {
     }
   };
 
+  /* Delete confirm + toast */
   const requestDelete = () => {
     if (!iAmAuthor) return;
     setShowConfirm(true);
@@ -242,6 +252,7 @@ export default function CommunityPostCard({ post, onReacted }) {
     }
   };
 
+  /* Share */
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/community/${post._id}`;
     try {
@@ -263,6 +274,7 @@ export default function CommunityPostCard({ post, onReacted }) {
 
   if (post._deleted) return null;
 
+  // resolve possible avatar fields from server
   const postAuthorAvatar =
     post.authorAvatar ||
     post.authorPhoto ||
@@ -270,6 +282,77 @@ export default function CommunityPostCard({ post, onReacted }) {
     post.avatar ||
     post.profilePic ||
     "";
+
+  /* ---------- comment edit/delete state ---------- */
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
+  const [savingComment, setSavingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState(null);
+
+  const startEditComment = (c) => {
+    setEditingCommentId(c._id);
+    setEditingCommentText(c.text || "");
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText("");
+  };
+
+  const saveCommentEdit = async (c) => {
+    if (!editingCommentText.trim()) return;
+    setSavingComment(true);
+    try {
+      const headers = { "x-user-name": auth.name() };
+      const tk = auth.token();
+      if (tk) headers.Authorization = `Bearer ${tk}`;
+      const res = await api.put(
+        `/community/${post._id}/comments/${c._id}`,
+        { text: editingCommentText.trim() },
+        { headers }
+      );
+      const updated = res.data;
+      setFull((p) => ({
+        comments: (p?.comments || []).map((cm) =>
+          cm._id === c._id ? { ...cm, text: updated.text, updatedAt: updated.updatedAt } : cm
+        ),
+      }));
+      // also keep post.comments (for count if collapsed) in sync when it exists
+      if (Array.isArray(post.comments)) {
+        const idx = post.comments.findIndex((cm) => cm._id === c._id);
+        if (idx >= 0) post.comments[idx].text = updated.text;
+      }
+      cancelEditComment();
+    } catch (e) {
+      console.error("Edit comment failed", e);
+      alert("Failed to edit comment");
+    } finally {
+      setSavingComment(false);
+    }
+  };
+
+  const deleteComment = async (c) => {
+    if (!confirm("Delete this comment?")) return;
+    setDeletingCommentId(c._id);
+    try {
+      const headers = { "x-user-name": auth.name() };
+      const tk = auth.token();
+      if (tk) headers.Authorization = `Bearer ${tk}`;
+      await api.delete(`/community/${post._id}/comments/${c._id}`, { headers });
+
+      setFull((p) => ({
+        comments: (p?.comments || []).filter((cm) => cm._id !== c._id),
+      }));
+      if (Array.isArray(post.comments)) {
+        post.comments = post.comments.filter((cm) => cm._id !== c._id);
+      }
+    } catch (e) {
+      console.error("Delete comment failed", e);
+      alert("Failed to delete comment");
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
 
   return (
     <>
@@ -520,12 +603,16 @@ export default function CommunityPostCard({ post, onReacted }) {
                   setNewComment("");
 
                   try {
+                    const headers = { "x-user-name": auth.name() };
+                    const tk = auth.token();
+                    if (tk) headers.Authorization = `Bearer ${tk}`;
                     const res = await api.post(
                       `/community/${post._id}/comments`,
                       {
                         text,
                         authorAvatar: auth.avatar(),
-                      }
+                      },
+                      { headers }
                     );
                     const saved = { ...res.data };
                     if (!saved.authorAvatar)
@@ -583,6 +670,8 @@ export default function CommunityPostCard({ post, onReacted }) {
                       c.avatar ||
                       c.profilePic ||
                       "";
+                    const canModify = (c.authorName || "User") === auth.name();
+
                     return (
                       <div
                         key={c._id}
@@ -595,17 +684,69 @@ export default function CommunityPostCard({ post, onReacted }) {
                             size="10"
                           />
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-bold text-emerald-800">
-                                {c.authorName || "User"}
-                              </span>
-                              <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-                                {timeAgo(c.createdAt)}
-                              </span>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-emerald-800">
+                                  {c.authorName || "User"}
+                                </span>
+                                <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+                                  {timeAgo(c.createdAt)}
+                                </span>
+                              </div>
+
+                              {canModify && (
+                                <div className="flex items-center gap-1">
+                                  {editingCommentId === c._id ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => saveCommentEdit(c)}
+                                        disabled={savingComment || !editingCommentText.trim()}
+                                        className="text-emerald-700 font-semibold px-3 py-1 rounded-lg border border-emerald-300 hover:bg-emerald-50 disabled:opacity-60"
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={cancelEditComment}
+                                        className="text-gray-600 font-medium px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-50"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <IconButton
+                                        title="Edit comment"
+                                        onClick={() => startEditComment(c)}
+                                      >
+                                        <PencilIcon className="h-4 w-4 text-emerald-600 hover:text-emerald-700" />
+                                      </IconButton>
+                                      <IconButton
+                                        title="Delete comment"
+                                        onClick={() => deleteComment(c)}
+                                        disabled={deletingCommentId === c._id}
+                                      >
+                                        <TrashIcon className="h-4 w-4 text-red-500 hover:text-red-600" />
+                                      </IconButton>
+                                    </>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                              {c.text}
-                            </p>
+
+                            {editingCommentId === c._id ? (
+                              <textarea
+                                rows={3}
+                                className="w-full rounded-xl border-2 border-emerald-200 p-3 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 transition-all"
+                                value={editingCommentText}
+                                onChange={(e) => setEditingCommentText(e.target.value)}
+                              />
+                            ) : (
+                              <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">
+                                {c.text}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

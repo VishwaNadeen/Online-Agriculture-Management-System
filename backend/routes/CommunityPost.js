@@ -31,14 +31,7 @@ const upload = multer({ storage });
 /* CREATE post */
 router.post("/", identifyUser, upload.single("image"), async (req, res) => {
   try {
-    const { title, comment, authorAvatar } = req.body;
-    // ---- category: ensure the selected category persists ----
-    const categoryRaw = req.body.category;
-    const category =
-      typeof categoryRaw === "string" && categoryRaw.trim()
-        ? categoryRaw.trim()
-        : "General";
-
+    const { title, comment, authorAvatar, category } = req.body;
     if (!title?.trim() || !comment?.trim()) {
       return res.status(400).json({ message: "Title and comment required" });
     }
@@ -50,7 +43,7 @@ router.post("/", identifyUser, upload.single("image"), async (req, res) => {
       authorName: req.userName,
       authorAvatar: authorAvatar || "",
       image: imagePath,
-      category, // <-- persist the chosen category
+      category: category || "General",
     });
 
     res.status(201).json(post);
@@ -111,17 +104,21 @@ async function applyReaction(req, res, type /* 'like' | 'dislike' */) {
   const post = await CommunityPost.findById(req.params.id);
   if (!post) return res.status(404).json({ message: "Not found" });
 
+  // find existing reaction from this user
   const idx = (post.reactions || []).findIndex((r) => (r.by || "").trim() === user);
   const prev = idx >= 0 ? post.reactions[idx].type : "none";
 
+  // counts
   let likes = post.likes || 0;
   let dislikes = post.dislikes || 0;
 
   if (prev === type) {
+    // toggle off
     if (type === "like") likes = Math.max(0, likes - 1);
     else dislikes = Math.max(0, dislikes - 1);
     if (idx >= 0) post.reactions.splice(idx, 1);
   } else {
+    // switching or adding
     if (prev === "like") likes = Math.max(0, likes - 1);
     if (prev === "dislike") dislikes = Math.max(0, dislikes - 1);
     if (type === "like") likes += 1;
@@ -139,9 +136,11 @@ async function applyReaction(req, res, type /* 'like' | 'dislike' */) {
   return res.json({ likes, dislikes, myReaction });
 }
 
+/* LIKE / DISLIKE endpoints now toggle/swap */
 router.post("/:id/like", identifyUser, (req, res) => applyReaction(req, res, "like"));
 router.post("/:id/dislike", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
 
+/* (Optional legacy toggles kept; forward to unified logic) */
 router.post("/:id/like/toggle", identifyUser, (req, res) => applyReaction(req, res, "like"));
 router.post("/:id/dislike/toggle", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
 
@@ -163,6 +162,55 @@ router.post("/:id/comments", identifyUser, async (req, res) => {
   await post.save();
 
   res.json(post.comments[post.comments.length - 1]);
+});
+
+/* --- NEW: Edit a comment (only by its author) --- */
+router.put("/:id/comments/:commentId", identifyUser, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ message: "Empty comment" });
+
+    const post = await CommunityPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Not found" });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+    if ((comment.authorName || "Anonymous").trim() !== (req.userName || "Anonymous").trim()) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    comment.text = text.trim();
+    comment.updatedAt = new Date();
+    await post.save();
+
+    res.json({ _id: comment._id, text: comment.text, updatedAt: comment.updatedAt });
+  } catch (err) {
+    console.error("Edit comment error:", err);
+    res.status(400).json({ message: err.message || "Failed to edit comment" });
+  }
+});
+
+/* --- NEW: Delete a comment (only by its author) --- */
+router.delete("/:id/comments/:commentId", identifyUser, async (req, res) => {
+  try {
+    const post = await CommunityPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Not found" });
+
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+    if ((comment.authorName || "Anonymous").trim() !== (req.userName || "Anonymous").trim()) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    comment.deleteOne(); // remove the subdocument
+    await post.save();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Delete comment error:", err);
+    res.status(400).json({ message: err.message || "Failed to delete comment" });
+  }
 });
 
 /* REPLIES */
