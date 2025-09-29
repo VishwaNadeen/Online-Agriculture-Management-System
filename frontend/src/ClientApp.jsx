@@ -11,6 +11,11 @@ import UserRegistration from "./pages/user/userRegistration";
 import UserRoleDetails from "./pages/user/userRoleDetails";
 import Login from "./pages/user/login";
 import Profile from "./pages/user/profile";
+import Farm from "./pages/user/farmerDetailsPage.jsx";
+import ProfileEdit from "./pages/user/profileEdit.jsx";
+import FarmEdit from "./pages/user/farmEdit.jsx";
+import Consultant from "./pages/user/ConsultantDetailsPage.jsx";
+import ConsultantEdit from "./pages/user/consultantedit.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -23,11 +28,13 @@ import CommunityForum from "./pages/community/CommunityForum";
 import MyPosts from "./pages/community/MyPosts.jsx";
 
 // Chanaka
-import AddCourse from "./pages/addCourse";
-import UpdateCourse from "./pages/updateCourse";
-import CoursesAdmin from "./pages/courseAdmin";
 import CoursesPage from "./pages/courses/coursePage";
 import CourseOverview from "./pages/courses/courseOverview";
+
+//dilhani
+import EventPage from "./pages/event/EventsPage.jsx";
+import EventDetail from "./pages/event/EventDetail.jsx";
+import MyEvents from "./pages/event/MyEvents.jsx";
 
 export default function ClientApp() {
   return (
@@ -43,6 +50,11 @@ export default function ClientApp() {
         <Route path="/register-step2" element={<UserRoleDetails />} />
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/farm" element={<Farm />} />
+        <Route path="/profile/edit" element={<ProfileEdit />} />
+        <Route path="/farm/edit" element={<FarmEdit />} />
+        <Route path="/profile/consultant" element={<Consultant />} />
+        <Route path="/profile/consultant/edit" element={<ConsultantEdit />} />
 
         {/* Methma */}
         <Route path="/SearchCon" element={<Searchcon />} />
@@ -55,11 +67,13 @@ export default function ClientApp() {
         <Route path="mine" element={<MyPosts />} />
 
         {/* Chanaka */}
-        <Route path="/addcourse" element={<AddCourse />} />
-        <Route path="/editcourse" element={<UpdateCourse />} />
-        <Route path="/courseAdmin" element={<CoursesAdmin />} />
         <Route path="/coursepage" element={<CoursesPage />} />
         <Route path="/courses/:courseID" element={<CourseOverview />} />
+
+        {/* dilhani */}
+        <Route path="/events" element={<EventPage />} />
+        <Route path="/events/:id" element={<EventDetail />} />
+        <Route path="/my-events" element={<MyEvents />} />
 
       </Routes>
       <Footer />
