@@ -31,7 +31,7 @@ const upload = multer({ storage });
 /* CREATE post */
 router.post("/", identifyUser, upload.single("image"), async (req, res) => {
   try {
-    const { title, comment, authorAvatar } = req.body;
+    const { title, comment, authorAvatar, category } = req.body;
     if (!title?.trim() || !comment?.trim()) {
       return res.status(400).json({ message: "Title and comment required" });
     }
@@ -43,6 +43,7 @@ router.post("/", identifyUser, upload.single("image"), async (req, res) => {
       authorName: req.userName,
       authorAvatar: authorAvatar || "",
       image: imagePath,
+      category: category || "General",
     });
 
     res.status(201).json(post);
@@ -65,7 +66,7 @@ router.get("/:id", async (req, res) => {
   res.json(post);
 });
 
-/* UPDATE (title/comment/image) — used by your editor */
+/* UPDATE (title/comment/image) */
 router.put("/:id", identifyUser, async (req, res) => {
   try {
     const { title, comment, image } = req.body;
@@ -86,7 +87,7 @@ router.put("/:id", identifyUser, async (req, res) => {
   }
 });
 
-/* DELETE — enables your Delete button */
+/* DELETE */
 router.delete("/:id", identifyUser, async (req, res) => {
   try {
     const post = await CommunityPost.findByIdAndDelete(req.params.id);
@@ -97,45 +98,51 @@ router.delete("/:id", identifyUser, async (req, res) => {
   }
 });
 
-/* LIKE / DISLIKE (simple increments) */
-router.post("/:id/like", async (req, res) => {
-  const updated = await CommunityPost.findByIdAndUpdate(
-    req.params.id,
-    { $inc: { likes: 1 } },
-    { new: true, projection: { likes: 1, dislikes: 1 } }
-  );
-  if (!updated) return res.status(404).json({ message: "Not found" });
-  res.json({ likes: updated.likes ?? 0, dislikes: updated.dislikes ?? 0 });
-});
-
-router.post("/:id/dislike", async (req, res) => {
-  const updated = await CommunityPost.findByIdAndUpdate(
-    req.params.id,
-    { $inc: { dislikes: 1 } },
-    { new: true, projection: { likes: 1, dislikes: 1 } }
-  );
-  if (!updated) return res.status(404).json({ message: "Not found" });
-  res.json({ likes: updated.likes ?? 0, dislikes: updated.dislikes ?? 0 });
-});
-
-/* Support like/unlike toggle your UI already calls */
-router.post("/:id/like/toggle", async (req, res) => {
-  const { remove } = req.body || {};
+/* ---------- REACTIONS: toggle & swap per user (by name) ---------- */
+async function applyReaction(req, res, type /* 'like' | 'dislike' */) {
+  const user = (req.userName || "Anonymous").trim();
   const post = await CommunityPost.findById(req.params.id);
   if (!post) return res.status(404).json({ message: "Not found" });
-  post.likes = Math.max(0, (post.likes || 0) + (remove ? -1 : 1));
-  await post.save();
-  res.json({ likes: post.likes, dislikes: post.dislikes || 0 });
-});
 
-router.post("/:id/dislike/toggle", async (req, res) => {
-  const { remove } = req.body || {};
-  const post = await CommunityPost.findById(req.params.id);
-  if (!post) return res.status(404).json({ message: "Not found" });
-  post.dislikes = Math.max(0, (post.dislikes || 0) + (remove ? -1 : 1));
+  // find existing reaction from this user
+  const idx = (post.reactions || []).findIndex((r) => (r.by || "").trim() === user);
+  const prev = idx >= 0 ? post.reactions[idx].type : "none";
+
+  // counts
+  let likes = post.likes || 0;
+  let dislikes = post.dislikes || 0;
+
+  if (prev === type) {
+    // toggle off
+    if (type === "like") likes = Math.max(0, likes - 1);
+    else dislikes = Math.max(0, dislikes - 1);
+    if (idx >= 0) post.reactions.splice(idx, 1);
+  } else {
+    // switching or adding
+    if (prev === "like") likes = Math.max(0, likes - 1);
+    if (prev === "dislike") dislikes = Math.max(0, dislikes - 1);
+    if (type === "like") likes += 1;
+    if (type === "dislike") dislikes += 1;
+
+    if (idx >= 0) post.reactions[idx].type = type;
+    else post.reactions.push({ by: user, type });
+  }
+
+  post.likes = likes;
+  post.dislikes = dislikes;
   await post.save();
-  res.json({ likes: post.likes || 0, dislikes: post.dislikes });
-});
+
+  const myReaction = prev === type ? "none" : type;
+  return res.json({ likes, dislikes, myReaction });
+}
+
+/* LIKE / DISLIKE endpoints now toggle/swap */
+router.post("/:id/like", identifyUser, (req, res) => applyReaction(req, res, "like"));
+router.post("/:id/dislike", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
+
+/* (Optional legacy toggles kept; forward to unified logic) */
+router.post("/:id/like/toggle", identifyUser, (req, res) => applyReaction(req, res, "like"));
+router.post("/:id/dislike/toggle", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
 
 /* COMMENTS */
 router.post("/:id/comments", identifyUser, async (req, res) => {
