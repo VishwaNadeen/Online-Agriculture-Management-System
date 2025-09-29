@@ -1,4 +1,4 @@
-// controllers/CommunityCtrl.js
+// backend/controllers/CommunityCtrl.js
 import CommunityPost from "../models/CommunityPost.js";
 
 const communityCtrl = {
@@ -7,12 +7,23 @@ const communityCtrl = {
   // Create a post
   async create(req, res) {
     try {
-      const { title, comment, image, rating } = req.body;
+      const { title, comment, image, rating, authorAvatar, category } = req.body;
+
+      if (!title?.trim() || !comment?.trim()) {
+        return res.status(400).json({ error: "Title and comment required" });
+      }
+      if (/^\s*\d/.test(title.trim())) {
+        return res.status(400).json({ error: "Title cannot start with a number." });
+      }
+
       const post = await CommunityPost.create({
-        title,
-        comment,
-        image,
+        title: title.trim(),
+        comment: comment.trim(),
+        image: image || "",
         rating: typeof rating === "number" ? Math.max(1, Math.min(5, rating)) : undefined,
+        authorName: req.userName || "Anonymous",
+        authorAvatar: authorAvatar || req.headers["x-user-avatar"] || "",
+        category: category || "General",
       });
       res.status(201).json(post);
     } catch (err) {
@@ -46,13 +57,20 @@ const communityCtrl = {
   async update(req, res) {
     try {
       const { title, comment, image, rating } = req.body;
+
+      if (title !== undefined && /^\s*\d/.test(String(title).trim())) {
+        return res.status(400).json({ error: "Title cannot start with a number." });
+      }
+
       const set = {};
       if (title !== undefined) set.title = title;
       if (comment !== undefined) set.comment = comment;
       if (image !== undefined) set.image = image;
       if (rating !== undefined) {
-        set.rating = typeof rating === "number" ? Math.max(1, Math.min(5, rating)) : rating;
+        set.rating =
+          typeof rating === "number" ? Math.max(1, Math.min(5, rating)) : rating;
       }
+
       const post = await CommunityPost.findOneAndUpdate(
         { _id: req.params.id },
         { $set: set },
@@ -70,7 +88,7 @@ const communityCtrl = {
     try {
       const post = await CommunityPost.findByIdAndDelete(req.params.id);
       if (!post) return res.status(404).json({ error: "Post not found" });
-      res.json({ ok: true });
+      res.json({ message: "Post deleted successfully" });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -81,12 +99,20 @@ const communityCtrl = {
   // Add root comment
   async addComment(req, res) {
     try {
-      const { text, authorName } = req.body;
+      const { text, authorName, authorAvatar } = req.body;
       if (!text) return res.status(400).json({ error: "Comment text required" });
 
       const post = await CommunityPost.findByIdAndUpdate(
         req.params.id,
-        { $push: { comments: { text, authorName: authorName || "User" } } },
+        {
+          $push: {
+            comments: {
+              text,
+              authorName: authorName || "User",
+              authorAvatar: authorAvatar || req.headers["x-user-avatar"] || "",
+            },
+          },
+        },
         { new: true }
       );
       if (!post) return res.status(404).json({ error: "Post not found" });
@@ -103,13 +129,21 @@ const communityCtrl = {
   // Add reply to a comment
   async addReplyToComment(req, res) {
     try {
-      const { text, authorName } = req.body;
+      const { text, authorName, authorAvatar } = req.body;
       const { id, commentId } = req.params;
       if (!text) return res.status(400).json({ error: "Reply text required" });
 
       const post = await CommunityPost.findOneAndUpdate(
         { _id: id, "comments._id": commentId },
-        { $push: { "comments.$.replies": { text, authorName: authorName || "User" } } },
+        {
+          $push: {
+            "comments.$.replies": {
+              text,
+              authorName: authorName || "User",
+              authorAvatar: authorAvatar || req.headers["x-user-avatar"] || "",
+            },
+          },
+        },
         { new: true }
       );
       if (!post) return res.status(404).json({ error: "Post or comment not found" });
@@ -133,6 +167,24 @@ const communityCtrl = {
       );
       if (!post) return res.status(404).json({ error: "Post not found" });
       res.json({ likes: post.likes });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  },
+
+  // ========= DELETE COMMENT =========
+  async deleteComment(req, res) {
+    try {
+      const post = await CommunityPost.findById(req.params.id);
+      if (!post) return res.status(404).json({ error: "Post not found" });
+
+      const comment = post.comments.id(req.params.commentId);
+      if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+      comment.deleteOne();
+      await post.save();
+
+      res.json({ message: "Comment deleted successfully" });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
