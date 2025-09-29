@@ -217,7 +217,7 @@ export default function EventAdmin() {
 
       {/* Floating Add Button */}
       <Link
-        to={"/events/add"}
+        to={"addEvent"}
         className="fixed bottom-5 right-5 px-4 py-3 bg-amber-300 text-black rounded-full shadow-2xl border border-amber-400 hover:bg-amber-200 transition flex items-center gap-2"
       >
         <BiPlus className="text-2xl" />
