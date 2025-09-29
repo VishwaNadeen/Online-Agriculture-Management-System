@@ -20,7 +20,7 @@ import api from "../utils/api";
 import { ConsultantAPI } from "../api/consultants";
 
 export default function AgriAnalytics() {
-  const [activeTab, setActiveTab] = useState("Today");
+  const [activeTab, setActiveTab] = useState("Today"); // Today | Yesterday | Last 7 days | Last 30 days | Weekly | Monthly
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -57,6 +57,50 @@ export default function AgriAnalytics() {
     };
   }, []);
 
+  // date range helper based on activeTab/select
+  const dateInRange = (date) => {
+    if (!date) return false;
+    const d = new Date(date);
+    const now = new Date();
+    const start = new Date(now);
+    // normalize times
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+
+    switch (activeTab) {
+      case "Today":
+        return d >= start && d <= end;
+      case "Yesterday": {
+        const yStart = new Date(start);
+        yStart.setDate(start.getDate() - 1);
+        const yEnd = new Date(end);
+        yEnd.setDate(end.getDate() - 1);
+        return d >= yStart && d <= yEnd;
+      }
+      case "Last 7 days": {
+        const s = new Date(end);
+        s.setDate(end.getDate() - 6);
+        s.setHours(0, 0, 0, 0);
+        return d >= s && d <= end;
+      }
+      case "Last 30 days": {
+        const s = new Date(end);
+        s.setDate(end.getDate() - 29);
+        s.setHours(0, 0, 0, 0);
+        return d >= s && d <= end;
+      }
+      default:
+        return true;
+    }
+  };
+
+  // Appointments filtered by active date range
+  const filteredAppointments = useMemo(
+    () => (myAppointments || []).filter((a) => dateInRange(a.appointmentDate)),
+    [myAppointments, activeTab]
+  );
+
   // helper functions: compute stats from appointments (no payments required)
   const pickUnique = (arr, key) => {
     const set = new Set();
@@ -65,10 +109,10 @@ export default function AgriAnalytics() {
   };
 
   const dashboardData = useMemo(() => {
-    const total = myAppointments.length;
-    const confirmed = myAppointments.filter((a) => a.status === "confirmed").length;
-    const completed = myAppointments.filter((a) => a.status === "completed").length;
-    const activeFarms = pickUnique(myAppointments, "userId");
+    const total = filteredAppointments.length;
+    const confirmed = filteredAppointments.filter((a) => a.status === "confirmed").length;
+    const completed = filteredAppointments.filter((a) => a.status === "completed").length;
+    const activeFarms = pickUnique(filteredAppointments, "userId");
 
     return {
       totalRequests: total,
@@ -81,12 +125,12 @@ export default function AgriAnalytics() {
       farmsChange: 0,
       completionChange: 0,
     };
-  }, [myAppointments]);
+  }, [filteredAppointments]);
 
   // group categories for right-side donut
   const clientsByIndustry = useMemo(() => {
     const by = new Map();
-    myAppointments.forEach((a) => {
+    filteredAppointments.forEach((a) => {
       const k = a.category || "Other";
       by.set(k, (by.get(k) || 0) + 1);
     });
@@ -102,19 +146,161 @@ export default function AgriAnalytics() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }));
-  }, [myAppointments]);
+  }, [filteredAppointments]);
 
   // simple weekly bar: count appointments by weekday
   const revenueData = useMemo(() => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const counts = new Array(7).fill(0);
-    for (const a of myAppointments) {
+    for (const a of filteredAppointments) {
       const d = new Date(a.appointmentDate);
       if (!isNaN(d)) counts[d.getDay()] += 1;
     }
     // scale to a pseudo monetary value to fit existing UI (multiply by constant)
     return days.map((day, idx) => ({ day, value: counts[idx] * 8000 }));
-  }, [myAppointments]);
+  }, [filteredAppointments]);
+
+  // Helper: load jsPDF + autoTable from CDN if not installed
+  const loadJsPDF = async () => {
+    if (window.jspdf?.jsPDF && window.jspdf?.default?.jsPDF) return window.jspdf.jsPDF || window.jspdf.default.jsPDF;
+    const loadScript = (src) => new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = src; s.async = true; s.onload = res; s.onerror = rej; document.body.appendChild(s);
+    });
+    // core jsPDF
+    await loadScript("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
+    // plugin
+    await loadScript("https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js");
+    return window.jspdf.jsPDF || window.jspdf.default.jsPDF;
+  };
+
+  // Download detailed PDF report for current filtered appointments
+  const handleDownloadPDF = async () => {
+    try {
+      const JS = await loadJsPDF();
+      const doc = new JS("p", "pt", "a4");
+
+      const margin = 36; // 0.5 inch
+      const titleY = 40;
+      const rangeLabel = activeTab;
+      const nowStr = new Date().toLocaleString();
+
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(33, 33, 33);
+      doc.text("Consultant Appointments Report", margin, titleY);
+      doc.setFontSize(11);
+      doc.setTextColor(90);
+      doc.text(`Consultant: ${me?.name || "-"}  •  Email: ${me?.email || "-"}`, margin, titleY + 18);
+      doc.text(`City: ${me?.city || "-"}  •  Specialization: ${me?.specialization || "-"}`, margin, titleY + 33);
+      doc.text(`Date Range: ${rangeLabel}  •  Generated: ${nowStr}`, margin, titleY + 48);
+
+      // Summary chips
+      const summaryY = titleY + 70;
+      const chip = (x, label, value) => {
+        doc.setDrawColor(200); doc.setFillColor(245);
+        doc.roundedRect(x, summaryY, 150, 46, 6, 6, "FD");
+        doc.setTextColor(100); doc.setFontSize(10); doc.text(label, x + 12, summaryY + 18);
+        doc.setTextColor(20); doc.setFontSize(14); doc.text(String(value), x + 12, summaryY + 36);
+      };
+      chip(margin, "Total Requests", dashboardData.totalRequests);
+      chip(margin + 170, "Confirmed", dashboardData.confirmedRequests);
+      chip(margin + 340, "Active Farms", dashboardData.activeFarms);
+      chip(margin + 510, "Completion %", `${dashboardData.projectCompletion}%`);
+
+      // Table data
+      const startTableY = summaryY + 66;
+      const head = [[
+        "Appt #", "Status", "Client Name", "Email", "Phone", "City",
+        "Category", "Date", "Time", "Duration(h)",
+      ]];
+      const rows = filteredAppointments.map((a) => ([
+        a.appointmentId ?? "",
+        a.status ?? "",
+        a.name ?? "",
+        a.email ?? "",
+        a.phone ?? "",
+        a.city ?? "",
+        a.category ?? "",
+        a.appointmentDate ? new Date(a.appointmentDate).toLocaleDateString() : "",
+        a.appointmentTime ?? "",
+        a.durationHours ?? "",
+      ]));
+
+      // autoTable
+      // eslint-disable-next-line no-undef
+      doc.autoTable({
+        startY: startTableY,
+        head,
+        body: rows,
+        styles: { fontSize: 9, cellPadding: 6, valign: "middle" },
+        headStyles: { fillColor: [46, 125, 50], halign: "left" },
+        alternateRowStyles: { fillColor: [248, 250, 248] },
+        didDrawPage: (data) => {
+          // Footer page numbers
+          const pageSize = doc.internal.pageSize;
+          const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+          const pageWidth = pageSize.width ? pageSize.width : pageSize.getWidth();
+          const pageStr = `Page ${doc.internal.getNumberOfPages()}`;
+          doc.setFontSize(9); doc.setTextColor(130);
+          doc.text(pageStr, pageWidth - margin - doc.getTextWidth(pageStr), pageHeight - 16);
+        },
+      });
+
+      const label = activeTab.replace(/\s+/g, "-");
+      doc.save(`consultant-report-${label}.pdf`);
+    } catch (e) {
+      // Fallback to CSV if PDF libs fail to load
+      console.error("PDF export failed, falling back to CSV", e);
+      handleDownloadCSV();
+    }
+  };
+
+  // CSV download as fallback/alternative
+  const handleDownloadCSV = () => {
+    const rows = filteredAppointments.map((a) => ({
+      appointmentId: a.appointmentId ?? "",
+      status: a.status,
+      name: a.name,
+      email: a.email,
+      phone: a.phone,
+      city: a.city,
+      category: a.category,
+      appointmentDate: a.appointmentDate ? new Date(a.appointmentDate).toISOString() : "",
+      appointmentTime: a.appointmentTime || "",
+      durationHours: a.durationHours ?? "",
+    }));
+    const header = Object.keys(rows[0] || {
+      appointmentId: "",
+      status: "",
+      name: "",
+      email: "",
+      phone: "",
+      city: "",
+      category: "",
+      appointmentDate: "",
+      appointmentTime: "",
+      durationHours: "",
+    });
+    const csv = [
+      ["Consultant Report"].join(","),
+      [me ? me.name : "", me ? me.email : ""].join(","),
+      [],
+      header.join(","),
+      ...rows.map((r) => header.map((h) => String(r[h] ?? "").replaceAll('"', '""')).map((v) => /[",\n]/.test(v) ? `"${v}"` : v).join(",")),
+    ].map((line) => (Array.isArray(line) ? line : [line]).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const now = new Date();
+    const label = activeTab.replace(/\s+/g, "-");
+    a.href = url;
+    a.download = `consultant-report-${label}-${now.toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   // ✅ FIXED: include `icon: Icon`
   const StatCard = ({ title, value, change, icon: Icon, suffix = "" }) => {
@@ -162,28 +348,31 @@ export default function AgriAnalytics() {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg border border-gray-200">
             <Calendar className="w-5 h-5 text-gray-400" />
-            <select className="border-none bg-transparent text-sm font-medium focus:outline-none">
-              <option>Select Date</option>
-              <option>Today</option>
-              <option>Yesterday</option>
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
+            <select
+              className="border-none bg-transparent text-sm font-medium focus:outline-none"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+            >
+              <option value="Today">Today</option>
+              <option value="Yesterday">Yesterday</option>
+              <option value="Last 7 days">Last 7 days</option>
+              <option value="Last 30 days">Last 30 days</option>
             </select>
           </div>
           <button className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium">
             <Filter className="w-4 h-4" />
             <span>Filter</span>
           </button>
-          <button className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700">
+          <button onClick={handleDownloadPDF} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700">
             <Download className="w-4 h-4" />
-            <span>Download Report</span>
+            <span>Download Report (PDF)</span>
           </button>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex space-x-1 mb-8 bg-gray-100 p-1 rounded-lg w-fit">
-        {["Today", "Yesterday", "Weekly", "Monthly"].map((tab) => (
+        {["Today", "Yesterday", "Last 7 days", "Last 30 days"].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
