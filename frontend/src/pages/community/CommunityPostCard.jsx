@@ -1,3 +1,4 @@
+// CommunityPostCard.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
@@ -39,7 +40,7 @@ const timeAgo = (d) => {
   return ts.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
-/* UPDATED: allow http(s), protocol-relative (//), data:, blob:, and /uploads */
+/* allow http(s), protocol-relative (//), data:, blob:, and /uploads */
 function resolveImageUrl(img) {
   if (!img) return "";
   if (/^(https?:)?\/\/|^data:|^blob:/i.test(img)) return img;
@@ -135,7 +136,7 @@ export default function CommunityPostCard({ post, onReacted, onDeleted }) {
         const res = await api.get(`/community/${post._id}`);
         let comments = Array.isArray(res.data?.comments) ? res.data.comments : [];
 
-        // NEW: normalize avatar keys so UI can display whatever backend sends
+        // normalize avatar keys
         comments = comments.map((c) => ({
           ...c,
           authorAvatar:
@@ -165,13 +166,13 @@ export default function CommunityPostCard({ post, onReacted, onDeleted }) {
     fetchComments();
   }, [open, full, post._id]);
 
-  // Unified react handler with toggle/swap
+  // react handler with toggle/swap
   const react = async (type /* 'like' | 'dislike' */) => {
     if (!auth.isLoggedIn()) {
       alert("Please log in to continue.");
       return;
     }
-    const headers = { "x-user-name": auth.name() };
+    const headers = { "x-user-name": auth.name(),"x-user-avatar": auth.avatar() ||  ""};
     const tk = auth.token();
     if (tk) headers.Authorization = `Bearer ${tk}`;
 
@@ -605,7 +606,7 @@ export default function CommunityPostCard({ post, onReacted, onDeleted }) {
                     const optimistic = {
                       _id: `tmp-${Date.now()}`,
                       authorName: auth.name(),
-                      authorAvatar: auth.avatar(), // ensure avatar immediate
+                      authorAvatar: auth.avatar(),
                       text,
                       createdAt: new Date().toISOString(),
                       replies: [],
@@ -679,7 +680,6 @@ export default function CommunityPostCard({ post, onReacted, onDeleted }) {
                     </div>
                   ) : (
                     (full?.comments || []).map((c) => {
-                      // UPDATED: much more robust avatar resolution
                       const commentAvatar =
                         c.authorAvatar ||
                         c.userAvatar ||
