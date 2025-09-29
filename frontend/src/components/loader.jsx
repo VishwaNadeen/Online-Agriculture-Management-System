@@ -3,7 +3,7 @@ import React from "react";
 
 export default function Loader() {
   return (
-    <div className="w-full h-full flex justify-center items-center bg-gradient-to-b from-emerald-50 to-green-100">
+    <div className="w-full h-full flex justify-center items-center bg-gradient-to-b from-emerald-50 to-green-120">
       <div className="relative">
         {/* Glow background */}
         <div className="absolute -inset-4 rounded-full bg-emerald-400/20 blur-2xl animate-pulse"></div>
