@@ -1,9 +1,12 @@
 // src/pages/SearchCon/SearchCon.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { useNavigate, useLocation } from "react-router-dom"; // CHANGE: add useLocation
-import { toast } from "react-hot-toast";                     // ADD: toast for login prompt
+import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "react-hot-toast";
 import ConsultantCard from "../../components/ConsultantCard";
+
+// ✅ Page loader (your existing component)
+import Loader from "../../components/loader.jsx";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const CONSULT_API = `${BASE}/consultants`;
@@ -54,7 +57,6 @@ const DISTRICTS = [
   "Trincomalee","Vavuniya",
 ];
 
-// use districts for "city" filter
 const CITY_OPTIONS = DISTRICTS;
 
 const CATEGORY_ALIASES = {
@@ -73,7 +75,7 @@ const CATEGORY_ALIASES = {
 const SUGGESTIONS = ["Kandy", "Colombo", "Soil Testing", "Pest Control", "Organic Farming"];
 const MY_APPTS_ROUTE = "/my-appointments";
 
-/* ==== Small skeleton while loading ==== */
+/* ==== Small skeleton (kept for fallback) ==== */
 function SkeletonCard() {
   return (
     <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
@@ -86,41 +88,55 @@ function SkeletonCard() {
   );
 }
 
-// ADD: small helper to read token from both storages & keys (matches your Login + API layer)
 const getToken = () =>
   localStorage.getItem("token") ||
   sessionStorage.getItem("token") ||
   localStorage.getItem("auth_token") ||
   sessionStorage.getItem("auth_token");
 
-// ADD: gate an action behind login; show toast + redirect to login with return path
 const requireLoginThen = (location, navigate, action) => {
   const token = getToken();
   if (token) return action();
-  toast.error("Please log in to continue");  // ADD
-  navigate("/login", { replace: true, state: { from: location.pathname } }); // ADD
+  toast.error("Please log in to continue");
+  navigate("/login", { replace: true, state: { from: location.pathname } });
 };
 
 export default function SearchCon() {
   const navigate = useNavigate();
-  const location = useLocation(); // ADD: so we can send { state: { from } }
+  const location = useLocation();
 
   const [active, setActive] = useState(TABS.SEARCH);
   const [selected, setSelected] = useState(null);
-
-  // this controls our popup
   const [popupOpen, setPopupOpen] = useState(false);
 
-  // unified query + explicit filters
   const [draft, setDraft] = useState({ q: "", category: "", city: "" });
 
   const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);     // true while fetching
+  const [showLoader, setShowLoader] = useState(false); // true while we DISPLAY loader (min duration)
+  const loaderStartRef = useRef(0);
+  const MIN_LOADER_MS = 900;
+
   const [err, setErr] = useState("");
+
+  // ---- helper to start/stop loader with minimum visible duration
+  const startLoader = () => {
+    loaderStartRef.current = Date.now();
+    setLoading(true);
+    setShowLoader(true);
+  };
+  const stopLoader = () => {
+    const elapsed = Date.now() - loaderStartRef.current;
+    const remain = Math.max(0, MIN_LOADER_MS - elapsed);
+    setTimeout(() => {
+      setLoading(false);
+      setShowLoader(false);
+    }, remain);
+  };
 
   const fetchConsultants = async (filters) => {
     try {
-      setLoading(true);
+      startLoader();
       setErr("");
       const params = {};
       if (filters.category) params.category = filters.category;
@@ -132,7 +148,7 @@ export default function SearchCon() {
     } catch (e) {
       setErr(e?.response?.data?.message || e.message || "Failed to load");
     } finally {
-      setLoading(false);
+      stopLoader();
     }
   };
 
@@ -142,7 +158,6 @@ export default function SearchCon() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // parse quick text into category/city if exact
   const parseFromQ = (rawInput) => {
     const raw = (rawInput || "").trim();
     if (!raw) return { category: "", city: "", q: "" };
@@ -199,8 +214,6 @@ export default function SearchCon() {
   };
 
   /* ==== Actions ==== */
-
-  // CHANGE: gate booking behind login
   const goBook = (c) => {
     requireLoginThen(location, navigate, () => {
       navigate("/appointment", {
@@ -228,17 +241,21 @@ export default function SearchCon() {
     setPopupOpen(true);
   };
 
-  // ADD: gate "My Appointments" button behind login
   const goMyAppointments = () => {
     requireLoginThen(location, navigate, () => {
       navigate(MY_APPTS_ROUTE);
     });
   };
 
+  /* ---------- PAGE LOADER ---------- */
+  if (showLoader) {
+    return <Loader />; // Full-screen loader with min visible time
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top search header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-200">
+    <div className="min-h-screen bg-green-50/95">
+      {/* Top search header (now blended with page; not sticky, no border) */}
+      <header className="bg-transparent">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
             {/* Big search box */}
@@ -305,7 +322,7 @@ export default function SearchCon() {
 
             {/* My Appointments */}
             <button
-              onClick={goMyAppointments} // CHANGE: gate behind login
+              onClick={goMyAppointments}
               className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-gray-900 text-white px-4 py-2 text-sm hover:bg-black"
             >
               My Appointments
@@ -340,13 +357,7 @@ export default function SearchCon() {
                 </h3>
               </div>
 
-              {loading ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <SkeletonCard key={i} />
-                  ))}
-                </div>
-              ) : list.length ? (
+              {list.length ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                   {list.map((c) => (
                     <button
@@ -356,7 +367,6 @@ export default function SearchCon() {
                       className="text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-xl"
                       aria-label={`Open actions for ${c.name}`}
                     >
-                      {/* No preview/book buttons inside card — whole card is clickable now */}
                       <ConsultantCard consultant={c} />
                     </button>
                   ))}
@@ -469,9 +479,8 @@ export default function SearchCon() {
                   )}
 
                   <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-200">
-                    {/* keep profile page actions (not on cards) */}
                     <button
-                      onClick={() => goBook(selected)} // CHANGE: gated
+                      onClick={() => goBook(selected)}
                       className="flex-1 bg-emerald-600 text-white py-3 px-6 rounded-lg hover:bg-emerald-700 transition-colors duration-200 font-medium"
                     >
                       Book Appointment
@@ -538,7 +547,7 @@ export default function SearchCon() {
               {/* Two big action buttons only */}
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={() => goBook(selected)} // CHANGE: gated
+                  onClick={() => goBook(selected)}
                   className="flex-1 py-3 px-4 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition"
                 >
                   Book Appointment

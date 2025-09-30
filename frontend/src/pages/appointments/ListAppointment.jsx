@@ -1,10 +1,11 @@
 // src/pages/appointments/ListAppointments.jsx
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApptAPI } from "../../api/appointments.js";
 import AppointmentCard from "../../components/appointmentCard.jsx";
-import AppointmentDetailsModal from "../../components/AppointmentDetailsModal.jsx"; // NEW
+import AppointmentDetailsModal from "../../components/AppointmentDetailsModal.jsx";
 import axios from "axios";
+import api from "../../utils/api";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
@@ -12,12 +13,14 @@ export default function ListAppointment() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const navigate = useNavigate();
 
-  // NEW: modal state
+  // modal state
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(null);
   const [consultant, setConsultant] = useState(null);
   const [loadingConsultant, setLoadingConsultant] = useState(false);
+  const [autoDownload, setAutoDownload] = useState(false); // <-- keep here
 
   const load = async () => {
     try {
@@ -32,27 +35,32 @@ export default function ListAppointment() {
     }
   };
 
+  const handleEdit = (appt) => {
+    if (!appt?._id) return;
+    navigate(`/appointment/${appt._id}/edit`, { state: { appt } });
+  };
+
+  const handleCancel = async (appt) => {
+    if (!appt?._id) return;
+    if (!window.confirm("Cancel this appointment?")) return;
+    try {
+      await api.post(`/appointments/${appt._id}/cancel`);
+      load();
+      setOpen(false);
+    } catch (e) {
+      alert(e?.response?.data?.message || e.message || "Cancel failed");
+    }
+  };
+
   useEffect(() => {
     load();
   }, []);
 
-  const onDelete = async (appt) => {
-    const id = appt._id || appt.appointmentId;
-    const ok = window.confirm(
-      `Delete appointment ${appt.appointmentId ? `#${appt.appointmentId}` : id}?`
-    );
-    if (!ok) return;
-    try {
-      await ApptAPI.remove(appt._id); // send Mongo _id
-      setList((prev) => prev.filter((x) => (x._id || x.appointmentId) !== id));
-    } catch (e) {
-      alert(e.message || "Delete failed");
-    }
-  };
-
+  // ---- VIEW ----
   const openDetails = async (appt) => {
     setActive(appt);
     setConsultant(null);
+    setAutoDownload(false);     // view only
     setOpen(true);
 
     if (appt.consultantId) {
@@ -61,7 +69,27 @@ export default function ListAppointment() {
         const { data } = await axios.get(`${BASE}/consultants/${appt.consultantId}`);
         setConsultant(data?.consultant || data);
       } catch {
-        // ignore
+        /* ignore */
+      } finally {
+        setLoadingConsultant(false);
+      }
+    }
+  };
+
+  // ---- DOWNLOAD ----
+  const onDownload = async (appt) => {
+    setActive(appt);
+    setConsultant(null);
+    setAutoDownload(true);      // 1) set flag FIRST
+    setOpen(true);              // 2) then open
+
+    if (appt.consultantId) {
+      try {
+        setLoadingConsultant(true);
+        const { data } = await axios.get(`${BASE}/consultants/${appt.consultantId}`);
+        setConsultant(data?.consultant || data);
+      } catch {
+        /* ignore */
       } finally {
         setLoadingConsultant(false);
       }
@@ -70,7 +98,6 @@ export default function ListAppointment() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Main content grows */}
       <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-3xl font-bold text-emerald-700">My Appointments</h2>
@@ -95,18 +122,23 @@ export default function ListAppointment() {
               <AppointmentCard
                 key={a._id || a.appointmentId}
                 appt={a}
-                onDelete={onDelete}
                 onOpen={openDetails}
+                onDownload={onDownload}
               />
             ))}
           </div>
         )}
 
         <AppointmentDetailsModal
+          key={`${active?._id || "none"}-${autoDownload ? "dl" : "view"}`} /* 3) force remount */
           open={open}
           onClose={() => setOpen(false)}
           appt={active || {}}
           consultant={loadingConsultant ? null : consultant}
+          onEdit={handleEdit}
+          onCancel={handleCancel}
+          canCancel={active && ["pending", "confirmed"].includes((active.status || "").toLowerCase())}
+          autoDownload={autoDownload}
         />
       </main>
     </div>

@@ -1,6 +1,7 @@
 // backend/routes/consultantRoutes.js
 import { Router } from "express";
 import User from "../models/userModel.js";
+import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 
@@ -80,6 +81,36 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("GET /consultants failed:", err);
     res.status(500).json({ message: "Failed to load consultants" });
+  }
+});
+
+/**
+ * GET /consultants/me
+ * Returns safe consultant profile of the authenticated user
+ */
+router.get("/me", requireAuth, async (req, res) => {
+  try {
+    const u = await User.findById(req.user._id).lean();
+    if (!u || u.role !== "consultant") {
+      return res.status(404).json({ message: "Consultant profile not found" });
+    }
+    const me = {
+      id: String(u._id),
+      name: `${u.firstName} ${u.lastName}`,
+      email: u.email,
+      phone: u.phone,
+      city: u.address?.city || "-",
+      specialization: u.consultant?.primarySpecialization || "",
+      yearsExp: u.consultant?.yearsOfExperience || 0,
+      languages: u.consultant?.languages || [],
+      bio: u.consultant?.bio || "",
+      availableDays: u.consultant?.availableDays || [],
+      availableTimeSlots: u.consultant?.availableTimeSlots || [],
+    };
+    res.json(me);
+  } catch (err) {
+    console.error("GET /consultants/me failed:", err);
+    res.status(500).json({ message: "Failed to load consultant" });
   }
 });
 

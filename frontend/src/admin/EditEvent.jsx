@@ -162,7 +162,7 @@ const EditEvent = () => {
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
             <Link
-              to={`/events/${id}`}
+              to={`/admin/event`}
               className="p-2 text-gray-600 hover:text-emerald-600 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
