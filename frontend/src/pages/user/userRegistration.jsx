@@ -3,10 +3,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import RoleSelectModal from "../../components/roleSelect.jsx"; // <-- path from /pages to /components
+import { User, Mail, Phone, Lock, MapPin, Calendar, Upload, Leaf } from "lucide-react";
+import RoleSelectModal from "../../components/roleSelect.jsx";
 
-// If your backend upload endpoint differs, change this:
-const UPLOAD_URL = "http://localhost:4000/uploads/profile"; // (kept but not used now)
+const UPLOAD_URL = "http://localhost:4000/uploads/profile";
 
 const FALLBACK_CODES = [
   { name: "Sri Lanka", dial_code: "+94", code: "LK" },
@@ -50,12 +50,11 @@ export default function UserRegistration() {
   });
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // kept but not used for auto-upload
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
-  // country codes combobox
   const [codes, setCodes] = useState([]);
   const [countryCode, setCountryCode] = useState("+94");
   const [query, setQuery] = useState("+94");
@@ -63,7 +62,6 @@ export default function UserRegistration() {
   const [highlightIndex, setHighlightIndex] = useState(0);
   const comboRef = useRef(null);
 
-  // validations state
   const [phoneLocal, setPhoneLocal] = useState("");
   const [errors, setErrors] = useState({
     phone: "",
@@ -73,10 +71,12 @@ export default function UserRegistration() {
     confirmPassword: "",
   });
 
-  // popup control
   const [chooseRoleOpen, setChooseRoleOpen] = useState(false);
 
-  // load dial codes from /public
+  useEffect(() => {
+    setTimeout(() => setMounted(true), 100);
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -158,7 +158,6 @@ export default function UserRegistration() {
     return () => window.removeEventListener("click", handler);
   }, []);
 
-  // validators
   const validatePhone = (val) => {
     if (!val) return "Phone is required";
     if (!/^\d+$/.test(val)) return "Only digits allowed";
@@ -189,7 +188,6 @@ export default function UserRegistration() {
     return "";
   };
 
-  // handlers with validation
   const handlePhoneChange = (e) => {
     const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
     setPhoneLocal(digits);
@@ -223,7 +221,6 @@ export default function UserRegistration() {
     }));
   };
 
-  // profile image preview only
   const [preview, setPreview] = useState("");
   const [profileFile, setProfileFile] = useState(null);
   const handleProfileFile = (e) => {
@@ -309,7 +306,7 @@ export default function UserRegistration() {
     setLoading(true);
     try {
       const fd = new FormData();
-      if (profileFile) fd.append("profile", profileFile); // field "profile" expected by backend
+      if (profileFile) fd.append("profile", profileFile);
       const payload = { ...form, phone: `${countryCode}${phoneLocal}` };
       fd.append("data", JSON.stringify(payload));
 
@@ -326,7 +323,7 @@ export default function UserRegistration() {
       }
 
       toast.success("Registration saved ✅");
-      setChooseRoleOpen(true); // open modal after save
+      setChooseRoleOpen(true);
     } catch (err) {
       console.error(err);
       const msg = err.response?.data?.message || "Registration failed ❌";
@@ -337,292 +334,365 @@ export default function UserRegistration() {
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-gradient-to-br from-emerald-50 via-green-50 to-lime-50 px-4 py-8">
+    <div className="min-h-screen flex justify-center items-center bg-emerald-50 px-4 py-12 relative overflow-hidden">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200 rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-300 rounded-full blur-3xl opacity-20 translate-y-1/2 -translate-x-1/2" />
+      
       <form
         onSubmit={handleSubmit}
-        className="bg-white/90 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-emerald-100 max-w-2xl w-full space-y-5"
+        className={`relative z-10 bg-white shadow-2xl p-8 rounded-3xl border border-emerald-100/50 max-w-3xl w-full space-y-6 transition-all duration-1000 ${
+          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+        }`}
       >
-        <h2 className="text-3xl font-bold text-emerald-700 text-center">User Registration</h2>
-
-        {/* First/Last Name */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-            <input
-              type="text"
-              name="firstName"
-              placeholder="First Name"
-              value={form.firstName}
-              onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-              required
-              className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-            />
+        {/* Decorative top accent */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 rounded-t-3xl" />
+        
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="relative">
+              <Leaf className="w-10 h-10 text-emerald-600" />
+              <div className="absolute inset-0 bg-emerald-400 opacity-30 blur-xl" />
+            </div>
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-emerald-500 bg-clip-text text-transparent">
+              User Registration
+            </h2>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-            <input
-              type="text"
-              name="lastName"
-              placeholder="Last Name"
-              value={form.lastName}
-              onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-              required
-              className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
+          <p className="text-emerald-600">Join the Green Grow community today</p>
         </div>
 
-        {/* Phone */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-          <div className="flex gap-2">
-            <div className="relative w-48" ref={comboRef}>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setIsOpen(true);
-                }}
-                onFocus={() => setIsOpen(true)}
-                onKeyDown={onComboKeyDown}
-                className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-                placeholder="+94 or type country"
-              />
-              {isOpen && (
-                <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border bg-white shadow">
-                  {filteredCodes.length === 0 ? (
-                    <li className="px-3 py-2 text-gray-500">No matches</li>
-                  ) : (
-                    filteredCodes.map((c, idx) => (
-                      <li
-                        key={`${c.code}-${c.dial_code}`}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          selectCode(c);
-                        }}
-                        className={cls(
-                          "px-3 py-2 cursor-pointer flex justify-between text-sm",
-                          idx === highlightIndex ? "bg-emerald-50 text-emerald-700" : "hover:bg-gray-50"
-                        )}
-                        onMouseEnter={() => setHighlightIndex(idx)}
-                      >
-                        <span>{c.name}</span>
-                        <span className="font-medium">{c.dial_code}</span>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              )}
-            </div>
+        {/* Personal Information Section */}
+        <div className="space-y-5">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <User className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Personal Information</h3>
+          </div>
 
-            <div className="flex-1">
+          {/* First/Last Name */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="group">
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">First Name</label>
               <input
-                id="phone-local-input"
                 type="text"
-                inputMode="numeric"
-                placeholder="9-digit number"
-                value={phoneLocal}
-                onChange={handlePhoneChange}
+                name="firstName"
+                placeholder="First Name"
+                value={form.firstName}
+                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                required
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+              />
+            </div>
+            <div className="group">
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">Last Name</label>
+              <input
+                type="text"
+                name="lastName"
+                placeholder="Last Name"
+                value={form.lastName}
+                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                required
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className="block text-sm font-semibold text-emerald-800 mb-2">Phone</label>
+            <div className="flex gap-3">
+              <div className="relative w-48" ref={comboRef}>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setIsOpen(true);
+                  }}
+                  onFocus={() => setIsOpen(true)}
+                  onKeyDown={onComboKeyDown}
+                  className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+                  placeholder="+94 or country"
+                />
+                {isOpen && (
+                  <ul className="absolute z-20 mt-2 max-h-64 w-full overflow-auto rounded-xl border-2 border-emerald-200 bg-white shadow-xl">
+                    {filteredCodes.length === 0 ? (
+                      <li className="px-4 py-3 text-gray-500">No matches</li>
+                    ) : (
+                      filteredCodes.map((c, idx) => (
+                        <li
+                          key={`${c.code}-${c.dial_code}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectCode(c);
+                          }}
+                          className={cls(
+                            "px-4 py-3 cursor-pointer flex justify-between text-sm transition-colors",
+                            idx === highlightIndex ? "bg-emerald-50 text-emerald-700 font-medium" : "hover:bg-emerald-50/50"
+                          )}
+                          onMouseEnter={() => setHighlightIndex(idx)}
+                        >
+                          <span>{c.name}</span>
+                          <span className="font-semibold">{c.dial_code}</span>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </div>
+
+              <div className="flex-1">
+                <input
+                  id="phone-local-input"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="9-digit number"
+                  value={phoneLocal}
+                  onChange={handlePhoneChange}
+                  required
+                  className={cls(
+                    "w-full rounded-xl border-2 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all",
+                    errors.phone ? "border-red-400 focus:border-red-500" : "border-emerald-200"
+                  )}
+                />
+                {errors.phone && <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                  <span className="text-red-500">⚠</span> {errors.phone}
+                </p>}
+              </div>
+            </div>
+          </div>
+
+          {/* Email */}
+          <div className="group">
+            <label className="block text-sm font-semibold text-emerald-800 mb-2">Email</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                <Mail className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+              </div>
+              <input
+                type="email"
+                name="email"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={handleEmailChange}
                 required
                 className={cls(
-                  "w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500",
-                  errors.phone ? "border-red-500" : ""
+                  "w-full rounded-xl border-2 bg-emerald-50/50 pl-12 pr-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all",
+                  errors.email ? "border-red-400 focus:border-red-500" : "border-emerald-200"
                 )}
               />
-              {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
+            </div>
+            {errors.email && <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+              <span className="text-red-500">⚠</span> {errors.email}
+            </p>}
+          </div>
+
+          {/* DOB & Gender */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="group">
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">Date of Birth</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                  <Calendar className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+                </div>
+                <input
+                  type="date"
+                  name="dateOfBirth"
+                  value={form.dateOfBirth}
+                  onChange={handleDOBChange}
+                  max={todayISO()}
+                  required
+                  className={cls(
+                    "w-full rounded-xl border-2 bg-emerald-50/50 pl-12 pr-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all",
+                    errors.dob ? "border-red-400 focus:border-red-500" : "border-emerald-200"
+                  )}
+                />
+              </div>
+              {errors.dob && <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                <span className="text-red-500">⚠</span> {errors.dob}
+              </p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">Gender</label>
+              <select
+                name="gender"
+                value={form.gender}
+                onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                required
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+              >
+                <option value="">Select Gender</option>
+                <option>Male</option>
+                <option>Female</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Password + Confirm */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="group">
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                  <Lock className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+                </div>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  value={form.password}
+                  onChange={handlePasswordChange}
+                  required
+                  className={cls(
+                    "w-full rounded-xl border-2 bg-emerald-50/50 pl-12 pr-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all",
+                    errors.password ? "border-red-400 focus:border-red-500" : "border-emerald-200"
+                  )}
+                />
+              </div>
+              {errors.password && <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                <span className="text-red-500">⚠</span> {errors.password}
+              </p>}
+            </div>
+            <div className="group">
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">Confirm Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                  <Lock className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+                </div>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Re-enter password"
+                  value={confirmPassword}
+                  onChange={handleConfirmPasswordChange}
+                  required
+                  className={cls(
+                    "w-full rounded-xl border-2 bg-emerald-50/50 pl-12 pr-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all",
+                    errors.confirmPassword ? "border-red-400 focus:border-red-500" : "border-emerald-200"
+                  )}
+                />
+              </div>
+              {errors.confirmPassword && <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
+                <span className="text-red-500">⚠</span> {errors.confirmPassword}
+              </p>}
             </div>
           </div>
         </div>
 
-        {/* Email */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-          <input
-            type="email"
-            name="email"
-            placeholder="you@example.com"
-            value={form.email}
-            onChange={handleEmailChange}
-            required
-            className={cls(
-              "w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500",
-              errors.email ? "border-red-500" : ""
-            )}
-          />
-          {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
-        </div>
-
-        {/* DOB & Gender */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-            <input
-              type="date"
-              name="dateOfBirth"
-              value={form.dateOfBirth}
-              onChange={handleDOBChange}
-              max={todayISO()}
-              required
-              className={cls(
-                "w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500",
-                errors.dob ? "border-red-500" : ""
-              )}
-            />
-            {errors.dob && <p className="text-red-600 text-sm mt-1">{errors.dob}</p>}
+        {/* Address Section */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Address Information</h3>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-            <select
-              name="gender"
-              value={form.gender}
-              onChange={(e) => setForm({ ...form, gender: e.target.value })}
-              required
-              className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500 bg-white"
-            >
-              <option value="">Select Gender</option>
-              <option>Male</option>
-              <option>Female</option>
-              <option>Other</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Password + Confirm */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={form.password}
-              onChange={handlePasswordChange}
-              required
-              className={cls(
-                "w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500",
-                errors.password ? "border-red-500" : ""
-              )}
-            />
-            {errors.password && <p className="text-red-600 text-sm mt-1">{errors.password}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <input
-              type="password"
-              name="confirmPassword"
-              placeholder="Re-enter password"
-              value={confirmPassword}
-              onChange={handleConfirmPasswordChange}
-              required
-              className={cls(
-                "w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500",
-                errors.confirmPassword ? "border-red-500" : ""
-              )}
-            />
-            {errors.confirmPassword && <p className="text-red-600 text-sm mt-1">{errors.confirmPassword}</p>}
-          </div>
-        </div>
-
-        {/* Address */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-          <input
-            type="text"
-            name="address.country"
-            placeholder="Country"
-            value={form.address.country}
-            onChange={(e) =>
-              setForm({ ...form, address: { ...form.address, country: e.target.value } })
-            }
-            required
-            className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-          />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">State / Province</label>
+            <label className="block text-sm font-semibold text-emerald-800 mb-2">Country</label>
             <input
               type="text"
-              name="address.stateProvince"
-              placeholder="State / Province"
-              value={form.address.stateProvince}
+              name="address.country"
+              placeholder="Country"
+              value={form.address.country}
               onChange={(e) =>
-                setForm({ ...form, address: { ...form.address, stateProvince: e.target.value } })
+                setForm({ ...form, address: { ...form.address, country: e.target.value } })
               }
               required
-              className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
+                                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
             />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">State / Province</label>
+              <input
+                type="text"
+                name="address.stateProvince"
+                placeholder="State / Province"
+                value={form.address.stateProvince}
+                onChange={(e) =>
+                  setForm({ ...form, address: { ...form.address, stateProvince: e.target.value } })
+                }
+                required
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">City</label>
+              <input
+                type="text"
+                name="address.city"
+                placeholder="City"
+                value={form.address.city}
+                onChange={(e) =>
+                  setForm({ ...form, address: { ...form.address, city: e.target.value } })
+                }
+                required
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">Postal Code</label>
+              <input
+                type="text"
+                name="address.postalCode"
+                placeholder="Postal Code"
+                value={form.address.postalCode}
+                onChange={(e) =>
+                  setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
+                }
+                required
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">Address Line 1</label>
+              <input
+                type="text"
+                name="address.line1"
+                placeholder="Street address"
+                value={form.address.line1}
+                onChange={(e) =>
+                  setForm({ ...form, address: { ...form.address, line1: e.target.value } })
+                }
+                required
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+              />
+            </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+            <label className="block text-sm font-semibold text-emerald-800 mb-2">Address Line 2 (optional)</label>
             <input
               type="text"
-              name="address.city"
-              placeholder="City"
-              value={form.address.city}
+              name="address.line2"
+              placeholder="Apartment, suite, etc."
+              value={form.address.line2}
               onChange={(e) =>
-                setForm({ ...form, address: { ...form.address, city: e.target.value } })
+                setForm({ ...form, address: { ...form.address, line2: e.target.value } })
               }
-              required
-              className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
             />
           </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
-            <input
-              type="text"
-              name="address.postalCode"
-              placeholder="Postal Code"
-              value={form.address.postalCode}
-              onChange={(e) =>
-                setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
-              }
-              required
-              className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1</label>
-            <input
-              type="text"
-              name="address.line1"
-              placeholder="Street address"
-              value={form.address.line1}
-              onChange={(e) =>
-                setForm({ ...form, address: { ...form.address, line1: e.target.value } })
-              }
-              required
-              className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2 (optional)</label>
-          <input
-            type="text"
-            name="address.line2"
-            placeholder="Apartment, suite, etc."
-            value={form.address.line2}
-            onChange={(e) =>
-              setForm({ ...form, address: { ...form.address, line2: e.target.value } })
-            }
-            className="w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-          />
         </div>
 
         {/* Profile Picture */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Profile Picture</label>
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-full border overflow-hidden bg-gray-100 flex items-center justify-center">
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <Upload className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Profile Picture</h3>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <div className="relative w-24 h-24 rounded-full border-4 border-emerald-200 overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center shadow-lg group">
               {preview ? (
-                <img src={preview} alt="Profile preview" className="w-full h-full object-cover" />
+                <>
+                  <img src={preview} alt="Profile preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
+                </>
               ) : (
-                <span className="text-xs text-gray-400">No image</span>
+                <Upload className="w-8 h-8 text-emerald-300" />
               )}
             </div>
             <div className="flex-1">
@@ -630,28 +700,37 @@ export default function UserRegistration() {
                 type="file"
                 accept="image/*"
                 onChange={handleProfileFile}
-                className="block w-full text-sm text-gray-700
-                           file:mr-4 file:py-2 file:px-4
-                           file:rounded-lg file:border-0
+                className="block w-full text-sm text-emerald-700
+                           file:mr-4 file:py-3 file:px-6
+                           file:rounded-xl file:border-0
                            file:text-sm file:font-semibold
-                           file:bg-emerald-50 file:text-emerald-700
-                           hover:file:bg-emerald-100"
+                           file:bg-emerald-100 file:text-emerald-700
+                           hover:file:bg-emerald-200 file:transition-colors file:cursor-pointer
+                           cursor-pointer"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Choose an image (JPG/PNG). It will upload with your details when you click Next.
+              <p className="text-xs text-gray-500 mt-2">
+                Choose an image (JPG/PNG). Maximum 5MB. It will upload with your details.
               </p>
-              {uploading && <p className="text-xs text-emerald-700 mt-1">Uploading…</p>}
-              {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
+              {uploading && <p className="text-xs text-emerald-700 mt-1 flex items-center gap-1">
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Uploading…
+              </p>}
+              {uploadError && <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                <span className="text-red-500">⚠</span> {uploadError}
+              </p>}
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
           <button
             type="button"
             onClick={handleReset}
-            className="w-full py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 transition"
+            className="w-full py-3.5 rounded-xl bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-2 border-gray-200"
           >
             Reset
           </button>
@@ -660,19 +739,31 @@ export default function UserRegistration() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700 disabled:bg-gray-400 transition"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:scale-[1.02] transform"
             >
-              {loading ? "Saving..." : "Next →"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Saving...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  Next
+                  <span className="text-lg">→</span>
+                </span>
+              )}
             </button>
           ) : (
-            <div className="w-full py-3 rounded-xl bg-gray-200 text-gray-500 text-center select-none">
+            <div className="w-full py-3.5 rounded-xl bg-gray-200 text-gray-400 text-center select-none font-semibold border-2 border-gray-300 cursor-not-allowed">
               Next
             </div>
           )}
         </div>
       </form>
 
-      {/* Role selection modal — handles its own navigation */}
       <RoleSelectModal open={chooseRoleOpen} onClose={() => setChooseRoleOpen(false)} />
     </div>
   );
