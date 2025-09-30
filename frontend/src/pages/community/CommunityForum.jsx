@@ -193,7 +193,7 @@ export default function CommunityForum() {
     (t.length > 0 && !onlyLetters(t)) || (t.length > 0 && startsWithNumber.test(t));
   const canShare = !!t && !!c && !invalidTitleNow && !errors.file && !submitting;
 
-  // JSON if no image, FormData if image + send x-user-avatar so comments and posts can show profile photo
+  // JSON if no image, FormData if image — NO custom headers that cause CORS preflight failures
   const handleNewPost = async (e) => {
     e.preventDefault();
     if (!auth.require()) return;
@@ -215,15 +215,13 @@ export default function CommunityForum() {
     try {
       setSubmitting(true);
 
+      // Only include Authorization. Remove x-user-name/x-user-avatar to avoid preflight CORS issues.
       const headers = {};
       const token = auth.token();
       if (token) headers.Authorization = `Bearer ${token}`;
-      headers["x-user-name"] = auth.name() || "User";
-      headers["x-user-avatar"] = auth.avatar() || ""; // ensure backend gets avatar
 
       let data;
       if (file) {
-        // multipart when an image exists
         data = new FormData();
         data.append("title", t);
         data.append("comment", c);
@@ -231,9 +229,9 @@ export default function CommunityForum() {
         data.append("authorName", auth.name() || "User");
         const av = auth.avatar();
         if (av) data.append("authorAvatar", av);
-        data.append("image", file);
+        data.append("image", file); // the actual file
+        // Note: do NOT set Content-Type manually for FormData; Axios will set it with the proper boundary
       } else {
-        // JSON when no image
         data = {
           title: t,
           comment: c,

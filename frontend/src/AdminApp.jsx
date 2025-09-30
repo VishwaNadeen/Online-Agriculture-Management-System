@@ -9,6 +9,7 @@ import CommentsAdmin from "./admin/CommentsAdmin.jsx";
 import EventAdmin from "./admin/EventAdmin.jsx";
 import AddEvent from "./admin/AddEvent.jsx";
 import EditEvent from "./admin/EditEvent.jsx";
+import ConsultantAdmin from "./admin/consultantAdmin.jsx";
 
 // Replace with your real pages
 
@@ -35,8 +36,9 @@ export default function AdminApp() {
         <Route path="settings" element={<SettingsAdmin />} />
         <Route path="comments" element={<CommentsAdmin />} />
         <Route path="event" element={<EventAdmin></EventAdmin>} />
+          <Route path="consultant" element={<ConsultantAdmin></ConsultantAdmin>} />
         <Route path="addevent" element={<AddEvent></AddEvent>} />
-        <Route path="event/:id/editevent" element={<EditEvent></EditEvent>} />
+        <Route path="event/:id/editevent" element={<EditEvent></EditEvent>} />
         {/*Catch-all fallback */}
         <Route path="*" element={<Navigate to="." replace />} />
       </Route>
