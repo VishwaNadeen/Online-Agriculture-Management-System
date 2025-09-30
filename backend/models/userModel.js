@@ -37,8 +37,8 @@ const userSchema = new Schema(
 
     address: { type: addressSchema, required: true }, 
 
-
-    role: { type: String, enum: ["farmer", "consultant", "user"], default: "user" },
+    // ⬇️ Added "admin" here
+    role: { type: String, enum: ["farmer", "consultant", "user", "admin"], default: "user" },
 
     // Farmer-only
     farmer: {
