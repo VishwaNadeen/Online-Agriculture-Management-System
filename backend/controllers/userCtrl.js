@@ -3,11 +3,21 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
 
+/* ---------- env admin config ---------- */
+const {
+  ADMIN_EMAIL = "",
+  ADMIN_PASSWORD_HASH = "",
+  ADMIN_PASSWORD = "", // optional plaintext fallback (not recommended)
+} = process.env;
+
 /* ---------- helpers ---------- */
 const signTokenIfPossible = (user) => {
   const secret = process.env.JWT_SECRET;
   if (!secret) return null;
-  return jwt.sign({ sub: user._id, role: user.role }, secret, { expiresIn: "7d" });
+  // support virtual admin id
+  const sub = user._id || user.id || user.sub || "unknown";
+  const role = user.role || "user";
+  return jwt.sign({ sub, role }, secret, { expiresIn: "7d" });
 };
 
 // Accept either `address: { ... }` or flat address fields in body
@@ -56,7 +66,7 @@ const create = async (req, res) => {
       gender,
       profilePicture, // Cloudinary URL (set in route if file uploaded)
       password,
-      role,        // "user" | "farmer" | "consultant"
+      role,        // "user" | "farmer" | "consultant" | "admin"
       farmer,
       consultant,
     } = req.body;
@@ -108,10 +118,44 @@ const login = async (req, res) => {
       return res.status(400).json({ message: "emailOrPhone and password are required." });
     }
 
-    const query =
-      String(emailOrPhone).includes("@")
-        ? { email: String(emailOrPhone).toLowerCase().trim() }
-        : { phone: String(emailOrPhone).trim() };
+    const val = String(emailOrPhone).trim();
+    const isEmail = val.includes("@");
+
+    /* -------- 1) ENV ADMIN LOGIN (no DB lookup) -------- */
+    if (isEmail && ADMIN_EMAIL && val.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      if (!ADMIN_PASSWORD_HASH && !ADMIN_PASSWORD) {
+        return res.status(500).json({ message: "Admin password not configured" });
+      }
+
+      let ok = false;
+      if (ADMIN_PASSWORD_HASH) {
+        ok = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+      } else if (ADMIN_PASSWORD) {
+        ok = password === ADMIN_PASSWORD; // plaintext fallback (not recommended)
+      }
+
+      if (!ok) return res.status(401).json({ message: "Invalid credentials." });
+
+      const adminUser = {
+        id: "env-admin",
+        firstName: "Admin",
+        lastName: "User",
+        email: ADMIN_EMAIL,
+        role: "admin",
+      };
+
+      const token = signTokenIfPossible(adminUser);
+      return res.json({
+        message: "Login successful",
+        ...(token ? { token } : {}),
+        user: adminUser,
+      });
+    }
+
+    /* -------- 2) NORMAL DB LOGIN (unchanged) -------- */
+    const query = isEmail
+      ? { email: val.toLowerCase() }
+      : { phone: val };
 
     const user = await User.findOne(query);
     if (!user) return res.status(401).json({ message: "Invalid credentials." });
