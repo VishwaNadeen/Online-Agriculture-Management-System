@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AdminHome from "./admin/sidebar.jsx";
 import AdminDashboard from "./admin/dashboard.jsx";
-import UsersAdmin from "./admin/UsersAdmin.jsx";
+import UsersAdmin from "./admin/usersAdmin.jsx";
 import CoursesAdmin from "./admin/courseAdmin.jsx";
 import AddCourse from "./admin/addCourse.jsx";
 import UpdateCourse from "./admin/updateCourse.jsx";
