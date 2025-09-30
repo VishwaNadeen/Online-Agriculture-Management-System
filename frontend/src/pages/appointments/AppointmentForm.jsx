@@ -273,6 +273,7 @@ export default function AppointmentForm({
   const [submitting, setSubmitting] = useState(false);
   const [countryCode, setCountryCode] = useState("+94");
   const [mounted, setMounted] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   /* ==== NEW: coords for map-picked location ==== */
   const [mapBusy, setMapBusy] = useState(false);
@@ -407,6 +408,12 @@ export default function AppointmentForm({
     try {
       setSubmitting(true);
       await onSubmit(payload);
+      // Show success animation and reload shortly after
+      setShowSuccess(true);
+      setTimeout(() => {
+        // Reload current page
+        navigate(0);
+      }, 1400);
     } catch (err) {
       setServerMsg?.({ type: "error", text: err.message || "Failed to schedule appointment" });
     } finally {
@@ -930,6 +937,30 @@ export default function AppointmentForm({
           </div>
         )}
       </form>
+
+      {showSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-3 border border-emerald-100 transition-transform">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center animate-pulse">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  className="w-10 h-10 text-emerald-600"
+                >
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </div>
+              <span className="absolute -top-2 -right-2 w-5 h-5 bg-emerald-500 rounded-full blur-sm opacity-70" />
+            </div>
+            <p className="text-emerald-700 font-semibold text-lg">Appointment scheduled!</p>
+            <p className="text-gray-600 text-sm">Refreshing page…</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

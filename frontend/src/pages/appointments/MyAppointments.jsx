@@ -1,5 +1,5 @@
 // src/pages/appointments/MyAppointments.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import AppointmentCard from "../../components/appointmentCard.jsx";
@@ -9,7 +9,6 @@ import {
   Star,
   User,
   Phone,
-  Mail,
   TrendingUp,
   CheckCircle,
   AlertCircle,
@@ -70,14 +69,67 @@ const colorStyles = {
 /* =========================
    Reusable UI bits
 ========================= */
+function useRevealOnEnter(options = { threshold: 0.1 }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          setVisible(true);
+          obs.unobserve(e.target);
+        }
+      });
+    }, options);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [options]);
+  return { ref, visible };
+}
+
+const CountUp = ({ end = 0, duration = 900 }) => {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    const start = performance.now();
+    const from = 0;
+    const to = Number(end) || 0;
+    const anim = (t) => {
+      const p = Math.min(1, (t - start) / duration);
+      setVal(Math.round(from + (to - from) * p));
+      if (p < 1) requestAnimationFrame(anim);
+    };
+    requestAnimationFrame(anim);
+  }, [end, duration]);
+  return <>{val}</>;
+};
+
 const StatCard = ({ title, value, subtitle, icon: Icon, color = "blue" }) => {
   const cs = colorStyles[color] || colorStyles.blue;
+  const { ref, visible } = useRevealOnEnter();
+  const numeric = typeof value === "number" || /^(\d+)(\+?)$/.test(String(value));
+  const suffix = typeof value === "string" && value.endsWith("+") ? "+" : "";
+  const endVal = typeof value === "string" ? parseInt(value) || 0 : value;
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+    <div
+      ref={ref}
+      className={`bg-white rounded-xl p-6 shadow-sm border border-gray-100 transition-all duration-700 transform hover:-translate-y-0.5 hover:shadow-md ${
+        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+      }`}
+    >
       <div className="flex items-center justify-between">
         <div>
           <p className="text-gray-600 text-sm font-medium">{title}</p>
-          <p className={`text-2xl font-bold mt-1 ${cs.text}`}>{value}</p>
+          <p className={`text-2xl font-bold mt-1 ${cs.text}`}>
+            {numeric ? (
+              <>
+                <CountUp end={endVal} />{suffix}
+              </>
+            ) : (
+              value
+            )}
+          </p>
           <p className="text-gray-500 text-xs mt-1">{subtitle}</p>
         </div>
         <div className={`p-3 rounded-full ${cs.bgIcon}`}>
@@ -390,12 +442,29 @@ function ConsultantDashboard({ user }) {
     }
   };
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-6 text-gray-500">Loading…</div>;
+  if (loading)
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="animate-pulse space-y-6">
+          <div className="h-16 bg-gray-200 rounded-xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <div className="h-4 bg-gray-200 rounded w-1/2 mb-3" />
+                <div className="h-6 bg-gray-200 rounded w-1/3 mb-2" />
+                <div className="h-3 bg-gray-200 rounded w-1/4" />
+              </div>
+            ))}
+          </div>
+          <div className="h-64 bg-gray-200 rounded-xl" />
+        </div>
+      </div>
+    );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-green-50/95">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-transparent">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -409,14 +478,7 @@ function ConsultantDashboard({ user }) {
                 <p className="text-sm text-gray-600">Business Strategy Consultant</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-600 hover:text-gray-900">
-                <Mail className="w-5 h-5" />
-              </button>
-              <button className="p-2 text-gray-600 hover:text-gray-900">
-                <Calendar className="w-5 h-5" />
-              </button>
-            </div>
+            {/* Icons removed as requested */}
           </div>
         </div>
       </div>
@@ -433,7 +495,7 @@ function ConsultantDashboard({ user }) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all active:scale-95 ${
                 activeTab === tab.id ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
               }`}
               type="button"
@@ -456,7 +518,7 @@ function ConsultantDashboard({ user }) {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Today */}
-              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
+              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 transition-all duration-700 hover:shadow-md hover:-translate-y-0.5">
                 <div className="p-6 border-b border-gray-100">
                   <h3 className="text-lg font-semibold text-gray-900">Today&apos;s Appointments</h3>
                   <p className="text-sm text-gray-500">{new Date().toLocaleDateString()}</p>
@@ -477,18 +539,18 @@ function ConsultantDashboard({ user }) {
               </div>
 
               {/* Quick Actions / Reviews */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-all duration-700 hover:shadow-md hover:-translate-y-0.5">
                 <div className="p-6 border-b border-gray-100">
                   <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
                 </div>
                 <div className="p-6 space-y-3">
-                  <button type="button" className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                  <button type="button" className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-all active:scale-95">
                     Block Time Slot
                   </button>
-                  <button type="button" className="w-full bg-gray-100 text-gray-900 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+                  <button type="button" className="w-full bg-gray-100 text-gray-900 py-2 px-4 rounded-lg hover:bg-gray-200 transition-all active:scale-95">
                     View Calendar
                   </button>
-                  <button type="button" className="w-full bg-gray-100 text-gray-900 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+                  <button type="button" className="w-full bg-gray-100 text-gray-900 py-2 px-4 rounded-lg hover:bg-gray-200 transition-all active:scale-95">
                     Update Availability
                   </button>
                 </div>
@@ -516,7 +578,7 @@ function ConsultantDashboard({ user }) {
         {/* Appointments */}
         {activeTab === "appointments" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-all duration-700 hover:shadow-md hover:-translate-y-0.5">
               <div className="p-6 border-b border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-900">Confirmed Appointments</h3>
               </div>
@@ -529,7 +591,7 @@ function ConsultantDashboard({ user }) {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-all duration-700 hover:shadow-md hover:-translate-y-0.5">
               <div className="p-6 border-b border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-900">Recent Completed</h3>
               </div>
@@ -546,7 +608,7 @@ function ConsultantDashboard({ user }) {
 
         {/* Requests */}
         {activeTab === "requests" && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 transition-all duration-700 hover:shadow-md hover:-translate-y-0.5">
             <div className="p-6 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Appointment Requests</h3>
               <p className="text-sm text-gray-600 mt-1">Review and respond to consultation requests</p>
