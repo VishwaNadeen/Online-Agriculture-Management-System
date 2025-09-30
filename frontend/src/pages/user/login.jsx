@@ -81,6 +81,13 @@ export default function Login() {
       // notify rest of app
       window.dispatchEvent(new Event("auth-changed"));
 
+      /* --------- ADDED: redirect admins to /admin --------- */
+      if (user?.role === "admin") {
+        navigate("/admin", { replace: true });
+        return;
+      }
+      /* ---------------------------------------------------- */
+
       navigate(from, { replace: true });
     } catch (e) {
       const msg =
