@@ -598,8 +598,7 @@ export default function UserRegistration() {
               onChange={(e) =>
                 setForm({ ...form, address: { ...form.address, country: e.target.value } })
               }
-              required
-                                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+              required className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -628,7 +627,8 @@ export default function UserRegistration() {
                   setForm({ ...form, address: { ...form.address, city: e.target.value } })
                 }
                 required
-                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+
               />
             </div>
           </div>
@@ -644,7 +644,8 @@ export default function UserRegistration() {
                   setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
                 }
                 required
-                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+
               />
             </div>
             <div>
@@ -658,7 +659,8 @@ export default function UserRegistration() {
                   setForm({ ...form, address: { ...form.address, line1: e.target.value } })
                 }
                 required
-                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+
               />
             </div>
           </div>
@@ -672,7 +674,8 @@ export default function UserRegistration() {
               onChange={(e) =>
                 setForm({ ...form, address: { ...form.address, line2: e.target.value } })
               }
-              className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+              className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+
             />
           </div>
         </div>

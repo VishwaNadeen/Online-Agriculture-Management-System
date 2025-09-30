@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
+import { Briefcase, User, Calendar, Globe, MessageSquare, Leaf } from "lucide-react";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
 /* ---------------- small ui helpers ---------------- */
 const Field = ({ label, required, children }) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-sm font-medium text-gray-700">
+  <div className="flex flex-col gap-2">
+    <label className="text-sm font-semibold text-emerald-800">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     {children}
@@ -17,7 +18,7 @@ const Field = ({ label, required, children }) => (
 
 const Select = ({ value, onChange, options, placeholder = "Select...", disabled }) => (
   <select
-    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 disabled:bg-gray-100"
+    className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
     value={value}
     onChange={(e) => onChange(e.target.value)}
     disabled={disabled}
@@ -46,26 +47,26 @@ const MultiSelect = ({ value = [], onChange, options, placeholder = "Select..." 
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-left text-sm text-gray-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+        className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-left text-sm text-emerald-900 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
       >
         {value.length > 0 ? (
           <span>{value.join(", ")}</span>
         ) : (
-          <span className="text-gray-400">{placeholder}</span>
+          <span className="text-emerald-400">{placeholder}</span>
         )}
       </button>
       {isOpen && (
-        <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-10 mt-2 w-full rounded-xl border-2 border-emerald-200 bg-white shadow-xl max-h-60 overflow-y-auto">
           {options.map((opt) => (
             <label
               key={opt}
-              className="flex items-center px-3 py-2 hover:bg-emerald-50 cursor-pointer"
+              className="flex items-center px-4 py-3 hover:bg-emerald-50 cursor-pointer transition-colors"
             >
               <input
                 type="checkbox"
                 checked={value.includes(opt)}
                 onChange={() => toggleOption(opt)}
-                className="mr-2 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                className="mr-3 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
               />
               <span className="text-sm text-gray-700">{opt}</span>
             </label>
@@ -113,6 +114,11 @@ export default function ConsultantRegistration() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => setMounted(true), 100);
+  }, []);
 
   useEffect(() => {
     const id = localStorage.getItem("tempUserId");
@@ -230,26 +236,49 @@ export default function ConsultantRegistration() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-lime-50 flex items-start justify-center p-6">
+    <div className="min-h-screen bg-emerald-50 flex items-start justify-center px-4 py-12 relative overflow-hidden">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200 rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-300 rounded-full blur-3xl opacity-20 translate-y-1/2 -translate-x-1/2" />
+      
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-4xl bg-white rounded-2xl shadow-lg p-8"
+        className={`relative z-10 w-full max-w-4xl bg-white shadow-2xl rounded-3xl border border-emerald-100/50 p-8 space-y-8 transition-all duration-700 ${
+          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        }`}
       >
-        <h2 className="text-3xl font-bold text-emerald-700 mb-8 text-center">
-          Consultant Registration
-        </h2>
+        {/* Decorative top accent */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 rounded-t-3xl" />
+        
+        {/* Header */}
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="relative">
+              <Briefcase className="w-10 h-10 text-emerald-600" />
+              <div className="absolute inset-0 bg-emerald-400 opacity-30 blur-xl" />
+            </div>
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-emerald-500 bg-clip-text text-transparent">
+              Consultant Registration
+            </h2>
+          </div>
+          <p className="text-emerald-600">Complete your consultant profile</p>
+        </div>
 
         {/* Personal Information */}
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold text-gray-800">Personal Information</h3>
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <User className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Personal Information</h3>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Field label="Primary Specialization" required>
               <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
                 value={consultant.primarySpecialization}
                 onChange={(e) =>
                   setConsultant({ ...consultant, primarySpecialization: e.target.value })
                 }
+                placeholder="e.g., Soil Science"
                 required
               />
             </Field>
@@ -257,39 +286,45 @@ export default function ConsultantRegistration() {
               <input
                 type="number"
                 min="0"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
                 value={consultant.yearsOfExperience}
                 onChange={(e) =>
                   setConsultant({ ...consultant, yearsOfExperience: e.target.value })
                 }
+                placeholder="Years"
                 required
               />
             </Field>
             <Field label="Highest Qualification" required>
               <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
                 value={consultant.highestQualification}
                 onChange={(e) =>
                   setConsultant({ ...consultant, highestQualification: e.target.value })
                 }
+                placeholder="e.g., PhD in Agriculture"
                 required
               />
             </Field>
             <Field label="Organization Name">
               <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
                 value={consultant.organizationName}
                 onChange={(e) =>
                   setConsultant({ ...consultant, organizationName: e.target.value })
                 }
+                placeholder="Organization (optional)"
               />
             </Field>
           </div>
         </div>
 
         {/* Services and Availability */}
-        <div className="mt-8 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-800">Services & Availability</h3>
+        <div className="space-y-6 pt-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <Calendar className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Services & Availability</h3>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Field label="Consultation Types">
               <MultiSelect
@@ -319,11 +354,12 @@ export default function ConsultantRegistration() {
               <input
                 type="number"
                 min="0"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
                 value={consultant.coverageRadiusKm}
                 onChange={(e) =>
                   setConsultant({ ...consultant, coverageRadiusKm: e.target.value })
                 }
+                placeholder="Radius in km"
               />
             </Field>
             <Field label="Available Days">
@@ -346,8 +382,11 @@ export default function ConsultantRegistration() {
         </div>
 
         {/* Professional Details */}
-        <div className="mt-8 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-800">Professional Details</h3>
+        <div className="space-y-6 pt-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <Briefcase className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Professional Details</h3>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Field label="Fee Structure">
               <Select
@@ -377,12 +416,15 @@ export default function ConsultantRegistration() {
         </div>
 
         {/* Social Links */}
-        <div className="mt-8 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-800">Social Links</h3>
+        <div className="space-y-6 pt-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <Globe className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Social Links</h3>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Field label="Facebook">
               <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
                 placeholder="Link or @username"
                 value={social.facebook}
                 onChange={(e) => setSocial({ ...social, facebook: e.target.value })}
@@ -390,7 +432,7 @@ export default function ConsultantRegistration() {
             </Field>
             <Field label="Instagram">
               <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
                 placeholder="Link or @username"
                 value={social.instagram}
                 onChange={(e) => setSocial({ ...social, instagram: e.target.value })}
@@ -398,7 +440,7 @@ export default function ConsultantRegistration() {
             </Field>
             <Field label="LinkedIn">
               <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
                 placeholder="Link or @username"
                 value={social.linkedin}
                 onChange={(e) => setSocial({ ...social, linkedin: e.target.value })}
@@ -408,27 +450,50 @@ export default function ConsultantRegistration() {
         </div>
 
         {/* Bio */}
-        <div className="mt-8 space-y-6">
-          <h3 className="text-lg font-semibold text-gray-800">Bio</h3>
+        <div className="space-y-6 pt-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <MessageSquare className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Bio</h3>
+          </div>
           <Field label="Short Bio">
             <textarea
               rows={4}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 placeholder-emerald-400 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all resize-none"
               value={consultant.bio}
               onChange={(e) => setConsultant({ ...consultant, bio: e.target.value })}
+              placeholder="Tell us about yourself and your expertise..."
             />
           </Field>
         </div>
 
         {/* Error and Submit */}
-        {err && <p className="text-red-500 text-sm mt-6">{err}</p>}
-        <div className="mt-8 flex justify-center">
+        {err && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
+            <div className="flex items-start gap-2">
+              <svg className="w-5 h-5 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span>{err}</span>
+            </div>
+          </div>
+        )}
+        <div className="flex justify-center pt-4">
           <button
             type="submit"
             disabled={!canSubmit || loading}
-            className="px-8 py-3 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="px-10 py-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:from-emerald-700 hover:to-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-300 hover:scale-[1.02] transform"
           >
-            {loading ? "Saving..." : "Save & Finish"}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Saving...
+              </span>
+            ) : (
+              "Save & Finish"
+            )}
           </button>
         </div>
       </form>
