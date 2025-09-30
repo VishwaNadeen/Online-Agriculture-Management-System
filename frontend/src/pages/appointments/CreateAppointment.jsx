@@ -104,8 +104,8 @@ export default function CreateAppointment() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
-      <h2 className="text-3xl font-bold text-emerald-700">Book Appointment</h2>
+    <div className="mx-auto max-w-4xl px-4 py-6 ">
+     
 
       {serverMsg && (
         <div

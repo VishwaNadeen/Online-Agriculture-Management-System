@@ -1,511 +1,796 @@
-// src/pages/dashboard/Dashboard.jsx
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import MyAppointments from "../appointments/MyAppointments";
-import API from "../../utils/api";
-import PageLoader from "../../components/loader.jsx";
+// src/pages/appointments/AppointmentForm.jsx
+import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { Calendar, Clock, MapPin, FileText, User, Phone, Mail, Briefcase } from "lucide-react";
 
-import {
-  Calendar,
-  Clock,
-  Star,
-  User,
-  Phone,
-  Mail,
-  TrendingUp,
-  CheckCircle,
-  AlertCircle,
-  Users,
-} from "lucide-react";
-
-/* ------------------ Auth helper ------------------ */
-function readAuthUser() {
-  try {
-    return (
-      JSON.parse(localStorage.getItem("auth_user") || "null") ||
-      JSON.parse(sessionStorage.getItem("auth_user") || "null")
-    );
-  } catch {
-    return null;
-  }
-}
-
-function userIsConsultant(u) {
-  if (!u) return false;
-  if (u.role === "consultant") return true;
-  if (Array.isArray(u.roles) && u.roles.includes("consultant")) return true;
-  if (u.consultantProfile?.active) return true;
-  return false;
-}
-
-/* ------------------ Small date helpers ------------------ 
-function ymdLocal(date) {
-  const d = new Date(date);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-*/
-// Normalize date field from an appointment record
-function apptDate(appt) {
-  const val = appt?.appointmentDate || appt?.appointmentDateISO || appt?.dateISO || appt?.date;
-  return val ? new Date(val) : null;
-}
-
-const mockRequests = [
-  {
-    id: 5,
-    patient: { name: "Lisa Park", avatar: "/api/placeholder/40/40" },
-    requestDate: "2024-09-27",
-    preferredDate: "2024-09-28",
-    type: "Business Consultation",
-    message: "Need help with digital transformation strategy",
-  },
-  {
-    id: 6,
-    patient: { name: "James Rodriguez", avatar: "/api/placeholder/40/40" },
-    requestDate: "2024-09-26",
-    preferredDate: "2024-09-29",
-    type: "Follow-up Session",
-    message: "Follow-up on previous marketing strategy discussion",
-  },
+/* ===== Options ===== */
+const CATEGORY_OPTIONS = [
+  "Crop Consultation", "Soil Testing", "Pest Control", "Irrigation Planning",
+  "Harvesting Support", "Equipment Maintenance", "Organic Farming", "Livestock Consultation",
 ];
 
-/* ------------------ Small UI bits ------------------ */
-// Avoid Tailwind JIT purge by mapping classes explicitly
-const colorStyles = {
-  blue: { text: "text-blue-600", bgIcon: "bg-blue-100" },
-  green: { text: "text-green-600", bgIcon: "bg-green-100" },
-  orange: { text: "text-orange-600", bgIcon: "bg-orange-100" },
-  yellow: { text: "text-yellow-600", bgIcon: "bg-yellow-100" },
-};
+const PERIOD_OPTIONS = ["morning", "afternoon", "evening"];
+const DURATION_OPTIONS = [
+  { value: 1, label: "1 hour" },
+  { value: 2, label: "2 hours" },
+  { value: 3, label: "3 hours" },
+  { value: 4, label: "4 hours" },
+  { value: 6, label: "6 hours (Half day)" },
+  { value: 8, label: "8 hours (Full day)" },
+];
 
-const StatCard = ({ title, value, subtitle, icon:  color = "blue" }) => {
-  const cs = colorStyles[color] || colorStyles.blue;
-  return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-600 text-sm font-medium">{title}</p>
-          <p className={`text-2xl font-bold mt-1 ${cs.text}`}>{value}</p>
-          <p className="text-gray-500 text-xs mt-1">{subtitle}</p>
-        </div>
-        <div className={`p-3 rounded-full ${cs.bgIcon}`}>
-          <Icon className={`w-6 h-6 ${cs.text}`} />
-        </div>
-      </div>
-    </div>
-  );
-};
+const PHONE_CODES = [
+  { code: "+94", country: "Sri Lanka" },
+  { code: "+1", country: "US/Canada" },
+  { code: "+44", country: "UK" },
+  { code: "+91", country: "India" },
+  { code: "+86", country: "China" },
+  { code: "+81", country: "Japan" },
+  { code: "+61", country: "Australia" },
+  { code: "+27", country: "South Africa" },
+];
 
-const Stars = ({ value = 0 }) => (
-  <div className="flex items-center space-x-1">
-    {[...Array(5)].map((_, i) => (
-      <Star
-        key={i}
-        className={`w-4 h-4 ${i < value ? "text-yellow-400 fill-current" : "text-gray-300"}`}
-      />
-    ))}
-  </div>
-);
-
-const Avatar = ({ src, alt }) => (
-  <img
-    src={src}
-    alt={alt}
-    onError={(e) => {
-      e.currentTarget.onerror = null;
-      e.currentTarget.src =
-        "data:image/svg+xml;utf8," +
-        encodeURIComponent(
-          `<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='100%' height='100%' fill='#e5e7eb'/><text x='50%' y='55%' text-anchor='middle' fill='#9ca3af' font-size='14' font-family='Arial'>👤</text></svg>`
-        );
-    }}
-    className="w-10 h-10 rounded-full bg-gray-200 object-cover"
-  />
-);
-
-/* ------------------ Cards ------------------ */
-const AppointmentCard = ({ appointment, onComplete }) => {
-  const isConfirmed = appointment.status === "confirmed";
-  return (
-    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-3">
-          <Avatar src={appointment.avatar || "/api/placeholder/40/40"} alt={appointment.name} />
-          <div>
-            <h4 className="font-semibold text-gray-900">{appointment.name}</h4>
-            {appointment.category && <p className="text-sm text-gray-500">{appointment.category}</p>}
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-medium text-gray-900">{appointment.appointmentTime || "-"}</p>
-          <p className="text-xs text-gray-500">
-            {appointment.durationHours ? `${appointment.durationHours} h` : ""}
-          </p>
-        </div>
-      </div>
-
-      {isConfirmed ? (
-        <div className="flex items-center justify-between">
-          <span className="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs rounded-full">Confirmed</span>
-          <div className="flex space-x-2">
-            <button type="button" title="Call" className="text-blue-600 hover:text-blue-800 text-sm">
-              <Phone className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700"
-              onClick={() => onComplete?.(appointment)}
-            >
-              Complete
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
-              {appointment.status}
-            </span>
-          </div>
+/* ===== Inputs ===== */
+const Input = ({ id, label, error, success, warning, icon: Icon, className = "", onBlur, ...props }) => (
+  <div className="group">
+    <label htmlFor={id} className="block text-sm font-semibold text-emerald-800 mb-2">
+      {label} {props.required && <span className="text-red-500">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+          <Icon className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
         </div>
       )}
+      <input
+        id={id}
+        name={id}
+        autoComplete="off"
+        className={`w-full rounded-xl border-2 ${Icon ? "pl-12" : "pl-4"} pr-4 py-3 text-emerald-900 placeholder-emerald-400 transition-all ${
+          error
+            ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+            : success
+            ? "border-green-400 bg-green-50/50 focus:border-green-500 focus:border-[3px]"
+            : warning
+            ? "border-amber-400 bg-amber-50/50 focus:border-amber-500 focus:border-[3px]"
+            : `border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px] ${className}`
+        } focus:outline-none`}
+        onBlur={onBlur}
+        {...props}
+      />
     </div>
-  );
-};
-
-const RequestCard = ({ request, onAction }) => (
-  <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center space-x-3">
-        <Avatar src={request.patient.avatar} alt={request.patient.name} />
-        <div>
-          <h4 className="font-semibold text-gray-900">{request.patient.name}</h4>
-          <p className="text-sm text-gray-500">{request.type}</p>
-        </div>
-      </div>
-      <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">Pending</span>
-    </div>
-
-    <p className="text-sm text-gray-600 mb-3">"{request.message}"</p>
-    <p className="text-xs text-gray-500 mb-3">Preferred: {request.preferredDate}</p>
-
-    <div className="flex space-x-2">
-      <button
-        className="flex-1 bg-green-600 text-white text-sm py-2 px-3 rounded-lg hover:bg-green-700"
-        onClick={() => onAction(request.id, "accept")}
-      >
-        Accept
-      </button>
-      <button
-        className="flex-1 bg-gray-200 text-gray-800 text-sm py-2 px-3 rounded-lg hover:bg-gray-300"
-        onClick={() => onAction(request.id, "decline")}
-      >
-        Decline
-      </button>
-    </div>
+    {error && (
+      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+        <span className="text-red-500">⚠</span> {error}
+      </p>
+    )}
+    {success && <p className="mt-2 text-sm text-green-600 flex items-center gap-1">✓ {success}</p>}
+    {warning && <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">ℹ️ {warning}</p>}
   </div>
 );
 
-/* ------------------ Consultant Dashboard ------------------ */
-const ConsultantDashboard = ({ user }) => {
-  const [activeTab, setActiveTab] = useState("overview");
-  const [appointments, setAppointments] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const Select = ({ id, label, error, success, icon: Icon, className = "", children, onBlur, ...props }) => (
+  <div className="group">
+    <label htmlFor={id} className="block text-sm font-semibold text-emerald-800 mb-2">
+      {label} {props.required && <span className="text-red-500">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && (
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none z-10">
+          <Icon className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+        </div>
+      )}
+      <select
+        id={id}
+        name={id}
+        className={`w-full rounded-xl border-2 ${Icon ? "pl-12" : "pl-4"} pr-4 py-3 text-emerald-900 transition-all ${
+          error
+            ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+            : success
+            ? "border-green-400 bg-green-50/50 focus:border-green-500 focus:border-[3px]"
+            : `border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px] ${className}`
+        } focus:outline-none`}
+        onBlur={onBlur}
+        {...props}
+      >
+        {children}
+      </select>
+    </div>
+    {error && (
+      <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+        <span className="text-red-500">⚠</span> {error}
+      </p>
+    )}
+    {success && <p className="mt-2 text-sm text-green-600 flex items-center gap-1">✓ {success}</p>}
+  </div>
+);
 
-  // --- Minimum loader display time (smooth UX)
-  const MIN_LOADER_MS = 900;                 // <— change this to adjust
-  const loadStartRef = useRef(Date.now());   // track when load started
-
-  // Today as local yyyy-mm-dd string
- // const todayStr = ymdLocal(new Date());
-
-  // load consultant appointments (confirmed + others for stats)
-  async function load() {
-    setError("");
-    setLoading(true);
-    loadStartRef.current = Date.now();
-    try {
-      const { data } = await API.get(`/appointments/my-consultant`);
-      setAppointments(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setError(e?.response?.data?.message || e?.message || "Failed to load appointments");
-    } finally {
-      const elapsed = Date.now() - loadStartRef.current;
-      const remain = Math.max(0, MIN_LOADER_MS - elapsed);
-      setTimeout(() => setLoading(false), remain);
+/* ===== Validation ===== */
+const validators = {
+  name: (v) => {
+    if (!v?.trim()) return "Full name is required";
+    if (v.length < 2) return "Name must be at least 2 characters";
+    if (v.length > 50) return "Name must be less than 50 characters";
+    if (!/^[a-zA-Z0-9\s\-'.]+$/.test(v)) return "Use letters, numbers, spaces, - and ' only";
+    return null;
+  },
+  phone: (v) => {
+    if (!v?.trim()) return "Mobile number is required";
+    const digits = v.replace(/\D/g, "");
+    if (digits.length < 8) return "Phone number is too short";
+    if (digits.length > 15) return "Phone number is too long";
+    if (!/^\d+$/.test(digits)) return "Phone number can only contain digits";
+    return null;
+  },
+  email: (v) => {
+    if (!v?.trim()) return "Email address is required";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(v)) return "Please enter a valid email address";
+    if (v.length > 100) return "Email address is too long";
+    return null;
+  },
+  state: (v) => {
+    if (!v?.trim()) return "Province is required";
+    if (v.length < 2) return "Province name is too short";
+    if (v.length > 50) return "Province name is too long";
+    return null;
+  },
+  city: (v) => {
+    if (!v?.trim()) return "District/City is required";
+    if (v.length < 2) return "City name is too short";
+    if (v.length > 50) return "City name is too long";
+    return null;
+  },
+  category: (v) => (!v ? "Service category is required" : null),
+  appointmentDate: (v) => {
+    if (!v) return "Appointment date is required";
+    const selected = new Date(v);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selected < today) return "Appointment date cannot be in the past";
+    const max = new Date();
+    max.setFullYear(today.getFullYear() + 1);
+    if (selected > max) return "Appointment date cannot be more than 1 year ahead";
+    return null;
+  },
+  appointmentTime: (v, form) => {
+    if (!v) return "Appointment time is required";
+    if (form.timeMode === "period") {
+      if (!["morning", "afternoon", "evening"].includes(v)) {
+        return "Choose morning/afternoon/evening";
+      }
+      return null;
     }
-  }
+    const ok = /^\d{2}:\d{2}$/.test(v);
+    if (!ok) return "Use HH:mm format";
+    const [hours, minutes] = v.split(":").map(Number);
+    if (hours < 6 || (hours === 22 && minutes > 0) || hours > 22) {
+      return "Appointments available between 06:00 and 22:00";
+    }
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (form.appointmentDate === todayStr) {
+      const now = new Date();
+      const appt = new Date(`${todayStr}T${v}`);
+      if (appt < now) return "Appointment time cannot be in the past";
+    }
+    return null;
+  },
+  durationHours: (v) => {
+    if (!v || v < 1) return "Duration must be at least 1 hour";
+    if (v > 8) return "Duration cannot exceed 8 hours";
+    return null;
+  },
+  notes: (v) => (v && v.length > 1000 ? "Notes cannot exceed 1000 characters" : null),
+  consultantId: (v) => (!v ? "Consultant selection is required" : null),
+};
+
+const getSuccessMessages = {
+  name: (v) => (v && v.length >= 2 ? "Name looks good!" : null),
+  email: (v) => (v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "Valid email format" : null),
+  phone: (v) => (v && v.replace(/\D/g, "").length >= 8 ? "Valid phone number" : null),
+  state: (v) => (v && v.length >= 2 ? "Valid province name" : null),
+  city: (v) => (v && v.length >= 2 ? "Valid city name" : null),
+  category: (v) => (v ? "Service category selected" : null),
+  appointmentDate: (v) => (v ? "Date selected" : null),
+  appointmentTime: (v, form) => (v ? (form.timeMode === "period" ? "Time period selected" : "Time selected") : null),
+  durationHours: (v) => (v ? "Duration set" : null),
+};
+
+/* ===== Utils ===== */
+const ensureInOptions = (list, value) => (value && !list.includes(value) ? [value, ...list] : list);
+const dateOnlyToNoonISO = (dateStr) => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d, 12, 0, 0).toISOString();
+};
+const formatPhoneNumber = (value) => {
+  const numbers = value.replace(/\D/g, "");
+  if (numbers.length <= 3) return numbers;
+  if (numbers.length <= 6) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+  return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6, 10)}`;
+};
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
+export default function AppointmentForm({
+  initialValues = {},
+  onSubmit,
+  submitLabel = "Schedule Consultation",
+  setServerMsg,
+}) {
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  const [errors, setErrors] = useState({});
+  const [success, setSuccess] = useState({});
+  const [warnings, setWarnings] = useState({});
+  const [touched, setTouched] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [countryCode, setCountryCode] = useState("+94");
+  const [mounted, setMounted] = useState(false);
+
+  const [form, setForm] = useState(() => ({
+    name: "", phone: "", email: "", state: "", city: "",
+    address: "", category: "", appointmentDate: todayStr,
+    timeMode: "period", appointmentTime: "morning", durationHours: 1, notes: "",
+    consultantId: "", consultantName: "",
+    ...initialValues,
+  }));
 
   useEffect(() => {
-    load();
+    setTimeout(() => setMounted(true), 100);
   }, []);
 
-  const stats = useMemo(() => {
-    const total = appointments.length;
-    const completed = appointments.filter((a) => a.status === "completed").length;
-    const upcoming = appointments.filter((a) => a.status === "confirmed").length;
-    const ratings = appointments.filter((a) => typeof a.rating === "number");
-    const avg =
-      ratings.reduce((acc, a) => acc + (a.rating || 0), 0) / (ratings.length || 1) || 0;
-    return { total, completed, upcoming, avgRating: avg.toFixed(1) };
-  }, [appointments]);
+  useEffect(() => {
+    setForm((p) => ({ ...p, ...initialValues }));
+  }, [initialValues]);
 
-  const upcomingAppointments = appointments
-    .filter((a) => String(a.status || "").toLowerCase() === "confirmed")
-    .sort((a, b) => String(a.appointmentDate).localeCompare(String(b.appointmentDate)));
+  const debouncedValidation = useMemo(
+    () =>
+      debounce(() => {
+        const newErrors = {};
+        const newSuccess = {};
+        const newWarnings = {};
 
-  const completedAppointments = appointments
-    .filter((a) => String(a.status || "").toLowerCase() === "completed")
-    .sort((a, b) => String(b.appointmentDate).localeCompare(String(a.appointmentDate)));
+        Object.keys(validators).forEach((field) => {
+          if (touched[field] || form[field]) {
+            const error = validators[field](form[field], field === "phone" ? countryCode : form);
+            if (error) newErrors[field] = error;
+            else if (getSuccessMessages[field]) {
+              const successMsg = getSuccessMessages[field](form[field], form);
+              if (successMsg) newSuccess[field] = successMsg;
+            }
+          }
+        });
 
-  const todaysAppointments = appointments
-    .filter((a) => {
-      const s = String(a.status || "").toLowerCase();
-      return s === "pending" || s === "confirmed";
-    })
-    .filter((a) => {
-      const d = apptDate(a);
-      if (!d) return false;
-      return d.toDateString() === new Date().toDateString();
-    })
-    .sort((a, b) => String(a.appointmentDate).localeCompare(String(b.appointmentDate)));
+        if (form.notes && form.notes.length > 800) {
+          newWarnings.notes = `Approaching character limit (${form.notes.length}/1000)`;
+        }
 
-  // actions
-  async function completeAppt(appt) {
-    if (!window.confirm("Mark this appointment as completed?")) return;
-    try {
-      await API.post(`/appointments/${appt._id}/complete`);
-      await load();
-    } catch (e) {
-      alert(e?.response?.data?.message || "Failed to mark completed");
+        if (form.appointmentDate === todayStr && form.timeMode === "exact") {
+          const [hours] = (form.appointmentTime || "").split(":").map(Number);
+          const now = new Date().getHours();
+          if (hours <= now + 1) {
+            newWarnings.appointmentTime = "Short notice appointment - consultant availability may be limited";
+          }
+        }
+
+        if (form.appointmentDate) {
+          const date = new Date(form.appointmentDate);
+          const day = date.getDay();
+          if (day === 0 || day === 6) {
+            newWarnings.appointmentDate = "Weekend appointment - additional charges may apply";
+          }
+        }
+
+        setErrors(newErrors);
+        setSuccess(newSuccess);
+        setWarnings(newWarnings);
+      }, 300),
+    [form, touched, countryCode, todayStr]
+  );
+
+  useEffect(() => {
+    debouncedValidation();
+  }, [debouncedValidation]);
+
+  const categoryOptions = useMemo(
+    () => ensureInOptions(CATEGORY_OPTIONS, form.category),
+    [form.category]
+  );
+
+  const setField = useCallback((key, value) => {
+    setForm((prev) => {
+      let processedValue = value;
+      if (key === "phone" && value) processedValue = formatPhoneNumber(value);
+      return { ...prev, [key]: processedValue };
+    });
+  }, []);
+
+  const handleBlur = useCallback((field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  }, []);
+
+  const validateForm = useCallback(() => {
+    const newErrors = {};
+    Object.keys(validators).forEach((field) => {
+      const error = validators[field](form[field], field === "phone" ? countryCode : form);
+      if (error) newErrors[field] = error;
+    });
+    return newErrors;
+  }, [form, countryCode]);
+
+  const isFormValid = useMemo(() => {
+    const formErrors = validateForm();
+    return Object.keys(formErrors).length === 0;
+  }, [validateForm]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setServerMsg?.(null);
+
+    const allTouched = {};
+    Object.keys(validators).forEach((field) => {
+      allTouched[field] = true;
+    });
+    setTouched(allTouched);
+
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      const first = Object.keys(validationErrors)[0];
+      const el = document.getElementById(first);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus({ preventScroll: true });
+      }
+      return;
     }
-  }
 
-  const handleRequestAction = (requestId, action) => {
-    console.log(`${action} request ${requestId}`);
-    // TODO: call your API: POST /requests/:id/accept or decline
+    const payload = {
+      ...form,
+      appointmentDateISO: dateOnlyToNoonISO(form.appointmentDate),
+      phone: countryCode + form.phone.replace(/\D/g, ""),
+    };
+
+    try {
+      setSubmitting(true);
+      await onSubmit(payload);
+    } catch (err) {
+      setServerMsg?.({ type: "error", text: err.message || "Failed to schedule appointment" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // Full-page loader while fetching
-  if (loading) {
-    return <PageLoader message="Loading dashboard..." />;
-  }
+  const clearField = (field) => {
+    setField(field, "");
+    setTouched((prev) => ({ ...prev, [field]: false }));
+    setErrors((prev) => ({ ...prev, [field]: undefined }));
+    setSuccess((prev) => ({ ...prev, [field]: undefined }));
+    setWarnings((prev) => ({ ...prev, [field]: undefined }));
+  };
+
+  const resetForm = () => {
+    setForm({
+      name: "", phone: "", email: "", state: "", city: "",
+      address: "", category: "", appointmentDate: todayStr,
+      timeMode: "period", appointmentTime: "morning", durationHours: 1, notes: "",
+      consultantId: initialValues.consultantId || "",
+      consultantName: initialValues.consultantName || "",
+    });
+    setTouched({});
+    setErrors({});
+    setSuccess({});
+    setWarnings({});
+    setCountryCode("+94");
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  Dr. {user?.name || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Consultant"}
-                </h1>
-                <p className="text-sm text-gray-600">Business Strategy Consultant</p>
-              </div>
+    <div className="min-h-screen w-full bg-green-50/95 px-4 py-12 flex items-center justify-center">
+      <form
+        onSubmit={handleSubmit}
+        className={`relative bg-white shadow-xl p-8 rounded-3xl max-w-4xl w-full space-y-6 transition-all duration-1000 ${
+          mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+        }`}
+        noValidate
+      >
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="relative">
+              <Calendar className="w-10 h-10 text-emerald-600" />
             </div>
-            <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-600 hover:text-gray-900">
-                <Mail className="w-5 h-5" />
-              </button>
-              <button className="p-2 text-gray-600 hover:text-gray-900">
-                <Calendar className="w-5 h-5" />
-              </button>
-            </div>
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-emerald-500 bg-clip-text text-transparent">
+              Schedule Consultation
+            </h2>
           </div>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Tabs */}
-        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 mb-6 w-fit">
-          {[
-            { id: "overview", label: "Overview", icon: TrendingUp },
-            { id: "appointments", label: "Appointments", icon: Calendar },
-            { id: "requests", label: "Requests", icon: AlertCircle },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === tab.id ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
-              }`}
-              type="button"
-            >
-              <tab.icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          ))}
+          <p className="text-emerald-600">Book your agricultural consultation appointment</p>
         </div>
 
-        {/* Overview */}
-        {activeTab === "overview" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard title="Total Appointments" value={`${stats.total}+`} subtitle="All Time" icon={Users} color="blue" />
-              <StatCard title="Completed" value={stats.completed} subtitle="Overall" icon={CheckCircle} color="green" />
-              <StatCard title="Upcoming" value={stats.upcoming} subtitle="Scheduled" icon={Clock} color="orange" />
-              <StatCard title="Average Rating" value={stats.avgRating} subtitle="From Reviews" icon={Star} color="yellow" />
-            </div>
+        {/* Personal Information */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <User className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Personal Information</h3>
+          </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Today's Appointments */}
-              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
-                <div className="p-6 border-b border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-900">Today&apos;s Appointments</h3>
-                  <p className="text-sm text-gray-500">{new Date().toLocaleDateString()}</p>
-                </div>
-                <div className="p-6 space-y-4">
-                  {todaysAppointments.slice(0, 6).map((appointment) => (
-                    <AppointmentCard key={appointment._id || appointment.id} appointment={appointment} onComplete={completeAppt} />
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Input
+              id="name"
+              label="Full Name"
+              icon={User}
+              required
+              value={form.name}
+              onChange={(e) => setField("name", e.target.value)}
+              onBlur={() => handleBlur("name")}
+              error={errors.name}
+              success={success.name}
+              placeholder="Enter your full name"
+            />
+
+            <div className="group">
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">
+                Mobile Number <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  className="w-28 rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-3 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+                >
+                  {PHONE_CODES.map(({ code, country }) => (
+                    <option key={code} value={code} title={country}>
+                      {code}
+                    </option>
                   ))}
-                  {todaysAppointments.length === 0 && (
-                    <p className="text-gray-500 text-center py-8">No appointments scheduled for today</p>
-                  )}
-                  {error && <p className="text-red-600 text-sm text-center">{error}</p>}
-                </div>
-              </div>
-
-              {/* Quick Actions + Recent Reviews */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-                <div className="p-6 border-b border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
-                </div>
-                <div className="p-6 space-y-3">
-                  <button type="button" className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                    Block Time Slot
-                  </button>
-                  <button type="button" className="w-full bg-gray-100 text-gray-900 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
-                    View Calendar
-                  </button>
-                  <button type="button" className="w-full bg-gray-100 text-gray-900 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
-                    Update Availability
-                  </button>
-                </div>
-
-                <div className="px-6 pb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Recent Reviews</h4>
-                  <div className="space-y-3">
-                    {completedAppointments.slice(0, 2).map((appointment) => (
-                      <div key={appointment._id || appointment.id} className="border-l-4 border-green-400 pl-3">
-                        <div className="flex items-center space-x-1 mb-1">
-                          <Stars value={appointment.rating || 0} />
-                        </div>
-                        {appointment.feedback && <p className="text-xs text-gray-600">"{appointment.feedback}"</p>}
-                        <p className="text-xs text-gray-500 mt-1">- {appointment.patient?.name || appointment.patientName}</p>
-                      </div>
-                    ))}
-                    {completedAppointments.length === 0 && <p className="text-xs text-gray-500">No reviews yet.</p>}
+                </select>
+                <div className="flex-1 relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                    <Phone className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
                   </div>
+                  <input
+                    id="phone"
+                    value={form.phone}
+                    onChange={(e) => setField("phone", e.target.value)}
+                    onBlur={() => handleBlur("phone")}
+                    placeholder="123-456-7890"
+                    className={`w-full rounded-xl border-2 pl-12 pr-10 py-3 text-emerald-900 placeholder-emerald-400 transition-all ${
+                      errors.phone
+                        ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+                        : success.phone
+                        ? "border-green-400 bg-green-50/50 focus:border-green-500 focus:border-[3px]"
+                        : "border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px]"
+                    } focus:outline-none`}
+                  />
+                  {form.phone && (
+                    <button
+                      type="button"
+                      onClick={() => clearField("phone")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xl font-bold"
+                      title="Clear phone number"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Appointments */}
-        {activeTab === "appointments" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="p-6 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h3>
-              </div>
-              <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
-                {upcomingAppointments.map((appointment) => (
-                  <AppointmentCard key={appointment._id || appointment.id} appointment={appointment} />
-                ))}
-                {upcomingAppointments.length === 0 && (
-                  <p className="text-gray-500 text-center py-8">No upcoming appointments</p>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-              <div className="p-6 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Completed</h3>
-              </div>
-              <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
-                {completedAppointments.map((appointment) => (
-                  <AppointmentCard key={appointment._id || appointment.id} appointment={appointment} />
-                ))}
-                {completedAppointments.length === 0 && (
-                  <p className="text-gray-500 text-center py-8">No completed appointments yet</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Requests */}
-        {activeTab === "requests" && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900">Appointment Requests</h3>
-              <p className="text-sm text-gray-600 mt-1">Review and respond to consultation requests</p>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {mockRequests.map((request) => (
-                  <RequestCard key={request.id} request={request} onAction={handleRequestAction} />
-                ))}
-              </div>
-              {mockRequests.length === 0 && (
-                <p className="text-gray-500 text-center py-12">No pending requests</p>
+              {errors.phone && (
+                <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                  <span className="text-red-500">⚠</span> {errors.phone}
+                </p>
               )}
+              {success.phone && <p className="mt-2 text-sm text-green-600 flex items-center gap-1">✓ {success.phone}</p>}
             </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
-/* ------------------ Public Dashboard Wrapper ------------------ */
-export default function Dashboard() {
-  const user = readAuthUser();
-  const isConsultant = userIsConsultant(user);
-  const [tab, setTab] = useState(isConsultant ? "consultant" : "bookings");
-
-  if (isConsultant && tab === "consultant") {
-    return <ConsultantDashboard user={user} />;
-  }
-
-  // Non-consultant version (placeholder)
-  return (
-    <div className="max-w-6xl mx-auto p-4">
-      <div className="flex gap-2 border-b mb-4">
-        <button
-          className={`px-3 py-2 ${tab === "bookings" ? "border-b-2 border-green-600 font-semibold" : ""}`}
-          onClick={() => setTab("bookings")}
-          type="button"
-        >
-          My Bookings
-        </button>
-
-        {isConsultant && (
-          <button
-            className={`px-3 py-2 ${tab === "consultant" ? "border-b-2 border-green-600 font-semibold" : ""}`}
-            onClick={() => setTab("consultant")}
-            type="button"
-          >
-            Consultant Dashboard
-          </button>
-        )}
-      </div>
-
-      {tab === "bookings" && (
-        <div className="bg-white border rounded-xl p-6 text-gray-700">
-          MyBookings Component Here
+          <Input
+            id="email"
+            label="Email Address"
+            icon={Mail}
+            required
+            type="email"
+            value={form.email}
+            onChange={(e) => setField("email", e.target.value)}
+            onBlur={() => handleBlur("email")}
+            error={errors.email}
+            success={success.email}
+            placeholder="your.email@example.com"
+          />
         </div>
-      )}
+
+        {/* Location Information */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Farm Location Details</h3>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Input
+              id="state"
+              label="Province"
+              icon={MapPin}
+              required
+              value={form.state}
+              onChange={(e) => setField("state", e.target.value)}
+              onBlur={() => handleBlur("state")}
+              error={errors.state}
+              success={success.state}
+              placeholder="Enter your province"
+            />
+            <Input
+              id="city"
+              label="District / City"
+              icon={MapPin}
+              required
+              value={form.city}
+              onChange={(e) => setField("city", e.target.value)}
+              onBlur={() => handleBlur("city")}
+              error={errors.city}
+              success={success.city}
+              placeholder="Enter your district or city"
+            />
+          </div>
+
+          <Input
+            id="address"
+            label="Farm Address"
+            icon={MapPin}
+            value={form.address}
+            onChange={(e) => setField("address", e.target.value)}
+            onBlur={() => handleBlur("address")}
+            placeholder="Full farm address with landmarks"
+          />
+        </div>
+
+        {/* Service Requirements */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <Briefcase className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Service Requirements</h3>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Select
+              id="category"
+              label="Service Category"
+              icon={Briefcase}
+              required
+              value={form.category}
+              onChange={(e) => setField("category", e.target.value)}
+              onBlur={() => handleBlur("category")}
+              error={errors.category}
+              success={success.category}
+            >
+              <option value="">Select Agricultural Service</option>
+              {categoryOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </Select>
+
+            <Input
+              id="appointmentDate"
+              label="Preferred Date"
+              icon={Calendar}
+              required
+              type="date"
+              min={todayStr}
+              max={new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0]}
+              value={form.appointmentDate}
+              onChange={(e) => setField("appointmentDate", e.target.value)}
+              onBlur={() => handleBlur("appointmentDate")}
+              error={errors.appointmentDate}
+              success={success.appointmentDate}
+              warning={warnings.appointmentDate}
+            />
+          </div>
+        </div>
+
+        {/* Time Scheduling */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <Clock className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Time Scheduling</h3>
+          </div>
+
+          <div className="flex items-center gap-8">
+            <label className="inline-flex items-center gap-3 cursor-pointer group">
+              <input
+                type="radio"
+                name="timeMode"
+                checked={form.timeMode === "period"}
+                onChange={() =>
+                  setForm((p) => ({
+                    ...p,
+                    timeMode: "period",
+                    appointmentTime: PERIOD_OPTIONS.includes(p.appointmentTime) ? p.appointmentTime : "morning",
+                  }))
+                }
+                className="w-5 h-5 text-emerald-600 border-2 border-emerald-300 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              />
+              <span className="text-base font-semibold text-emerald-700 group-hover:text-emerald-800 transition-colors">
+                Time Period
+              </span>
+            </label>
+            <label className="inline-flex items-center gap-3 cursor-pointer group">
+              <input
+                type="radio"
+                name="timeMode"
+                checked={form.timeMode === "exact"}
+                onChange={() =>
+                  setForm((p) => ({
+                    ...p,
+                    timeMode: "exact",
+                    appointmentTime: PERIOD_OPTIONS.includes(p.appointmentTime) ? "09:00" : p.appointmentTime || "09:00",
+                  }))
+                }
+                className="w-5 h-5 text-emerald-600 border-2 border-emerald-300 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              />
+              <span className="text-base font-semibold text-emerald-700 group-hover:text-emerald-800 transition-colors">
+                Exact Time
+              </span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            {form.timeMode === "period" ? (
+              <Select
+                id="appointmentTime"
+                label="Preferred Time Period"
+                icon={Clock}
+                required
+                value={form.appointmentTime}
+                onChange={(e) => setField("appointmentTime", e.target.value)}
+                onBlur={() => handleBlur("appointmentTime")}
+                error={errors.appointmentTime}
+                success={success.appointmentTime}
+              >
+                {PERIOD_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt[0].toUpperCase() + opt.slice(1)}{" "}
+                    ({opt === "morning" ? "6 AM - 12 PM" : opt === "afternoon" ? "12 PM - 6 PM" : "6 PM - 10 PM"})
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Input
+                id="appointmentTime"
+                label="Exact Time"
+                icon={Clock}
+                required
+                type="time"
+                min="06:00"
+                max="22:00"
+                value={form.appointmentTime}
+                onChange={(e) => setField("appointmentTime", e.target.value)}
+                onBlur={() => handleBlur("appointmentTime")}
+                error={errors.appointmentTime}
+                success={success.appointmentTime}
+                warning={warnings.appointmentTime}
+              />
+            )}
+
+            <Select
+              id="durationHours"
+              label="Expected Duration"
+              icon={Clock}
+              required
+              value={form.durationHours}
+              onChange={(e) => setField("durationHours", parseInt(e.target.value) || 1)}
+              onBlur={() => handleBlur("durationHours")}
+              error={errors.durationHours}
+              success={success.durationHours}
+            >
+              {DURATION_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        {/* Additional Information */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <FileText className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Additional Information</h3>
+          </div>
+
+          <div className="group">
+            <label htmlFor="notes" className="block text-sm font-semibold text-emerald-800 mb-2">
+              Special Requirements & Notes (max 1000 characters)
+            </label>
+            <textarea
+              id="notes"
+              name="notes"
+              rows={5}
+              className={`w-full rounded-xl border-2 px-4 py-3 text-emerald-900 placeholder-emerald-400 transition-all resize-vertical ${
+                errors.notes
+                  ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+                  : warnings.notes
+                  ? "border-amber-400 bg-amber-50/50 focus:border-amber-500 focus:border-[3px]"
+                  : "border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px]"
+              } focus:outline-none`}
+              value={form.notes}
+              onChange={(e) => setField("notes", e.target.value)}
+              onBlur={() => handleBlur("notes")}
+              maxLength={1000}
+              placeholder="Please specify: crop types, farm size, equipment access, specific concerns, etc."
+            />
+            {errors.notes && (
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <span className="text-red-500">⚠</span> {errors.notes}
+              </p>
+            )}
+            {warnings.notes && <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">ℹ️ {warnings.notes}</p>}
+            <div
+              className={`mt-2 text-sm font-medium ${
+                form.notes?.length > 900 ? "text-red-600" : form.notes?.length > 800 ? "text-amber-600" : "text-gray-500"
+              }`}
+            >
+              {form.notes?.length || 0}/1000 characters
+            </div>
+          </div>
+        </div>
+
+        {/* Hidden consultant fields */}
+        <input type="hidden" id="consultantId" value={form.consultantId} readOnly />
+        <input type="hidden" id="consultantName" value={form.consultantName} readOnly />
+        {errors.consultantId && (
+          <p className="text-sm text-red-600 flex items-center gap-1">
+            <span className="text-red-500">⚠</span> {errors.consultantId}
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
+          <button
+            type="button"
+            onClick={resetForm}
+            className="w-full py-3.5 rounded-xl bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-2 border-gray-200"
+          >
+            Reset Form
+          </button>
+
+          <button
+            type="submit"
+            disabled={submitting || !isFormValid}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:scale-[1.02] transform disabled:hover:scale-100"
+          >
+            {submitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              submitLabel
+            )}
+          </button>
+        </div>
+
+        {!isFormValid && (
+          <div className="text-center text-sm text-gray-600 pt-2">
+            Please complete all required fields to enable submission
+          </div>
+        )}
+      </form>
     </div>
   );
 }

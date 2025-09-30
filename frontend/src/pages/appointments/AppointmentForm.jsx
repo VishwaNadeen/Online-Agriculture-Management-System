@@ -1,5 +1,22 @@
 // src/pages/appointments/AppointmentForm.jsx
 import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { Calendar, Clock, MapPin, FileText, User, Phone, Mail, Briefcase } from "lucide-react";
+
+/* ==== NEW: react-leaflet / leaflet imports for map picker ==== */
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+
+/* Fix default marker icons (needed when bundling with Vite/React) */
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
 
 /* ===== Options ===== */
 const CATEGORY_OPTIONS = [
@@ -29,50 +46,64 @@ const PHONE_CODES = [
 ];
 
 /* ===== Enhanced Input Components ===== */
-const Input = ({ id, label, error, success, warning, className = "", onBlur, ...props }) => (
-  <div>
-    <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">
+const Input = ({ id, label, error, success, warning, icon: Icon, className = "", onBlur, ...props }) => (
+  <div className="group">
+    <label htmlFor={id} className="block text-sm font-semibold text-emerald-800 mb-2">
       {label} {props.required && <span className="text-red-500">*</span>}
     </label>
-    <input
-      id={id}
-      name={id}
-      autoComplete="off"
-      className={`w-full rounded-lg border px-4 py-3 text-base outline-none transition-all duration-300 min-h-[48px] ${
-        error ? "border-red-500 ring-2 ring-red-200 focus:ring-red-300"
-        : success ? "border-green-500 ring-2 ring-green-200 focus:ring-green-300"
-        : warning ? "border-amber-500 ring-2 ring-amber-200 focus:ring-amber-300"
-        : `border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 hover:border-gray-400 ${className}`
-      }`}
-      onBlur={onBlur}
-      {...props}
-    />
-    {error && <p className="mt-1 text-sm text-red-600 flex items-center gap-1">⚠️ {error}</p>}
-    {success && <p className="mt-1 text-sm text-green-600 flex items-center gap-1">✓ {success}</p>}
-    {warning && <p className="mt-1 text-sm text-amber-600 flex items-center gap-1">ℹ️ {warning}</p>}
+    <div className="relative">
+      {Icon && (
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+          <Icon className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+        </div>
+      )}
+      <input
+        id={id}
+        name={id}
+        autoComplete="off"
+        className={`w-full rounded-xl border-2 ${Icon ? 'pl-12' : 'pl-4'} pr-4 py-3 text-emerald-900 placeholder-emerald-400 transition-all ${
+          error ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+          : success ? "border-green-400 bg-green-50/50 focus:border-green-500 focus:border-[3px]"
+          : warning ? "border-amber-400 bg-amber-50/50 focus:border-amber-500 focus:border-[3px]"
+          : `border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px] ${className}`
+        } focus:outline-none`}
+        onBlur={onBlur}
+        {...props}
+      />
+    </div>
+    {error && <p className="mt-2 text-sm text-red-600 flex items-center gap-1"><span className="text-red-500">⚠</span> {error}</p>}
+    {success && <p className="mt-2 text-sm text-green-600 flex items-center gap-1">✓ {success}</p>}
+    {warning && <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">ℹ️ {warning}</p>}
   </div>
 );
 
-const Select = ({ id, label, error, success, className = "", children, onBlur, ...props }) => (
-  <div>
-    <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">
+const Select = ({ id, label, error, success, icon: Icon, className = "", children, onBlur, ...props }) => (
+  <div className="group">
+    <label htmlFor={id} className="block text-sm font-semibold text-emerald-800 mb-2">
       {label} {props.required && <span className="text-red-500">*</span>}
     </label>
-    <select
-      id={id}
-      name={id}
-      className={`w-full rounded-lg border px-4 py-3 text-base outline-none transition-all duration-300 min-h-[48px] ${
-        error ? "border-red-500 ring-2 ring-red-200 focus:ring-red-300"
-        : success ? "border-green-500 ring-2 ring-green-200 focus:ring-green-300"
-        : `border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 hover:border-gray-400 ${className}`
-      }`}
-      onBlur={onBlur}
-      {...props}
-    >
-      {children}
-    </select>
-    {error && <p className="mt-1 text-sm text-red-600 flex items-center gap-1">⚠️ {error}</p>}
-    {success && <p className="mt-1 text-sm text-green-600 flex items-center gap-1">✓ {success}</p>}
+    <div className="relative">
+      {Icon && (
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none z-10">
+          <Icon className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+        </div>
+      )}
+      <select
+        id={id}
+        name={id}
+        className={`w-full rounded-xl border-2 ${Icon ? 'pl-12' : 'pl-4'} pr-4 py-3 text-emerald-900 transition-all ${
+          error ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+          : success ? "border-green-400 bg-green-50/50 focus:border-green-500 focus:border-[3px]"
+          : `border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px] ${className}`
+        } focus:outline-none`}
+        onBlur={onBlur}
+        {...props}
+      >
+        {children}
+      </select>
+    </div>
+    {error && <p className="mt-2 text-sm text-red-600 flex items-center gap-1"><span className="text-red-500">⚠</span> {error}</p>}
+    {success && <p className="mt-2 text-sm text-green-600 flex items-center gap-1">✓ {success}</p>}
   </div>
 );
 
@@ -139,7 +170,6 @@ const validators = {
       }
       return null;
     }
-    // exact
     const ok = /^\d{2}:\d{2}$/.test(value);
     if (!ok) return "Use HH:mm format";
     const [hours, minutes] = value.split(":").map(Number);
@@ -202,6 +232,31 @@ const debounce = (func, wait) => {
   };
 };
 
+/* ==== NEW: Small helper component to drop a marker on click ==== */
+function ClickToPickMarker({ onPick, position }) {
+  useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      onPick({ lat, lng });
+    },
+  });
+  if (!position) return null;
+  return <Marker position={[position.lat, position.lng]} />;
+}
+
+/* ==== NEW: Reverse geocode (lat,lng -> address) using OSM Nominatim ==== */
+async function reverseGeocode(lat, lng) {
+  const url = new URL("https://nominatim.openstreetmap.org/reverse");
+  url.searchParams.set("lat", String(lat));
+  url.searchParams.set("lon", String(lng));
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("addressdetails", "1");
+  const res = await fetch(url.toString(), { headers: { "Accept-Language": "en" } });
+  if (!res.ok) throw new Error("Failed to get address from location");
+  const data = await res.json();
+  return data.display_name || `${lat}, ${lng}`;
+}
+
 export default function AppointmentForm({
   initialValues = {},
   onSubmit,
@@ -209,6 +264,7 @@ export default function AppointmentForm({
   setServerMsg,
 }) {
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const navigate = useNavigate();
 
   const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState({});
@@ -216,14 +272,23 @@ export default function AppointmentForm({
   const [touched, setTouched] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [countryCode, setCountryCode] = useState("+94");
+  const [mounted, setMounted] = useState(false);
+
+  /* ==== NEW: coords for map-picked location ==== */
+  const [mapBusy, setMapBusy] = useState(false);
 
   const [form, setForm] = useState(() => ({
     name: "", phone: "", email: "", state: "", city: "",
     address: "", category: "", appointmentDate: todayStr,
     timeMode: "period", appointmentTime: "morning", durationHours: 1, notes: "",
     consultantId: "", consultantName: "",
+    farmLat: null, farmLng: null, // NEW
     ...initialValues,
   }));
+
+  useEffect(() => {
+    setTimeout(() => setMounted(true), 100);
+  }, []);
 
   useEffect(() => {
     setForm((p) => ({ ...p, ...initialValues }));
@@ -310,28 +375,6 @@ export default function AppointmentForm({
     return Object.keys(formErrors).length === 0;
   }, [validateForm]);
 
-  const getCompletionPercentage = useCallback(() => {
-    const requiredFields = [
-      "name",
-      "phone",
-      "email",
-      "state",
-      "city",
-      "category",
-      "appointmentDate",
-      "appointmentTime",
-      "durationHours",
-      "consultantId",
-    ];
-    const completed = requiredFields.filter((field) => {
-      const value = form[field];
-      if (!value) return false;
-      if (typeof value === "string") return value.trim().length > 0;
-      return true;
-    }).length;
-    return Math.round((completed / requiredFields.length) * 100);
-  }, [form]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setServerMsg?.(null);
@@ -358,6 +401,7 @@ export default function AppointmentForm({
       ...form,
       appointmentDateISO: dateOnlyToNoonISO(form.appointmentDate),
       phone: countryCode + form.phone.replace(/\D/g, ""),
+      // lat/lng already in form.farmLat / form.farmLng
     };
 
     try {
@@ -385,6 +429,7 @@ export default function AppointmentForm({
       timeMode: "period", appointmentTime: "morning", durationHours: 1, notes: "",
       consultantId: initialValues.consultantId || "",
       consultantName: initialValues.consultantName || "",
+      farmLat: null, farmLng: null,
     });
     setTouched({});
     setErrors({});
@@ -393,102 +438,153 @@ export default function AppointmentForm({
     setCountryCode("+94");
   };
 
-  const completionPercentage = getCompletionPercentage();
+  /* ==== NEW: when user picks on map, store coords ==== */
+  const handlePickOnMap = async ({ lat, lng }) => {
+    setForm((f) => ({ ...f, farmLat: lat, farmLng: lng }));
+  };
+
+  /* ==== NEW: get device location and set marker ==== */
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      setServerMsg?.({ type: "error", text: "Geolocation not supported in this browser." });
+      return;
+    }
+    setMapBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setForm((f) => ({ ...f, farmLat: latitude, farmLng: longitude }));
+        setMapBusy(false);
+      },
+      (err) => {
+        setMapBusy(false);
+        setServerMsg?.({ type: "error", text: err.message || "Unable to read your location." });
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
+  /* ==== NEW: fill address input from current marker via reverse geocoding ==== */
+  const fillAddressFromMarker = async () => {
+    if (!form.farmLat || !form.farmLng) return;
+    try {
+      setMapBusy(true);
+      const addr = await reverseGeocode(form.farmLat, form.farmLng);
+      setField("address", addr);
+      setTouched((t) => ({ ...t, address: true }));
+      setMapBusy(false);
+    } catch (e) {
+      setMapBusy(false);
+      setServerMsg?.({ type: "error", text: e.message || "Could not fetch address." });
+    }
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-2 space-y-8" noValidate>
-      {/* Form Status Indicator */}
-      <div
-        className={`p-4 rounded-lg border-2 transition-all duration-300 ${
-          isFormValid ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+    <div className="min-h-screen flex justify-center items-center bg-emerald-50 px-4 py-12 relative overflow-hidden">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200 rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-300 rounded-full blur-3xl opacity-20 translate-y-1/2 -translate-x-1/2" />
+
+      <form
+        onSubmit={handleSubmit}
+        className={`relative z-10 bg-white shadow-2xl p-8 rounded-3xl border border-emerald-100/50 max-w-4xl w-full space-y-6 transition-all duration-1000 ${
+          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         }`}
+        noValidate
       >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${isFormValid ? "bg-green-500" : "bg-amber-500"}`}></div>
-            <span className={`font-medium ${isFormValid ? "text-green-800" : "text-amber-800"}`}>
-              {isFormValid ? "Form is ready to submit" : "Please complete all required fields"}
-            </span>
-          </div>
-          <div className="text-sm text-gray-600">{completionPercentage}% completed</div>
-        </div>
+        {/* Decorative top accent */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 rounded-t-3xl" />
 
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div
-            className={`h-2 rounded-full transition-all duration-500 ${
-              completionPercentage === 100 ? "bg-green-500" : "bg-amber-500"
-            }`}
-            style={{ width: `${completionPercentage}%` }}
-          ></div>
-        </div>
-      </div>
-
-      {/* Personal Information */}
-      <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-6 border border-emerald-100">
-        <h3 className="text-lg font-semibold text-emerald-800 mb-6">Personal Information</h3>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Input
-            id="name"
-            label="Full Name"
-            required
-            value={form.name}
-            onChange={(e) => setField("name", e.target.value)}
-            onBlur={() => handleBlur("name")}
-            error={errors.name}
-            success={success.name}
-            placeholder="Enter your full name"
-          />
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mobile Number <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
-                className="w-28 rounded-lg border border-gray-300 px-3 py-3 text-base outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40"
-              >
-                {PHONE_CODES.map(({ code, country }) => (
-                  <option key={code} value={code} title={country}>
-                    {code}
-                  </option>
-                ))}
-              </select>
-              <div className="flex-1 relative">
-                <input
-                  id="phone"
-                  value={form.phone}
-                  onChange={(e) => setField("phone", e.target.value)}
-                  onBlur={() => handleBlur("phone")}
-                  placeholder="123-456-7890"
-                  className={`w-full rounded-lg border px-4 py-3 text-base outline-none transition-all duration-300 min-h-[48px] ${
-                    errors.phone
-                      ? "border-red-500 ring-2 ring-red-200 focus:ring-red-300"
-                      : success.phone
-                      ? "border-green-500 ring-2 ring-green-200 focus:ring-green-300"
-                      : "border-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/40 hover:border-gray-400"
-                  }`}
-                />
-                {form.phone && (
-                  <button
-                    type="button"
-                    onClick={() => clearField("phone")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg"
-                    title="Clear phone number"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="relative">
+              <Calendar className="w-10 h-10 text-emerald-600" />
+              <div className="absolute inset-0 bg-emerald-400 opacity-30 blur-xl" />
             </div>
-            {errors.phone && <p className="text-sm text-red-600 flex items-center gap-1">⚠️ {errors.phone}</p>}
-            {success.phone && <p className="text-sm text-green-600 flex items-center gap-1">✓ {success.phone}</p>}
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-emerald-700 to-emerald-500 bg-clip-text text-transparent">
+              Schedule Consultation
+            </h2>
+          </div>
+          <p className="text-emerald-600">Book your agricultural consultation appointment</p>
+        </div>
+
+        {/* Personal Information */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <User className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Personal Information</h3>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Input
+              id="name"
+              label="Full Name"
+              icon={User}
+              required
+              value={form.name}
+              onChange={(e) => setField("name", e.target.value)}
+              onBlur={() => handleBlur("name")}
+              error={errors.name}
+              success={success.name}
+              placeholder="Enter your full name"
+            />
+
+            <div className="group">
+              <label className="block text-sm font-semibold text-emerald-800 mb-2">
+                Mobile Number <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  className="w-28 rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-3 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+                >
+                  {PHONE_CODES.map(({ code, country }) => (
+                    <option key={code} value={code} title={country}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex-1 relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                    <Phone className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
+                  </div>
+                  <input
+                    id="phone"
+                    value={form.phone}
+                    onChange={(e) => setField("phone", e.target.value)}
+                    onBlur={() => handleBlur("phone")}
+                    placeholder="123-456-7890"
+                    className={`w-full rounded-xl border-2 pl-12 pr-10 py-3 text-emerald-900 placeholder-emerald-400 transition-all ${
+                      errors.phone
+                        ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+                        : success.phone
+                        ? "border-green-400 bg-green-50/50 focus:border-green-500 focus:border-[3px]"
+                        : "border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px]"
+                    } focus:outline-none`}
+                  />
+                  {form.phone && (
+                    <button
+                      type="button"
+                      onClick={() => clearField("phone")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xl font-bold"
+                      title="Clear phone number"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+              {errors.phone && <p className="mt-2 text-sm text-red-600 flex items-center gap-1"><span className="text-red-500">⚠</span> {errors.phone}</p>}
+              {success.phone && <p className="mt-2 text-sm text-green-600 flex items-center gap-1">✓ {success.phone}</p>}
+            </div>
           </div>
 
           <Input
             id="email"
             label="Email Address"
+            icon={Mail}
             required
             type="email"
             value={form.email}
@@ -497,134 +593,204 @@ export default function AppointmentForm({
             error={errors.email}
             success={success.email}
             placeholder="your.email@example.com"
-            className="md:col-span-2"
           />
         </div>
-      </div>
 
-      {/* Location Information */}
-      <div className="bg-gradient-to-r from-lime-50 to-emerald-50 rounded-xl p-6 border border-lime-100">
-        <h3 className="text-lg font-semibold text-lime-800 mb-6">Farm Location Details</h3>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Input
-            id="state"
-            label="Province"
-            required
-            value={form.state}
-            onChange={(e) => setField("state", e.target.value)}
-            onBlur={() => handleBlur("state")}
-            error={errors.state}
-            success={success.state}
-            placeholder="Enter your province"
-          />
+        {/* Location Information */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Farm Location Details</h3>
+          </div>
 
-          <Input
-            id="city"
-            label="District / City"
-            required
-            value={form.city}
-            onChange={(e) => setField("city", e.target.value)}
-            onBlur={() => handleBlur("city")}
-            error={errors.city}
-            success={success.city}
-            placeholder="Enter your district or city"
-          />
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Input
+              id="state"
+              label="Province"
+              icon={MapPin}
+              required
+              value={form.state}
+              onChange={(e) => setField("state", e.target.value)}
+              onBlur={() => handleBlur("state")}
+              error={errors.state}
+              success={success.state}
+              placeholder="Enter your province"
+            />
 
+            <Input
+              id="city"
+              label="District / City"
+              icon={MapPin}
+              required
+              value={form.city}
+              onChange={(e) => setField("city", e.target.value)}
+              onBlur={() => handleBlur("city")}
+              error={errors.city}
+              success={success.city}
+              placeholder="Enter your district or city"
+            />
+          </div>
+
+          {/* ==== NEW: Map Picker (click map to drop the pin) ==== */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-emerald-800">Pick Location on Map</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={useMyLocation}
+                  className="px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white transition text-sm"
+                  disabled={mapBusy}
+                >
+                  {mapBusy ? "Locating..." : "Use My Location"}
+                </button>
+                <button
+                  type="button"
+                  onClick={fillAddressFromMarker}
+                  className="px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white transition text-sm"
+                  disabled={mapBusy || !form.farmLat || !form.farmLng}
+                >
+                  Fill Address From Pin
+                </button>
+              </div>
+            </div>
+
+            <div className="w-full h-72 rounded-xl overflow-hidden border-2 border-emerald-300">
+              <MapContainer
+                center={[7.8731, 80.7718]} // Sri Lanka
+                zoom={7}
+                className="h-full w-full"
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <ClickToPickMarker
+                  onPick={handlePickOnMap}
+                  position={form.farmLat && form.farmLng ? { lat: form.farmLat, lng: form.farmLng } : null}
+                />
+                {form.farmLat && form.farmLng && (
+                  <Marker position={[form.farmLat, form.farmLng]} />
+                )}
+              </MapContainer>
+            </div>
+
+            {form.farmLat && form.farmLng && (
+              <div className="text-sm text-gray-700">
+                📍 Selected: <span className="font-medium">{form.farmLat.toFixed(5)}, {form.farmLng.toFixed(5)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Keep your address input (can be auto-filled by the button above) */}
           <Input
             id="address"
             label="Farm Address"
+            icon={MapPin}
             value={form.address}
             onChange={(e) => setField("address", e.target.value)}
             onBlur={() => handleBlur("address")}
             placeholder="Full farm address with landmarks"
-            className="md:col-span-2"
           />
         </div>
-      </div>
 
-      {/* Service Requirements */}
-      <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-6 border border-green-100">
-        <h3 className="text-lg font-semibold text-green-800 mb-6">Service Requirements</h3>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <Select
-            id="category"
-            label="Service Category"
-            required
-            value={form.category}
-            onChange={(e) => setField("category", e.target.value)}
-            onBlur={() => handleBlur("category")}
-            error={errors.category}
-            success={success.category}
-          >
-            <option value="">Select Agricultural Service</option>
-            {categoryOptions.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </Select>
+        {/* Service Requirements */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <Briefcase className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Service Requirements</h3>
+          </div>
 
-          <Input
-            id="appointmentDate"
-            label="Preferred Date"
-            required
-            type="date"
-            min={todayStr}
-            max={new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0]}
-            value={form.appointmentDate}
-            onChange={(e) => setField("appointmentDate", e.target.value)}
-            onBlur={() => handleBlur("appointmentDate")}
-            error={errors.appointmentDate}
-            success={success.appointmentDate}
-            warning={warnings.appointmentDate}
-          />
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <Select
+              id="category"
+              label="Service Category"
+              icon={Briefcase}
+              required
+              value={form.category}
+              onChange={(e) => setField("category", e.target.value)}
+              onBlur={() => handleBlur("category")}
+              error={errors.category}
+              success={success.category}
+            >
+              <option value="">Select Agricultural Service</option>
+              {categoryOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </Select>
+
+            <Input
+              id="appointmentDate"
+              label="Preferred Date"
+              icon={Calendar}
+              required
+              type="date"
+              min={todayStr}
+              max={new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0]}
+              value={form.appointmentDate}
+              onChange={(e) => setField("appointmentDate", e.target.value)}
+              onBlur={() => handleBlur("appointmentDate")}
+              error={errors.appointmentDate}
+              success={success.appointmentDate}
+              warning={warnings.appointmentDate}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Time Scheduling */}
-      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-100">
-        <h3 className="text-lg font-semibold text-teal-800 mb-6">Time Scheduling</h3>
-        <div className="space-y-6">
+        {/* Time Scheduling */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <Clock className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Time Scheduling</h3>
+          </div>
+
           <div className="flex items-center gap-8">
-            <label className="inline-flex items-center gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="timeMode"
-                checked={form.timeMode === "period"}
-                onChange={() => {
-                  setForm((p) => ({
-                    ...p,
-                    timeMode: "period",
-                    appointmentTime: PERIOD_OPTIONS.includes(p.appointmentTime) ? p.appointmentTime : "morning",
-                  }));
-                }}
-                className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-base font-medium text-teal-700">Time Period</span>
+            <label className="inline-flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="radio"
+                  name="timeMode"
+                  checked={form.timeMode === "period"}
+                  onChange={() => {
+                    setForm((p) => ({
+                      ...p,
+                      timeMode: "period",
+                      appointmentTime: PERIOD_OPTIONS.includes(p.appointmentTime) ? p.appointmentTime : "morning",
+                    }));
+                  }}
+                  className="w-5 h-5 text-emerald-600 border-2 border-emerald-300 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                />
+              </div>
+              <span className="text-base font-semibold text-emerald-700 group-hover:text-emerald-800 transition-colors">Time Period</span>
             </label>
-            <label className="inline-flex items-center gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="timeMode"
-                checked={form.timeMode === "exact"}
-                onChange={() => {
-                  setForm((p) => ({
-                    ...p,
-                    timeMode: "exact",
-                    appointmentTime: PERIOD_OPTIONS.includes(p.appointmentTime) ? "09:00" : (p.appointmentTime || "09:00"),
-                  }));
-                }}
-                className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-base font-medium text-teal-700">Exact Time</span>
+            <label className="inline-flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="radio"
+                  name="timeMode"
+                  checked={form.timeMode === "exact"}
+                  onChange={() => {
+                    setForm((p) => ({
+                      ...p,
+                      timeMode: "exact",
+                      appointmentTime: PERIOD_OPTIONS.includes(p.appointmentTime) ? "09:00" : (p.appointmentTime || "09:00"),
+                    }));
+                  }}
+                  className="w-5 h-5 text-emerald-600 border-2 border-emerald-300 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                />
+              </div>
+              <span className="text-base font-semibold text-emerald-700 group-hover:text-emerald-800 transition-colors">Exact Time</span>
             </label>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             {form.timeMode === "period" ? (
               <Select
                 id="appointmentTime"
                 label="Preferred Time Period"
+                icon={Clock}
                 required
                 value={form.appointmentTime}
                 onChange={(e) => setField("appointmentTime", e.target.value)}
@@ -643,6 +809,7 @@ export default function AppointmentForm({
               <Input
                 id="appointmentTime"
                 label="Exact Time"
+                icon={Clock}
                 required
                 type="time"
                 min="06:00"
@@ -659,6 +826,7 @@ export default function AppointmentForm({
             <Select
               id="durationHours"
               label="Expected Duration"
+              icon={Clock}
               required
               value={form.durationHours}
               onChange={(e) => setField("durationHours", parseInt(e.target.value) || 1)}
@@ -674,84 +842,94 @@ export default function AppointmentForm({
             </Select>
           </div>
         </div>
-      </div>
 
-      {/* Additional Information */}
-      <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-100">
-        <h3 className="text-lg font-semibold text-amber-800 mb-6">Additional Information</h3>
-        <div className="space-y-3">
-          <label htmlFor="notes" className="block text-sm font-medium text-amber-800">
-            Special Requirements & Notes (max 1000 characters)
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            rows={5}
-            className={`w-full rounded-lg border px-4 py-3 text-base outline-none transition-all duration-300 bg-white/90 resize-vertical ${
-              errors.notes
-                ? "border-red-500 ring-2 ring-red-200"
-                : warnings.notes
-                ? "border-amber-500 ring-2 ring-amber-200"
-                : "border-amber-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
-            }`}
-            value={form.notes}
-            onChange={(e) => setField("notes", e.target.value)}
-            onBlur={() => handleBlur("notes")}
-            maxLength={1000}
-            placeholder="Please specify: crop types, farm size, equipment access, specific concerns, etc."
-          />
-          {errors.notes && <p className="text-sm text-red-600 flex items-center gap-1">⚠️ {errors.notes}</p>}
-          {warnings.notes && <p className="text-sm text-amber-600 flex items-center gap-1">ℹ️ {warnings.notes}</p>}
-          <div
-            className={`text-sm ${
-              form.notes?.length > 900
-                ? "text-red-600 font-medium"
-                : form.notes?.length > 800
-                ? "text-amber-600"
-                : "text-amber-600"
-            }`}
-          >
-            {form.notes?.length || 0}/1000 characters used
+        {/* Additional Information */}
+        <div className="space-y-5 pt-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-emerald-100">
+            <FileText className="w-5 h-5 text-emerald-600" />
+            <h3 className="text-lg font-semibold text-emerald-800">Additional Information</h3>
+          </div>
+
+          <div className="group">
+            <label htmlFor="notes" className="block text-sm font-semibold text-emerald-800 mb-2">
+              Special Requirements & Notes (max 1000 characters)
+            </label>
+            <textarea
+              id="notes"
+              name="notes"
+              rows={5}
+              className={`w-full rounded-xl border-2 px-4 py-3 text-emerald-900 placeholder-emerald-400 transition-all resize-vertical ${
+                errors.notes
+                  ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+                  : warnings.notes
+                  ? "border-amber-400 bg-amber-50/50 focus:border-amber-500 focus:border-[3px]"
+                  : "border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px]"
+              } focus:outline-none`}
+              value={form.notes}
+              onChange={(e) => setField("notes", e.target.value)}
+              onBlur={() => handleBlur("notes")}
+              maxLength={1000}
+              placeholder="Please specify: crop types, farm size, equipment access, specific concerns, etc."
+            />
+            {errors.notes && <p className="mt-2 text-sm text-red-600 flex items-center gap-1"><span className="text-red-500">⚠</span> {errors.notes}</p>}
+            {warnings.notes && <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">ℹ️ {warnings.notes}</p>}
+            <div
+              className={`mt-2 text-sm font-medium ${
+                form.notes?.length > 900
+                  ? "text-red-600"
+                  : form.notes?.length > 800
+                  ? "text-amber-600"
+                  : "text-gray-500"
+              }`}
+            >
+              {form.notes?.length || 0}/1000 characters
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Hidden consultant fields */}
-      <input type="hidden" id="consultantId" value={form.consultantId} readOnly />
-      <input type="hidden" id="consultantName" value={form.consultantName} readOnly />
-      {errors.consultantId && (
-        <p className="text-sm text-red-600 flex items-center gap-1">⚠️ {errors.consultantId}</p>
-      )}
+        {/* Hidden consultant fields */}
+        <input type="hidden" id="consultantId" value={form.consultantId} readOnly />
+        <input type="hidden" id="consultantName" value={form.consultantName} readOnly />
+        {errors.consultantId && (
+          <p className="text-sm text-red-600 flex items-center gap-1"><span className="text-red-500">⚠</span> {errors.consultantId}</p>
+        )}
 
-      {/* Actions */}
-      <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-        <button
-          type="submit"
-          disabled={submitting || !isFormValid}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 px-8 py-4 text-base font-semibold text-white shadow-lg hover:from-emerald-700 hover:to-green-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:shadow-xl"
-        >
-          {submitting ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Processing...
-            </>
-          ) : (
-            submitLabel
-          )}
-        </button>
+        {/* Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
+          {/* Back button replaces Reset Form */}
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="w-full py-3.5 rounded-xl bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-2 border-gray-200"
+          >
+            Back
+          </button>
 
-        <button
-          type="button"
-          onClick={resetForm}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gray-200 px-6 py-4 text-base font-semibold text-gray-700 hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-200 transition-all duration-300"
-        >
-          ↺ Reset Form
-        </button>
-
-        <div className="text-sm text-gray-600 flex-1 text-center sm:text-right">
-          {!isFormValid ? "Please fix all errors before submitting" : "All fields are valid ✓"}
+          <button
+            type="submit"
+            disabled={submitting || !isFormValid}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:from-emerald-700 hover:to-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:scale-[1.02] transform disabled:hover:scale-100"
+          >
+            {submitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              submitLabel
+            )}
+          </button>
         </div>
-      </div>
-    </form>
+
+        {!isFormValid && (
+          <div className="text-center text-sm text-gray-600 pt-2">
+            Please complete all required fields to enable submission
+          </div>
+        )}
+      </form>
+    </div>
   );
 }

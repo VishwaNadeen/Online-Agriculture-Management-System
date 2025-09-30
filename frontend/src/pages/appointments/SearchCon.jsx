@@ -253,9 +253,9 @@ export default function SearchCon() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top search header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-200">
+    <div className="min-h-screen bg-green-50/95">
+      {/* Top search header (now blended with page; not sticky, no border) */}
+      <header className="bg-transparent">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
             {/* Big search box */}

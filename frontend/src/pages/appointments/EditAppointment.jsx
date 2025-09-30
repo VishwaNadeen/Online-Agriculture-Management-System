@@ -14,17 +14,14 @@ const toYMD = (d) => {
     .slice(0, 10);
 };
 
-// Combine date (YYYY-MM-DD) and optional time ("HH:MM") into ISO
 const combineDateTimeToISO = (yyyy_mm_dd, hh_mm) => {
   if (!yyyy_mm_dd) return undefined;
   const t = (hh_mm && /^\d{2}:\d{2}$/.test(hh_mm)) ? `${hh_mm}:00` : "00:00:00";
-  // Construct as local then convert to ISO
   const local = new Date(`${yyyy_mm_dd}T${t}`);
   if (isNaN(local)) return undefined;
   return local.toISOString();
 };
 
-// Remove fields that the backend won’t accept on update
 const stripImmutable = (obj) => {
   const clone = { ...obj };
   [
@@ -34,20 +31,17 @@ const stripImmutable = (obj) => {
     "createdAt",
     "updatedAt",
     "created_by",
-    "patient", // in case your model uses different names
+    "patient",
     "consultant",
   ].forEach((k) => delete clone[k]);
   return clone;
 };
 
-// Coerce simple field types; tweak as needed for your model
 const normalizeTypes = (obj) => {
   const out = { ...obj };
-  // trim strings
   Object.keys(out).forEach((k) => {
     if (typeof out[k] === "string") out[k] = out[k].trim();
   });
-  // number-y fields (example)
   ["fee", "durationMinutes"].forEach((k) => {
     if (out[k] !== undefined && out[k] !== null && out[k] !== "") {
       const n = Number(out[k]);
@@ -57,16 +51,15 @@ const normalizeTypes = (obj) => {
   return out;
 };
 
-// Extract a readable error message from axios/fetch-like errors
 const readError = (e) => {
   const data = e?.response?.data;
   if (!data) return e.message || "Request failed";
   if (typeof data === "string") return data;
   if (data.message) return data.message;
-  // common validation error shapes
   if (Array.isArray(data.errors) && data.errors.length) {
-    // e.g. [{path:"appointmentDate", msg:"Invalid date"}]
-    return data.errors.map((er) => er.msg || er.message || `${er.path}: invalid`).join("\n");
+    return data.errors
+      .map((er) => er.msg || er.message || `${er.path}: invalid`)
+      .join("\n");
   }
   if (data.error) return typeof data.error === "string" ? data.error : JSON.stringify(data.error);
   return JSON.stringify(data);
@@ -87,7 +80,6 @@ export default function EditAppointment() {
         setServerMsg(null);
         const appt = await ApptAPI.get(id);
 
-        // Try to preserve time if your form has it
         const dateYMD = toYMD(appt.appointmentDate || appt.appointmentDateISO || appt.date);
         const timeHHMM =
           appt.appointmentTime?.slice?.(0, 5) ||
@@ -96,7 +88,7 @@ export default function EditAppointment() {
         setInitial({
           ...appt,
           appointmentDate: dateYMD,
-          appointmentTime: timeHHMM || "", // keeps input happy if you have a <input type="time" />
+          appointmentTime: timeHHMM || "",
         });
       } catch (e) {
         setServerMsg({
@@ -114,22 +106,11 @@ export default function EditAppointment() {
       setSubmitting(true);
       setServerMsg(null);
 
-      // 1) build payload
       const cleaned = stripImmutable(formValues);
-
-      // 2) ensure correct date format expected by backend
-      // If your backend expects a single ISO datetime field:
       const iso = combineDateTimeToISO(cleaned.appointmentDate, cleaned.appointmentTime);
-      if (iso) {
-        cleaned.appointmentDate = iso; // overwrite with ISO datetime
-      }
+      if (iso) cleaned.appointmentDate = iso;
 
-      // If backend instead expects a plain date (YYYY-MM-DD), comment the line above and keep cleaned.appointmentDate
-
-      // 3) normalize types
       const payload = normalizeTypes(cleaned);
-
-      // 4) send
       await ApptAPI.update(id, payload);
 
       setServerMsg({ type: "success", text: "Appointment updated." });
@@ -146,7 +127,11 @@ export default function EditAppointment() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <h2 className="text-3xl font-bold text-emerald-700">Edit Appointment</h2>
+      {/* Header with Back button */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold text-emerald-700">Edit Appointment</h2>
+        
+      </div>
 
       {serverMsg && (
         <div
