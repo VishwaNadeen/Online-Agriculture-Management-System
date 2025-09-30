@@ -1,8 +1,10 @@
+// backend/routes/CommunityPost.js
 import { Router } from "express";
 import fs from "fs";
 import path from "path";
 import multer from "multer";
 import CommunityPost from "../models/CommunityPost.js";
+import cloudinary, { connectCloudinary } from "../config/cloudinary.js";
 
 const router = Router();
 
@@ -13,11 +15,11 @@ function identifyUser(req, _res, next) {
   next();
 }
 
-/* Ensure uploads dir exists */
+/* Ensure uploads dir exists (temp folder for multer) */
 const uploadsDir = path.resolve(process.cwd(), "backend", "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-/* Multer (optional image upload) */
+/* Multer (temporary storage before Cloudinary upload) */
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
   filename: (_req, file, cb) => {
@@ -28,34 +30,68 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-/* CREATE post */
+/* ---------- CREATE POST (UPLOAD IMAGE TO CLOUDINARY) ---------- */
 router.post("/", identifyUser, upload.single("image"), async (req, res) => {
   try {
-    const { title, comment, authorAvatar, category } = req.body;
+    const {
+      title,
+      comment,
+      authorAvatar: bodyAvatar,
+      authorName: bodyAuthorName,
+      category,
+    } = req.body;
 
     if (!title?.trim() || !comment?.trim()) {
       return res.status(400).json({ message: "Title and comment required" });
     }
-    // NEW: block titles starting with a number
     if (/^\s*\d/.test(title.trim())) {
       return res.status(400).json({ message: "Title cannot start with a number." });
     }
 
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : (req.body.image || "");
+    let imageUrl = "";
+    if (req.file?.path) {
+      try {
+        connectCloudinary();
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder: "greengrow/community",
+          resource_type: "image",
+          transformation: [{ quality: "auto", fetch_format: "auto" }],
+        });
+        imageUrl = result?.secure_url || "";
+      } catch (cloudErr) {
+        console.error("Cloudinary upload failed:", cloudErr);
+      } finally {
+        try { fs.unlinkSync(req.file.path); } catch {}
+      }
+    } else if (req.body?.image) {
+      // optional support for base64/data URI
+      try {
+        connectCloudinary();
+        const result = await cloudinary.uploader.upload(req.body.image, {
+          folder: "greengrow/community",
+          resource_type: "image",
+          transformation: [{ quality: "auto", fetch_format: "auto" }],
+        });
+        imageUrl = result?.secure_url || "";
+      } catch (cloudErr) {
+        console.error("Cloudinary (base64) upload failed:", cloudErr);
+      }
+    }
 
     const post = await CommunityPost.create({
       title: title.trim(),
       comment: comment.trim(),
-      authorName: req.userName,
-      authorAvatar: authorAvatar || req.headers["x-user-avatar"] || "",
-      image: imagePath,
+      // prefer values from body (so no custom headers are needed)
+      authorName: (bodyAuthorName || req.userName || "Anonymous").trim(),
+      authorAvatar: bodyAvatar || req.headers["x-user-avatar"] || "",
+      image: imageUrl,
       category: category || "General",
     });
 
-    res.status(201).json(post);
+    return res.status(201).json(post);
   } catch (err) {
     console.error("Error creating post:", err);
-    res.status(500).json({ message: "Failed to create post" });
+    return res.status(500).json({ message: "Failed to create post" });
   }
 });
 
@@ -72,7 +108,7 @@ router.get("/:id", async (req, res) => {
   res.json(post);
 });
 
-/* UPDATE (title/comment/image) */
+/* UPDATE (title/comment/image string) */
 router.put("/:id", identifyUser, async (req, res) => {
   try {
     const { title, comment, image } = req.body;
@@ -109,27 +145,23 @@ router.delete("/:id", identifyUser, async (req, res) => {
   }
 });
 
-/* ---------- REACTIONS: toggle & swap per user (by name) ---------- */
-async function applyReaction(req, res, type /* 'like' | 'dislike' */) {
+/* ---------- REACTIONS: toggle & swap per user ---------- */
+async function applyReaction(req, res, type) {
   const user = (req.userName || "Anonymous").trim();
   const post = await CommunityPost.findById(req.params.id);
   if (!post) return res.status(404).json({ message: "Not found" });
 
-  // find existing reaction from this user
   const idx = (post.reactions || []).findIndex((r) => (r.by || "").trim() === user);
   const prev = idx >= 0 ? post.reactions[idx].type : "none";
 
-  // counts
   let likes = post.likes || 0;
   let dislikes = post.dislikes || 0;
 
   if (prev === type) {
-    // toggle off
     if (type === "like") likes = Math.max(0, likes - 1);
     else dislikes = Math.max(0, dislikes - 1);
     if (idx >= 0) post.reactions.splice(idx, 1);
   } else {
-    // switching or adding
     if (prev === "like") likes = Math.max(0, likes - 1);
     if (prev === "dislike") dislikes = Math.max(0, dislikes - 1);
     if (type === "like") likes += 1;
@@ -147,11 +179,8 @@ async function applyReaction(req, res, type /* 'like' | 'dislike' */) {
   return res.json({ likes, dislikes, myReaction });
 }
 
-/* LIKE / DISLIKE endpoints now toggle/swap */
 router.post("/:id/like", identifyUser, (req, res) => applyReaction(req, res, "like"));
 router.post("/:id/dislike", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
-
-/* (Optional legacy toggles kept; forward to unified logic) */
 router.post("/:id/like/toggle", identifyUser, (req, res) => applyReaction(req, res, "like"));
 router.post("/:id/dislike/toggle", identifyUser, (req, res) => applyReaction(req, res, "dislike"));
 
@@ -176,7 +205,7 @@ router.post("/:id/comments", identifyUser, async (req, res) => {
   res.json(post.comments[post.comments.length - 1]);
 });
 
-/* --- Edit a comment (only by its author) --- */
+/* Edit comment */
 router.put("/:id/comments/:commentId", identifyUser, async (req, res) => {
   try {
     const { text } = req.body;
@@ -203,7 +232,7 @@ router.put("/:id/comments/:commentId", identifyUser, async (req, res) => {
   }
 });
 
-/* --- Delete a comment (only by its author) --- */
+/* Delete comment */
 router.delete("/:id/comments/:commentId", identifyUser, async (req, res) => {
   try {
     const post = await CommunityPost.findById(req.params.id);
@@ -225,7 +254,7 @@ router.delete("/:id/comments/:commentId", identifyUser, async (req, res) => {
   }
 });
 
-/* REPLIES */
+/* Replies */
 router.post("/:postId/comments/:commentId/replies", identifyUser, async (req, res) => {
   const { text } = req.body;
   const authorAvatar = req.body?.authorAvatar || req.headers["x-user-avatar"] || "";
