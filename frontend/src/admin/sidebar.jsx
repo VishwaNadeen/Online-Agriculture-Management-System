@@ -47,10 +47,10 @@ export default function AdminHome() {
           </NavLink>
 
           <NavLink
-            to="appointments"
+            to="consultant"
             className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
           >
-            <FaCalendarAlt /> Appointments
+            <FaCalendarAlt />Consultant
           </NavLink>
 
           <NavLink

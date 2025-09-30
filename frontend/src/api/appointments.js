@@ -29,6 +29,16 @@ export const ApptAPI = {
     return Array.isArray(data) ? data : data?.appointments || [];
   },
 
+  // NEW: consultant's own assigned appointments
+  listAsConsultant: async (params = {}) => {
+    const { data } = await axios.get(`${URL}/my-consultant`, {
+      params,
+      headers: authHeaders(),
+      withCredentials: true,
+    });
+    return Array.isArray(data) ? data : data?.appointments || [];
+  },
+
   // Get one (controller enforces owner-or-admin)
   get: async (id) => {
     const { data } = await axios.get(`${URL}/${id}`, {

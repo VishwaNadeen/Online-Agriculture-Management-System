@@ -3,7 +3,16 @@ import React, { useRef, useState } from "react";
 import html2canvas from "html2canvas";
 import { downloadElementAsPdf } from "../utils/pdf";
 
-export default function AppointmentDetailsModal({ open, onClose, appt, consultant }) {
+export default function AppointmentDetailsModal({
+  open,
+  onClose,
+  appt,
+  consultant,
+  onEdit,
+  onCancel,
+  canCancel,
+  autoDownload = false,
+}) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const printRef = useRef(null);
   const scrollRef = useRef(null);
@@ -28,7 +37,7 @@ export default function AppointmentDetailsModal({ open, onClose, appt, consultan
     setIsGeneratingPdf(true);
 
     const input = printRef.current;
-    const scroller = scrollRef.current;
+    const scroller = scrollRef.current || input?.parentElement;
 
     if (!input) {
       alert("Unable to find content to export.");
@@ -45,8 +54,12 @@ export default function AppointmentDetailsModal({ open, onClose, appt, consultan
     }
 
     try {
-      // allow reflow
+      // allow layout/reflow
       await new Promise((res) => setTimeout(res, 50));
+
+      // Ensure images and fonts in the capture area are ready
+      await waitForImages(input);
+      await waitForFonts();
 
       if (typeof window !== "undefined" && !window.html2canvas) {
         window.html2canvas = html2canvas;
@@ -67,6 +80,16 @@ export default function AppointmentDetailsModal({ open, onClose, appt, consultan
       setIsGeneratingPdf(false);
     }
   };
+
+  // Auto-trigger download once opened if requested (NOW also depends on appt id)
+  React.useEffect(() => {
+    if (open && autoDownload) {
+      const t = setTimeout(() => {
+        handleDownloadPdf();
+      }, 250);
+      return () => clearTimeout(t);
+    }
+  }, [open, autoDownload, appt?._id]); // <- UPDATED
 
   // Inline HEX styles to avoid OKLCH usage
   const COLORS = {
@@ -96,9 +119,11 @@ export default function AppointmentDetailsModal({ open, onClose, appt, consultan
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-      <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border max-h-[90vh] overflow-hidden animate-slideUp"
-           style={{ borderColor: COLORS.green100 }}>
-        {/* Header (HEX gradient, no Tailwind gradient utilities) */}
+      <div
+        className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border max-h-[90vh] overflow-hidden animate-slideUp"
+        style={{ borderColor: COLORS.green100 }}
+      >
+        {/* Header */}
         <div
           className="relative px-8 py-6"
           style={{
@@ -131,6 +156,24 @@ export default function AppointmentDetailsModal({ open, onClose, appt, consultan
               </div>
             </div>
             <div className="flex gap-3">
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(appt)}
+                  className="px-4 py-2 rounded-xl shadow-sm border transition-all duration-300 hover:scale-[1.02]"
+                  style={{ backgroundColor: COLORS.white70, color: "#14532d", borderColor: "#ffffff" }}
+                >
+                  Edit
+                </button>
+              )}
+              {onCancel && canCancel && (
+                <button
+                  onClick={() => onCancel(appt)}
+                  className="px-4 py-2 rounded-xl shadow-sm border transition-all duration-300 hover:scale-[1.02]"
+                  style={{ backgroundColor: COLORS.white70, color: "#14532d", borderColor: "#ffffff" }}
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 onClick={handleDownloadPdf}
                 disabled={isGeneratingPdf}
@@ -267,7 +310,7 @@ export default function AppointmentDetailsModal({ open, onClose, appt, consultan
               </Card>
             )}
 
-            {/* Footer (HEX gradient) */}
+            {/* Footer */}
             <div
               className="rounded-2xl p-6 border text-center"
               style={{ background: "linear-gradient(to right, #dcfce7, #ecfccb)", borderColor: COLORS.green100 }}
@@ -322,7 +365,36 @@ function InfoCard({ icon, label, value, colors }) {
   );
 }
 
-/* ----------------- Icons (unchanged) ----------------- */
+/* ----------------- Helpers & Icons ----------------- */
+
+// Ensure images inside the capture area are fully loaded before html2canvas runs
+async function waitForImages(root) {
+  if (!root) return;
+  const imgs = Array.from(root.querySelectorAll("img"));
+  if (!imgs.length) return;
+  await Promise.all(
+    imgs.map((img) => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise((resolve) => {
+        const done = () => {
+          img.removeEventListener("load", done);
+          img.removeEventListener("error", done);
+          resolve();
+        };
+        img.addEventListener("load", done, { once: true });
+        img.addEventListener("error", done, { once: true });
+      });
+    })
+  );
+}
+
+// Wait for web fonts to be ready (prevents blank text in canvas)
+async function waitForFonts() {
+  try {
+    if (document?.fonts?.ready) await document.fonts.ready;
+  } catch {}
+}
+
 const UserIcon = () => (
   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
     <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
@@ -349,7 +421,7 @@ const ClockIcon = () => (
 
 const StatusIcon = () => (
   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l-4-4z" clipRule="evenodd" />
   </svg>
 );
 
