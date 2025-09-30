@@ -77,7 +77,7 @@ export default function EventAdmin() {
       })
       .catch((err) => {
         console.error("Delete failed", err);
-        toast.error("Failed to delete event");
+        toast.error("Failed to delete event...");
         axios
           .get(`${BASE_URL}/events`)
           .then((res) => {

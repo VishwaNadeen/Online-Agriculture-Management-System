@@ -65,7 +65,7 @@ const EditEvent = () => {
       });
     } catch (error) {
       console.error('Error fetching event:', error);
-      toast.error('Failed to load event details');
+      toast.error('Failed to load event details...');
       navigate('/events');
     } finally {
       setLoading(false);

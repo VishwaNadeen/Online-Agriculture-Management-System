@@ -53,14 +53,14 @@ const AddEvent = () => {
     }
     
     if (regDeadline <= today) {
-      toast.error("Registration deadline must be in the future");
+      toast.error("Registration deadline must be in the future...");
       return false;
     }
 
     // Validate capacity
     const capacity = parseInt(formData.capacity);
     if (isNaN(capacity) || capacity <= 0) {
-      toast.error("Capacity must be a positive number");
+      toast.error("Capacity must be a positive number...");
       return false;
     }
 
