@@ -4,22 +4,6 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { EventAPI } from "../api/events";
 import toast from "react-hot-toast";
 
-// Helper function to read auth from storage
-function readAuthFromStorage() {
-  const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
-  const token = get("auth_token") || get("token") || get("user_token") || get("authToken") || "";
-  let user = null;
-  const rawUser = get("auth_user");
-  if (rawUser) {
-    try {
-      user = JSON.parse(rawUser);
-    } catch {
-      user = null;
-    }
-  }
-  return { token, user };
-}
-
 // Safely convert any date-like value to an <input type="date"> value (YYYY-MM-DD)
 function dateToInput(val) {
   try {
@@ -35,7 +19,6 @@ function dateToInput(val) {
 const EditEvent = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = readAuthFromStorage();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -51,20 +34,13 @@ const EditEvent = () => {
     registrationDeadline: ""
   });
 
-  const isAdmin = user?.role === 'admin' || user?.email?.includes('admin');
   const didFetchRef = useRef(false);
 
-  // Redirect if not admin
   useEffect(() => {
-    if (!user || !isAdmin) {
-      toast.error("Access denied. Admin privileges required.");
-      navigate('/events');
-      return;
-    }
     if (didFetchRef.current) return;
     didFetchRef.current = true;
     fetchEvent();
-  }, [user, isAdmin, navigate, id]);
+  }, [id, navigate]);
 
   const fetchEvent = async () => {
     try {
@@ -89,7 +65,7 @@ const EditEvent = () => {
       });
     } catch (error) {
       console.error('Error fetching event:', error);
-      toast.error('Failed to load event details');
+      toast.error('Failed to load event details...');
       navigate('/events');
     } finally {
       setLoading(false);
@@ -147,7 +123,7 @@ const EditEvent = () => {
       });
       
       toast.success('Event updated successfully!');
-      navigate(`/events/${id}`);
+      navigate(`/admin/event`);
     } catch (error) {
       console.error('Error updating event:', error);
       toast.error(error.response?.data?.message || 'Failed to update event');
@@ -155,10 +131,6 @@ const EditEvent = () => {
       setSubmitting(false);
     }
   };
-
-  if (!user || !isAdmin) {
-    return null; // Will redirect in useEffect
-  }
 
   if (loading) {
     return (
@@ -168,7 +140,7 @@ const EditEvent = () => {
             <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
             <div className="bg-white rounded-2xl shadow-lg p-8">
               <div className="space-y-6">
-                <div className="h-4 bg-gray-200 rounded w-full"></div>
+                <div className="h-4 bg-gray-200 rounded w/full"></div>
                 <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                 <div className="h-32 bg-gray-200 rounded w-full"></div>
                 <div className="grid gap-6 md:grid-cols-2">
@@ -190,7 +162,7 @@ const EditEvent = () => {
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
             <Link
-              to={`/events/${id}`}
+              to={`/admin/event`}
               className="p-2 text-gray-600 hover:text-emerald-600 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,7 +363,7 @@ const EditEvent = () => {
               </button>
               
               <Link
-                to={`/events/${id}`}
+                to={`/admin/event`}
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-center"
               >
                 Cancel

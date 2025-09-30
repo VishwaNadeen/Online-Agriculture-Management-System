@@ -61,7 +61,7 @@ export default function AdminHome() {
           </NavLink>
 
           <NavLink
-            to="events"
+            to="event"
             className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
           >
             <FaComments /> Events
