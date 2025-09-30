@@ -1,33 +1,101 @@
 // src/admin/users/UsersAdmin.jsx
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { FiSearch, FiPlus, FiMoreVertical, FiTrash2 } from "react-icons/fi";
-import { MdEdit } from "react-icons/md";
+import { FiSearch, FiTrash2 } from "react-icons/fi";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
+
+/* read token the same way you do elsewhere (for DELETE auth) */
+function readAuthToken() {
+  const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
+  return (
+    get("auth_token") ||
+    get("token") ||
+    get("user_token") ||
+    get("authToken") ||
+    ""
+  );
+}
+
+/* normalize API response shape */
+function pickUsersFrom(res) {
+  if (!res) return [];
+  if (Array.isArray(res.data)) return res.data;
+  if (Array.isArray(res.data?.users)) return res.data.users;
+  if (Array.isArray(res.data?.data?.users)) return res.data.data.users;
+  return [];
+}
+
+/* UI helpers */
+const Th = ({ children, className = "" }) => (
+  <th className={`px-4 py-3 font-medium text-xs uppercase tracking-wide text-gray-600 ${className}`}>
+    {children}
+  </th>
+);
+const Td = ({ children, className = "" }) => (
+  <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>
+);
+
+function RoleBadge({ role }) {
+  const r = (role || "").toLowerCase();
+  const map = {
+    farmer: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    consultant: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+    admin: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200",
+  };
+  return (
+    <span className={`text-[11px] px-2 py-1 rounded-full ${map[r] || "bg-gray-50 text-gray-700 ring-1 ring-gray-200"}`}>
+      {r || "-"}
+    </span>
+  );
+}
+function StatusBadge({ status }) {
+  const s = (status || "").toUpperCase();
+  const map = {
+    ACTIVE: "bg-green-50 text-green-700 ring-1 ring-green-200",
+    PENDING: "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200",
+    INACTIVE: "bg-red-50 text-red-700 ring-1 ring-red-200",
+  };
+  return (
+    <span className={`text-[11px] px-2 py-1 rounded-full ${map[s] || "bg-gray-50 text-gray-700 ring-1 ring-gray-200"}`}>
+      {s || "-"}
+    </span>
+  );
+}
+function formatDate(d) {
+  if (!d) return "-";
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "-";
+  return dt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+function initials(name = "") {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase())
+    .join("");
+}
 
 export default function UsersAdmin() {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
+  const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [role, setRole] = useState("ALL");
   const [status, setStatus] = useState("ALL");
-  const [showCreate, setShowCreate] = useState(false);
 
   const loadUsers = async () => {
+    setError("");
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await axios.get(`${BASE}/api/admin/users`);
-      const rows = Array.isArray(res.data) ? res.data : (res.data?.users || []);
+      const res = await axios.get(`${BASE}/api/users`);
+      const rows = pickUsersFrom(res);
       setUsers(rows);
     } catch (err) {
-      console.error(err);
-      // fallback so UI works even if API is not ready
-      setUsers([
-        { _id: "u1", firstName: "Kamal", lastName: "Perera", email: "kamal@gg.lk", phone: "0771234567", role: "farmer", status: "ACTIVE", createdAt: "2025-08-01" },
-        { _id: "u2", firstName: "Nimali", lastName: "Silva",  email: "nimali@gg.lk", phone: "0719876543", role: "consultant", status: "PENDING", createdAt: "2025-08-12" },
-        { _id: "u3", firstName: "Admin",  lastName: "User",   email: "admin@gg.lk", phone: "0705555555", role: "admin", status: "ACTIVE", createdAt: "2025-07-22" },
-      ]);
+      console.error("GET /api/users failed:", err?.response?.status, err?.response?.data || err?.message);
+      setUsers([]);
+      setError("Could not load users from /api/users");
     } finally {
       setLoading(false);
     }
@@ -55,59 +123,49 @@ export default function UsersAdmin() {
     const ok = confirm("Delete this user? This cannot be undone.");
     if (!ok) return;
     try {
-      await axios.delete(`${BASE}/api/admin/users/${id}`);
+      const token = readAuthToken();
+      await axios.delete(`${BASE}/api/users/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       setUsers((prev) => prev.filter((u) => u._id !== id));
-      // optional: toast.success("User deleted");
     } catch (err) {
-      console.error(err);
-      alert("Failed to delete user");
+      console.error("DELETE /api/users/:id failed:", err?.response?.status, err?.response?.data || err?.message);
+      alert(err?.response?.data?.message || "Failed to delete user");
     }
   };
 
-  const handleCreate = async (payload) => {
-    try {
-      // you can keep create local-only (no backend) or hit POST if you have it
-      const fallback = { _id: crypto.randomUUID(), ...payload, status: "ACTIVE", createdAt: new Date().toISOString() };
-      setUsers((prev) => [fallback, ...prev]);
-      setShowCreate(false);
-    } catch {
-      setShowCreate(false);
-    }
-  };
+  const count = filtered.length;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-green-700">Users</h1>
-          <p className="text-gray-600">Manage farmers, consultants, and admins.</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-green-700">Green Grow Users</h1>
+            <p className="text-gray-600">Manage farmers and consultants.</p>
+          </div>
+          <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
+            {count} {count === 1 ? "user" : "users"}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadUsers}
-            className="px-3 py-2 rounded-lg border hover:bg-gray-50"
-            disabled={loading}
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800"
-          >
-            <FiPlus /> Add User
-          </button>
-        </div>
+        <button
+          onClick={loadUsers}
+          className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+          disabled={loading}
+        >
+          {loading ? "Refreshing…" : "Refresh"}
+        </button>
       </div>
 
-      {/* Filters (client-side only) */}
+      {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="relative">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, email, phone..."
+            placeholder="Search name, email, phone…"
             className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-600"
           />
         </div>
@@ -133,11 +191,11 @@ export default function UsersAdmin() {
         </select>
       </div>
 
-      {/* Table */}
-      <div className="bg-white shadow-sm rounded-xl overflow-hidden">
+      {/* Table Card */}
+      <div className="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0 z-10">
               <tr className="text-left text-gray-600">
                 <Th>Name</Th>
                 <Th>Email</Th>
@@ -148,44 +206,75 @@ export default function UsersAdmin() {
                 <Th className="text-right pr-4">Actions</Th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {loading && (
-                <tr><td colSpan={7} className="p-6 text-center text-gray-500">Loading…</td></tr>
+                <>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <Td><div className="h-5 w-40 bg-gray-100 rounded" /></Td>
+                      <Td><div className="h-5 w-48 bg-gray-100 rounded" /></Td>
+                      <Td><div className="h-5 w-28 bg-gray-100 rounded" /></Td>
+                      <Td><div className="h-5 w-20 bg-gray-100 rounded" /></Td>
+                      <Td><div className="h-5 w-20 bg-gray-100 rounded" /></Td>
+                      <Td><div className="h-5 w-24 bg-gray-100 rounded" /></Td>
+                      <Td className="text-right pr-4"><div className="h-8 w-9 bg-gray-100 rounded-md ml-auto" /></Td>
+                    </tr>
+                  ))}
+                </>
               )}
-              {!loading && filtered.length === 0 && (
-                <tr><td colSpan={7} className="p-6 text-center text-gray-500">No users found.</td></tr>
+
+              {!loading && error && (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center">
+                    <div className="inline-flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg ring-1 ring-red-200">
+                      {error}
+                    </div>
+                  </td>
+                </tr>
               )}
-              {!loading && filtered.map((u) => (
-                <tr key={u._id} className="border-t">
+
+              {!loading && !error && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center">
+                    <div className="text-gray-600 font-medium">No users found</div>
+                    <div className="text-gray-500 text-sm mt-1">Try adjusting filters or refresh.</div>
+                  </td>
+                </tr>
+              )}
+
+              {!loading && !error && filtered.map((u, idx) => (
+                <tr
+                  key={u._id}
+                  className={idx % 2 ? "bg-white" : "bg-gray-50/40 hover:bg-gray-50"}
+                >
                   <Td>
-                    <div className="font-medium text-gray-800">{u.firstName} {u.lastName}</div>
-                    <div className="text-xs text-gray-500">#{u._id?.slice(-6)}</div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold ring-1 ring-emerald-200">
+                        {initials(`${u.firstName || ""} ${u.lastName || ""}`) || "U"}
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-800 leading-5">
+                          {u.firstName} {u.lastName}
+                        </div>
+                        <div className="text-[11px] text-gray-500">#{u._id?.slice(-6)}</div>
+                      </div>
+                    </div>
                   </Td>
-                  <Td>{u.email}</Td>
-                  <Td>{u.phone || "-"}</Td>
+                  <Td className="max-w-[260px]">
+                    <div className="truncate">{u.email}</div>
+                  </Td>
+                  <Td className="whitespace-nowrap">{u.phone || "-"}</Td>
                   <Td><RoleBadge role={u.role} /></Td>
                   <Td><StatusBadge status={u.status} /></Td>
-                  <Td>{formatDate(u.createdAt)}</Td>
-                  <Td className="text-right">
-                    <div className="inline-flex items-center gap-2">
-                      <button
-                        title="Edit"
-                        className="p-2 rounded hover:bg-gray-100"
-                        onClick={() => alert("Open edit for " + (u.email || u._id))}
-                      >
-                        <MdEdit />
-                      </button>
-                      <button
-                        title="Delete"
-                        className="p-2 rounded hover:bg-red-50 text-red-600"
-                        onClick={() => deleteUser(u._id)}
-                      >
-                        <FiTrash2 />
-                      </button>
-                      <button title="More" className="p-2 rounded hover:bg-gray-100">
-                        <FiMoreVertical />
-                      </button>
-                    </div>
+                  <Td className="whitespace-nowrap">{formatDate(u.createdAt)}</Td>
+                  <Td className="text-right pr-4">
+                    <button
+                      title="Delete"
+                      className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                      onClick={() => deleteUser(u._id)}
+                    >
+                      <FiTrash2 />
+                    </button>
                   </Td>
                 </tr>
               ))}
@@ -194,109 +283,10 @@ export default function UsersAdmin() {
         </div>
       </div>
 
-      {showCreate && (
-        <CreateUserModal onClose={() => setShowCreate(false)} onCreate={handleCreate} />
-      )}
-    </div>
-  );
-}
-
-/* ---- Small UI helpers (unchanged) ---- */
-function Th({ children, className = "" }) {
-  return <th className={`px-4 py-3 font-semibold ${className}`}>{children}</th>;
-}
-function Td({ children, className = "" }) {
-  return <td className={`px-4 py-3 align-top ${className}`}>{children}</td>;
-}
-function RoleBadge({ role }) {
-  const r = (role || "").toLowerCase();
-  const map = {
-    farmer: "bg-emerald-100 text-emerald-700",
-    consultant: "bg-amber-100 text-amber-700",
-    admin: "bg-indigo-100 text-indigo-700",
-  };
-  return <span className={`text-xs px-2 py-1 rounded ${map[r] || "bg-gray-100 text-gray-700"}`}>{r || "-"}</span>;
-}
-function StatusBadge({ status }) {
-  const s = (status || "").toUpperCase();
-  const map = {
-    ACTIVE: "bg-green-100 text-green-700",
-    PENDING: "bg-yellow-100 text-yellow-700",
-    INACTIVE: "bg-red-100 text-red-700",
-  };
-  return <span className={`text-xs px-2 py-1 rounded ${map[s] || "bg-gray-100 text-gray-700"}`}>{s || "-"}</span>;
-}
-function formatDate(d) {
-  if (!d) return "-";
-  const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return "-";
-  return dt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-}
-
-/* ---- Create Modal (kept same) ---- */
-function CreateUserModal({ onClose, onCreate }) {
-  const [form, setForm] = useState({
-    firstName: "", lastName: "", email: "", phone: "", role: "farmer",
-  });
-  const [saving, setSaving] = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    await onCreate(form);
-    setSaving(false);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl w-full max-w-lg shadow-lg">
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Add New User</h3>
-          <button className="text-gray-500 hover:text-gray-800" onClick={onClose}>✕</button>
-        </div>
-        <form onSubmit={submit} className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Input label="First Name" value={form.firstName} onChange={(v) => setForm({ ...form, firstName: v })} required />
-            <Input label="Last Name"  value={form.lastName}  onChange={(v) => setForm({ ...form, lastName: v })}  required />
-          </div>
-          <Input label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
-          <Input label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
-          <div>
-            <label className="block text-sm font-medium mb-1">Role</label>
-            <select
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-600"
-            >
-              <option value="farmer">Farmer</option>
-              <option value="consultant">Consultant</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div className="pt-2 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border" disabled={saving}>Cancel</button>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-60" disabled={saving}>
-              {saving ? "Saving..." : "Create"}
-            </button>
-          </div>
-        </form>
+      {/* Footer hint */}
+      <div className="text-xs text-gray-500">
+        Showing <span className="font-medium">{count}</span> {count === 1 ? "record" : "records"}.
       </div>
-    </div>
-  );
-}
-function Input({ label, value, onChange, type = "text", required = false }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        type={type}
-        required={required}
-        className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-600"
-      />
     </div>
   );
 }

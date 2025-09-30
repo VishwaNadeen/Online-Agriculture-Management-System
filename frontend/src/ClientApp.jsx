@@ -8,12 +8,15 @@ import About from "./pages/about";
 
 // Vishwa
 import UserRegistration from "./pages/user/userRegistration";
-import UserRoleDetails from "./pages/user/userRoleDetails";
+import FarmRegistration from "./pages/user/farmRegistration.jsx";
+import ConsultantRegistration from "./pages/user/consultantRegistration.jsx";
 import Login from "./pages/user/login";
 import Profile from "./pages/user/profile";
 import Farm from "./pages/user/farmerDetailsPage.jsx";
 import ProfileEdit from "./pages/user/profileEdit.jsx";
 import FarmEdit from "./pages/user/farmEdit.jsx";
+import Consultant from "./pages/user/ConsultantDetailsPage.jsx";
+import ConsultantEdit from "./pages/user/consultantedit.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -23,6 +26,7 @@ import ListAppointment from "./pages/appointments/ListAppointment.jsx";
 
 //kalana
 import CommunityForum from "./pages/community/CommunityForum";
+import MyPosts from "./pages/community/MyPosts.jsx";
 
 // Chanaka
 import CoursesPage from "./pages/courses/coursePage";
@@ -44,12 +48,15 @@ export default function ClientApp() {
 
         {/* Vishwa */}
         <Route path="/signup" element={<UserRegistration />} />
-        <Route path="/register-step2" element={<UserRoleDetails />} />
+        <Route path="/register/farmer" element={<FarmRegistration />} />
+        <Route path="/register/consultant" element={<ConsultantRegistration />} />
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/farm" element={<Farm />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />
         <Route path="/farm/edit" element={<FarmEdit />} />
+        <Route path="/profile/consultant" element={<Consultant />} />
+        <Route path="/profile/consultant/edit" element={<ConsultantEdit />} />
 
         {/* Methma */}
         <Route path="/SearchCon" element={<Searchcon />} />
@@ -59,6 +66,8 @@ export default function ClientApp() {
 
         {/* kalana */}
         <Route path="/community" element={<CommunityForum />} />
+        <Route path="mine" element={<MyPosts />} />
+        
 
         {/* Chanaka */}
         <Route path="/coursepage" element={<CoursesPage />} />

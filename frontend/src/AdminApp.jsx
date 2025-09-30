@@ -1,13 +1,11 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AdminHome from "./admin/sidebar.jsx";
 import AdminDashboard from "./admin/dashboard.jsx";
-import UsersAdmin from "./admin/UsersAdmin.jsx";
+import UsersAdmin from "./admin/usersAdmin.jsx";
 import CoursesAdmin from "./admin/courseAdmin.jsx";
 import AddCourse from "./admin/addCourse.jsx";
 import UpdateCourse from "./admin/updateCourse.jsx";
-import EventAdmin from "./admin/EventAdmin.jsx";
-import AddEvent from "./admin/AddEvent.jsx";
-import UpdateEvent from "./admin/EditEvent.jsx";
+import CommentsAdmin from "./admin/CommentsAdmin.jsx";
 
 // Replace with your real pages
 
@@ -32,10 +30,7 @@ export default function AdminApp() {
         <Route path="appointments" element={<AppointmentsAdmin />} />
         <Route path="community" element={<CommunityAdmin />} />
         <Route path="settings" element={<SettingsAdmin />} />
-        <Route path="events" element={<EventAdmin></EventAdmin>} />
-        <Route path="addEvent" element={<AddEvent></AddEvent>} />
-        <Route path="updateEvent" element={<UpdateEvent></UpdateEvent>} /> 
-
+        <Route path="comments" element={<CommentsAdmin />} />
         {/*Catch-all fallback */}
         <Route path="*" element={<Navigate to="." replace />} />
       </Route>

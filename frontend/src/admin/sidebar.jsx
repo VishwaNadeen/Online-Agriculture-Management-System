@@ -1,11 +1,19 @@
 // src/pages/admin/AdminHome.jsx
-import { NavLink, Outlet } from "react-router-dom";
-import { FaUsers, FaBook, FaCalendarAlt, FaComments, FaCog, FaHome } from "react-icons/fa";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { FaUsers, FaBook, FaCalendarAlt, FaComments, FaHome, FaSignOutAlt } from "react-icons/fa";
 
 export default function AdminHome() {
+  const navigate = useNavigate();
+
   const linkBase = "flex items-center gap-2 p-2 rounded";
   const hover = "hover:bg-green-600";
   const active = "bg-green-800";
+
+  const handleLogout = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    navigate("/login");
+  };
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -17,7 +25,7 @@ export default function AdminHome() {
         <nav className="flex-1 p-4 space-y-2">
           {/* dashboard at /admin */}
           <NavLink
-            to="."
+            to=""
             end
             className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
           >
@@ -46,7 +54,7 @@ export default function AdminHome() {
           </NavLink>
 
           <NavLink
-            to="community"
+            to="comments"
             className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
           >
             <FaComments /> Community
@@ -58,18 +66,21 @@ export default function AdminHome() {
           >
             <FaComments /> Events
           </NavLink>
-
-          <NavLink
-            to="settings"
-            className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
-          >
-            <FaCog /> Settings
-          </NavLink>
         </nav>
+
+        {/* Logout button at bottom */}
+        <div className="p-4 border-t border-green-600">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-red-600 hover:bg-red-700 text-white text-sm font-medium"
+          >
+            <FaSignOutAlt /> Logout
+          </button>
+        </div>
       </aside>
 
       {/* Right content area */}
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 p-6 overflow-y-auto overflow-x-auto">
         <Outlet />
       </main>
     </div>
