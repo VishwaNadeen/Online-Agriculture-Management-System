@@ -120,7 +120,7 @@ export default function AppointmentCard({
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-3 mt-5">
+      <div className="flex flex-wrap gap-3 mt-5 justify-end">
        {/*} <button
           onClick={(e) => { e.stopPropagation(); onOpen?.(appt); }}
           className="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200"

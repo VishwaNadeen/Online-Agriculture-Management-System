@@ -113,7 +113,8 @@ const validators = {
     if (!value?.trim()) return "Full name is required";
     if (value.length < 2) return "Name must be at least 2 characters";
     if (value.length > 50) return "Name must be less than 50 characters";
-    if (!/^[a-zA-Z0-9\s\-'.]+$/.test(value)) return "Use letters, numbers, spaces, - and ' only";
+    if (!/^[a-zA-Z\s\-'.]+$/.test(value)) return "Name can only contain letters, spaces, hyphens, and apostrophes";
+    if (/\d/.test(value)) return "Name cannot contain numbers";
     return null;
   },
 
@@ -274,6 +275,7 @@ export default function AppointmentForm({
   const [countryCode, setCountryCode] = useState("+94");
   const [mounted, setMounted] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [nameInputWarning, setNameInputWarning] = useState(false);
 
   /* ==== NEW: coords for map-picked location ==== */
   const [mapBusy, setMapBusy] = useState(false);
@@ -524,10 +526,22 @@ export default function AppointmentForm({
               icon={User}
               required
               value={form.name}
-              onChange={(e) => setField("name", e.target.value)}
+              onChange={(e) => {
+                const input = e.target.value;
+                // Check if user tried to enter numbers or invalid chars
+                const hasInvalidChars = /[^a-zA-Z\s\-'.]/.test(input);
+                if (hasInvalidChars) {
+                  setNameInputWarning(true);
+                  setTimeout(() => setNameInputWarning(false), 2000);
+                }
+                // Only allow letters, spaces, hyphens, and apostrophes
+                const filtered = input.replace(/[^a-zA-Z\s\-'.]/g, '');
+                setField("name", filtered);
+              }}
               onBlur={() => handleBlur("name")}
               error={errors.name}
               success={success.name}
+              warning={nameInputWarning ? "Numbers and special characters are not allowed in name" : warnings.name}
               placeholder="Enter your full name"
             />
 
