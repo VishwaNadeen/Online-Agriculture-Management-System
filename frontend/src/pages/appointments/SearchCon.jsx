@@ -283,10 +283,10 @@ export default function SearchCon() {
   };
 
   const goProfile = (c) => {
-    setSelected(c);
-    setActive(TABS.PROFILE);
+    const id = c?.id || c?._id || c?.consultantId;
+    if (!id) return;
     setPopupOpen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigate(`/profile/consultant`, { state: { publicView: true, consultant: c } });
   };
 
   const openPopupFor = (c) => {

@@ -17,6 +17,7 @@ import ProfileEdit from "./pages/user/profileEdit.jsx";
 import FarmEdit from "./pages/user/farmEdit.jsx";
 import Consultant from "./pages/user/ConsultantDetailsPage.jsx";
 import ConsultantEdit from "./pages/user/consultantedit.jsx";
+import ConsultantPublicProfile from "./pages/consultants/ConsultantPublicProfile.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -47,6 +48,7 @@ export default function ClientApp() {
         {/* public */}
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
+        <Route path="/consultants/:id" element={<ConsultantPublicProfile />} />
 
         {/* Vishwa */}
         <Route path="/signup" element={<UserRegistration />} />
