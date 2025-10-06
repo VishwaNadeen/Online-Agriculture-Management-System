@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Clock, MapPin, FileText, User, Phone, Mail, Briefcase } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 /* ==== NEW: react-leaflet / leaflet imports for map picker ==== */
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
@@ -263,6 +264,8 @@ export default function AppointmentForm({
   onSubmit,
   submitLabel = "Schedule Consultation",
   setServerMsg,
+  suppressSuccessFlow = false, // when true, parent handles toast/navigation
+  successToast = "Appointment booked successfully!",
 }) {
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const navigate = useNavigate();
@@ -296,6 +299,38 @@ export default function AppointmentForm({
   useEffect(() => {
     setForm((p) => ({ ...p, ...initialValues }));
   }, [initialValues]);
+
+  // When editing, split an incoming full phone (e.g., "+94XXXXXXXXX")
+  // into the countryCode select and the local number input.
+  useEffect(() => {
+    const raw = initialValues?.phone || "";
+    if (!raw) return;
+    // extract digits only
+    const digits = String(raw).replace(/\D/g, "");
+    if (!digits) return;
+    // match a known country code prefix
+    const known = PHONE_CODES.map((p) => p.code.replace("+", "")).sort((a,b)=>b.length-a.length);
+    const match = known.find((cc) => digits.startsWith(cc));
+    if (match) {
+      const local = digits.slice(match.length);
+      setCountryCode("+" + match);
+      setForm((p) => ({ ...p, phone: formatPhoneNumber(local) }));
+    } else {
+      // fallback: keep last up to 10-12 digits as local
+      const local = digits.length > 12 ? digits.slice(-10) : digits;
+      setForm((p) => ({ ...p, phone: formatPhoneNumber(local) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValues?.phone]);
+
+  // Ensure valid default for period mode so validation doesn't complain while UI shows a label
+  useEffect(() => {
+    if (form.timeMode === "period" && !PERIOD_OPTIONS.includes(form.appointmentTime)) {
+      setForm((p) => ({ ...p, appointmentTime: PERIOD_OPTIONS[0] }));
+      setErrors((e) => ({ ...e, appointmentTime: undefined }));
+      setSuccess((s) => ({ ...s, appointmentTime: getSuccessMessages.appointmentTime?.(PERIOD_OPTIONS[0], form) }));
+    }
+  }, [form.timeMode, form.appointmentTime]);
 
   const debouncedValidation = useMemo(
     () =>
@@ -410,13 +445,21 @@ export default function AppointmentForm({
     try {
       setSubmitting(true);
       await onSubmit(payload);
-      // Show success animation and reload shortly after
-      setShowSuccess(true);
-      setTimeout(() => {
-        // Reload current page
-        navigate(0);
-      }, 1400);
+      if (!suppressSuccessFlow) {
+        // Show success animation
+        setShowSuccess(true);
+        toast.success(successToast);
+        setTimeout(() => {
+          // Navigate to My Appointments page and scroll to top
+          navigate("/my-appointments");
+          // Scroll to top smoothly after navigation
+          setTimeout(() => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }, 100);
+        }, 1200);
+      }
     } catch (err) {
+      toast.error(err.message || "Failed to schedule appointment");
       setServerMsg?.({ type: "error", text: err.message || "Failed to schedule appointment" });
     } finally {
       setSubmitting(false);
