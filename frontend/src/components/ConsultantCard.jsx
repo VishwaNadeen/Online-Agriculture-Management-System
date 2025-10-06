@@ -52,6 +52,9 @@ export default function ConsultantCard({ consultant, onPreview }) {
     .toUpperCase()
     .slice(0, 2);
 
+  // Profile picture or fallback to initials
+  const profilePicture = consultant.profilePicture || consultant.avatar || consultant.image;
+
   // Specializations (limit to 2 for card)
   const specs = consultant.specializations || consultant.specialization
     ? [consultant.specialization]
@@ -75,9 +78,17 @@ export default function ConsultantCard({ consultant, onPreview }) {
         <div className="flex items-start gap-4 mb-4">
           {/* Avatar */}
           <div className="relative flex-shrink-0">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center text-white text-lg font-bold shadow-lg ring-4 ring-emerald-50 group-hover:ring-emerald-100 transition-all">
-              {initials || "??"}
-            </div>
+            {profilePicture ? (
+              <img
+                src={profilePicture}
+                alt={consultant.name}
+                className="w-16 h-16 rounded-full object-cover shadow-lg ring-4 ring-emerald-50 group-hover:ring-emerald-100 transition-all"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center text-white text-lg font-bold shadow-lg ring-4 ring-emerald-50 group-hover:ring-emerald-100 transition-all">
+                {initials || "??"}
+              </div>
+            )}
             {consultant.yearsExp >= 5 && (
               <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5">
                 <CheckBadgeIcon className="text-emerald-500" />

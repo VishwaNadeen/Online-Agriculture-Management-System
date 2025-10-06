@@ -117,8 +117,27 @@ export default function ConsultantDetailsPage() {
   const publicView = !!(location.state && location.state.publicView);
   const passedConsultant = location.state?.consultant || null;
   const [{ token, userId, cachedUser }, setAuth] = useState(() => readAuth());
-  const [user, setUser] = useState(cachedUser);
-  const [loading, setLoading] = useState(!cachedUser && !publicView);
+  // Seed with passed consultant so the correct avatar/name render instantly in public view
+  const seededFromPassed = (() => {
+    if (!publicView || !passedConsultant) return null;
+    const full = passedConsultant.name || "";
+    const [firstName, ...rest] = full.split(" ");
+    return {
+      firstName: firstName || full,
+      lastName: rest.join(" ") || "",
+      role: "consultant",
+      createdAt: passedConsultant.createdAt || new Date().toISOString(),
+      profilePicture: passedConsultant.profilePicture || passedConsultant.avatar || passedConsultant.image || null,
+      email: passedConsultant.email,
+      phone: passedConsultant.phone,
+      address: passedConsultant.address,
+      consultant: {
+        bio: passedConsultant.about || passedConsultant.bio,
+      },
+    };
+  })();
+  const [user, setUser] = useState(publicView ? seededFromPassed : cachedUser);
+  const [loading, setLoading] = useState(publicView ? true : !cachedUser);
   const [pageErr, setPageErr] = useState("");
 
   // In public view, do not force login
