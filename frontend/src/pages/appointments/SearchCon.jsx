@@ -5,8 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import ConsultantCard from "../../components/ConsultantCard";
 
-// ✅ Page loader (your existing component)
-import Loader from "../../components/loader.jsx";
+// Removed blocking page loader; we'll show inline skeletons instead
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const CONSULT_API = `${BASE}/consultants`;
@@ -112,51 +111,103 @@ export default function SearchCon() {
   const [draft, setDraft] = useState({ q: "", category: "", city: "" });
 
   const [list, setList] = useState([]);
-  const [, setLoading] = useState(false);     // true while fetching
+  const [loading, setLoading] = useState(false);     // true while fetching
   const [showLoader, setShowLoader] = useState(false); // true while we DISPLAY loader (min duration)
   const loaderStartRef = useRef(0);
-  const MIN_LOADER_MS = 900;
+  const MIN_LOADER_MS_FIRST = 400; // faster perceived first load
+  const MIN_LOADER_MS_NEXT = 0; // keep subsequent queries snappy
+  const loadCounterRef = useRef(0);
+  const firstLoadDoneRef = useRef(false);
+  const activeControllerRef = useRef(null);
+  const cacheRef = useRef(new Map()); // key -> { ts, items }
+  const CACHE_TTL_MS = 30_000;
+  const MemoConsultantCard = React.memo(ConsultantCard);
 
   const [err, setErr] = useState("");
 
   // ---- helper to start/stop loader with minimum visible duration
-  const startLoader = () => {
+  const startLoader = (isFirst = false) => {
+    const id = ++loadCounterRef.current;
+    console.time(`SearchCon:load#${id}`);
     loaderStartRef.current = Date.now();
     setLoading(true);
-    setShowLoader(true);
+    // show full-screen loader only for first page load
+    if (isFirst && !firstLoadDoneRef.current) {
+      setShowLoader(true);
+    }
   };
-  const stopLoader = () => {
+  const stopLoader = (isFirst = false) => {
     const elapsed = Date.now() - loaderStartRef.current;
-    const remain = Math.max(0, MIN_LOADER_MS - elapsed);
+    const minMs = isFirst && !firstLoadDoneRef.current ? MIN_LOADER_MS_FIRST : MIN_LOADER_MS_NEXT;
+    const remain = Math.max(0, minMs - elapsed);
     setTimeout(() => {
       setLoading(false);
-      setShowLoader(false);
+      if (isFirst && !firstLoadDoneRef.current) {
+        setShowLoader(false);
+        firstLoadDoneRef.current = true;
+      }
+      console.timeEnd(`SearchCon:load#${loadCounterRef.current}`);
     }, remain);
   };
 
-  const fetchConsultants = async (filters) => {
+  const fetchConsultants = async (filters, opts = {}) => {
+    const { isFirst = false } = opts;
     try {
-      startLoader();
+      // respond from cache if fresh
+      const key = JSON.stringify({
+        category: filters.category || "",
+        city: filters.city || "",
+        q: (filters.q || "").toLowerCase(),
+      });
+      const hit = cacheRef.current.get(key);
+      if (hit && Date.now() - hit.ts < CACHE_TTL_MS) {
+        setList(hit.items);
+        // no network needed if cached is fresh
+        return;
+      }
+
+      // cancel previous request if any
+      if (activeControllerRef.current) {
+        try { activeControllerRef.current.abort(); } catch {}
+      }
+      const ctrl = new AbortController();
+      activeControllerRef.current = ctrl;
+
+      startLoader(isFirst);
       setErr("");
-      const params = {};
+      const params = { limit: 30 }; // backend may ignore; harmless if unsupported
       if (filters.category) params.category = filters.category;
       if (filters.city) params.city = filters.city;
       if (filters.q) params.q = String(filters.q).toLowerCase();
-      const { data } = await axios.get(CONSULT_API, { params });
+      const { data } = await axios.get(CONSULT_API, { params, signal: ctrl.signal, timeout: 10000 });
       const items = Array.isArray(data) ? data : data?.items || [];
-      setList(items);
+      // shallow check to avoid unnecessary re-renders
+      setList((prev) => {
+        if (prev.length === items.length && prev.every((p, i) => p.id === items[i]?.id)) return prev;
+        return items;
+      });
+      cacheRef.current.set(key, { ts: Date.now(), items });
     } catch (e) {
-      setErr(e?.response?.data?.message || e.message || "Failed to load");
+      if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") {
+        // ignore aborted fetches
+      } else {
+        setErr(e?.response?.data?.message || e.message || "Failed to load");
+      }
     } finally {
-      stopLoader();
+      stopLoader(isFirst);
     }
   };
 
   // initial load
   useEffect(() => {
-    fetchConsultants({});
+    fetchConsultants({}, { isFirst: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Log tab switches
+  useEffect(() => {
+    console.log("SearchCon:tabSwitch", active, new Date().toISOString());
+  }, [active]);
 
   const parseFromQ = (rawInput) => {
     const raw = (rawInput || "").trim();
@@ -178,7 +229,7 @@ export default function SearchCon() {
     return { category: "", city: "", q };
   };
 
-  // debounce typing
+  // debounce typing (slightly higher to reduce request churn)
   useEffect(() => {
     const h = setTimeout(() => {
       const parsed = parseFromQ(draft.q);
@@ -187,8 +238,10 @@ export default function SearchCon() {
         city: draft.city || parsed.city,
         q: !parsed.category && !parsed.city ? draft.q : "",
       };
+      // avoid network for 1-char free-text queries with no filters
+      if (next.q && next.q.trim().length === 1 && !next.category && !next.city) return;
       fetchConsultants(next);
-    }, 200);
+    }, 350);
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.q]);
@@ -247,10 +300,7 @@ export default function SearchCon() {
     });
   };
 
-  /* ---------- PAGE LOADER ---------- */
-  if (showLoader) {
-    return <Loader />; // Full-screen loader with min visible time
-  }
+  // Removed blocking page loader; we use inline skeletons in the list section
 
   return (
     <div className="min-h-screen bg-green-50/95">
@@ -359,7 +409,7 @@ export default function SearchCon() {
 
               {list.length ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {list.map((c) => (
+                  {list.slice(0, 24).map((c) => (
                     <button
                       key={c.id}
                       type="button"
@@ -367,8 +417,14 @@ export default function SearchCon() {
                       className="text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-xl"
                       aria-label={`Open actions for ${c.name}`}
                     >
-                      <ConsultantCard consultant={c} />
+                      <MemoConsultantCard consultant={c} />
                     </button>
+                  ))}
+                </div>
+              ) : showLoader || loading ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {Array.from({ length: 9 }).map((_, i) => (
+                    <SkeletonCard key={i} />
                   ))}
                 </div>
               ) : (

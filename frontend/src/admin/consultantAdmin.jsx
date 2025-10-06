@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Users,
-  DollarSign,
   TrendingUp,
   Calendar,
   FileText,
@@ -16,7 +15,6 @@ import {
   Sprout,
 } from "lucide-react";
 import { ApptAPI } from "../api/appointments";
-import api from "../utils/api";
 import { ConsultantAPI } from "../api/consultants";
 
 export default function AgriAnalytics() {
@@ -26,8 +24,8 @@ export default function AgriAnalytics() {
 
   // live data
   const [myAppointments, setMyAppointments] = useState([]); // assigned to me as consultant
-  const [topConsultants, setTopConsultants] = useState([]);
   const [me, setMe] = useState(null);
+  
 
   useEffect(() => {
     let mounted = true;
@@ -35,14 +33,12 @@ export default function AgriAnalytics() {
       setLoading(true);
       setError("");
       try {
-        const [appts, consultantsRes, meRes] = await Promise.all([
-          ApptAPI.listAsConsultant(),
-          api.get("/consultants", { params: { limit: 5 } }).then((r) => r.data?.items || []),
+        const [appts, meRes] = await Promise.all([
+          ApptAPI.listAsConsultant().catch(() => []),
           ConsultantAPI.getMe().catch(() => null),
         ]);
         if (!mounted) return;
         setMyAppointments(appts || []);
-        setTopConsultants(consultantsRes || []);
         setMe(meRes);
       } catch (e) {
         if (!mounted) return;
@@ -330,6 +326,11 @@ export default function AgriAnalytics() {
           {error}
         </div>
       )}
+      {!loading && !me && (
+        <div className="mb-4 p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm border border-yellow-200">
+          Please log in as a consultant to view your analytics and profile.
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -482,31 +483,59 @@ export default function AgriAnalytics() {
             )}
           </div>
         </div>
-
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Top Consultants</h3>
-            <a href="/consultants" className="text-sm text-green-600 hover:text-green-700">See All</a>
+            <h3 className="text-lg font-semibold text-gray-900">My Consultant Details</h3>
           </div>
-          <div className="space-y-4">
-            {topConsultants.map((c) => (
-              <div key={c.id} className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50">
+          {!me && loading && (
+            <p className="text-sm text-gray-500">Loading profile...</p>
+          )}
+          {!loading && me && (
+            <div className="space-y-3">
+              <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">🌿</div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{c.name}</h4>
-                  <p className="text-sm text-gray-600">{c.city}</p>
-                  <p className="text-xs text-green-600">{c.category}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-900">{(c.yearsExp || 0)} yrs</p>
-                  <p className="text-xs text-gray-600">{(c.languages || []).join(", ")}</p>
+                <div>
+                  <h4 className="font-medium text-gray-900">{me.name}</h4>
+                  <p className="text-sm text-gray-600">{me.city || "-"}</p>
                 </div>
               </div>
-            ))}
-            {!loading && topConsultants.length === 0 && (
-              <p className="text-sm text-gray-500">No consultants found.</p>
-            )}
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">Email</p>
+                  <p className="text-sm text-gray-900">{me.email || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Phone</p>
+                  <p className="text-sm text-gray-900">{me.phone || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Specialization</p>
+                  <p className="text-sm text-gray-900">{me.specialization || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Category</p>
+                  <p className="text-sm text-gray-900">{me.category || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Experience</p>
+                  <p className="text-sm text-gray-900">{me.yearsExp != null ? `${me.yearsExp} yrs` : "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Languages</p>
+                  <p className="text-sm text-gray-900">{Array.isArray(me.languages) ? me.languages.join(", ") : me.languages || "-"}</p>
+                </div>
+              </div>
+              {me.bio && (
+                <div>
+                  <p className="text-xs text-gray-500">Bio</p>
+                  <p className="text-sm text-gray-900">{me.bio}</p>
+                </div>
+              )}
+            </div>
+          )}
+          {!loading && !me && (
+            <p className="text-sm text-gray-500">No consultant profile available.</p>
+          )}
         </div>
       </div>
 
