@@ -104,28 +104,28 @@ export default function CreateAppointment() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 ">
-     
+    <div className="min-h-screen bg-green-50/95">
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        {serverMsg && (
+          <div
+            className={`mt-4 rounded-xl border px-6 py-4 text-sm ${
+              serverMsg.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-rose-200 bg-rose-50 text-rose-800"
+            }`}
+          >
+            {serverMsg.text}
+          </div>
+        )}
 
-      {serverMsg && (
-        <div
-          className={`mt-4 rounded-xl border px-6 py-4 text-sm ${
-            serverMsg.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
-          }`}
-        >
-          {serverMsg.text}
-        </div>
-      )}
-
-      <AppointmentForm
-        initialValues={prefill}
-        onSubmit={handleCreate}
-        submitLabel="Schedule Consultation"
-        serverMsg={serverMsg}
-        setServerMsg={setServerMsg}
-      />
+        <AppointmentForm
+          initialValues={prefill}
+          onSubmit={handleCreate}
+          submitLabel="Schedule Consultation"
+          serverMsg={serverMsg}
+          setServerMsg={setServerMsg}
+        />
+      </div>
     </div>
   );
 }

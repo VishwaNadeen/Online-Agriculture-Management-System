@@ -488,19 +488,13 @@ export default function AppointmentForm({
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-emerald-50 px-4 py-12 relative overflow-hidden">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200 rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-300 rounded-full blur-3xl opacity-20 translate-y-1/2 -translate-x-1/2" />
-
       <form
         onSubmit={handleSubmit}
-        className={`relative z-10 bg-white shadow-2xl p-8 rounded-3xl border border-emerald-100/50 max-w-4xl w-full space-y-6 transition-all duration-1000 ${
+        className={`relative z-10 bg-white shadow-md p-8 rounded-3xl max-w-4xl w-full space-y-6 transition-all duration-1000 ${
           mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         }`}
         noValidate
       >
-        {/* Decorative top accent */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 rounded-t-3xl" />
 
         {/* Header */}
         <div className="text-center mb-8">
@@ -662,7 +656,7 @@ export default function AppointmentForm({
               </div>
             </div>
 
-            <div className="w-full h-72 rounded-xl overflow-hidden border-2 border-emerald-300">
+            <div className="w-full h-72 rounded-xl overflow-hidden border-2 border-gray-200">
               <MapContainer
                 center={[7.8731, 80.7718]} // Sri Lanka
                 zoom={7}
