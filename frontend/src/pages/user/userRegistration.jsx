@@ -316,10 +316,20 @@ export default function UserRegistration() {
 
       const userId = res?.data?.user?._id || res?.data?.userId;
       const token = res?.data?.token;
-      if (userId) localStorage.setItem("tempUserId", userId);
+      const user = res?.data?.user;
+      
+      if (userId) {
+        localStorage.setItem("tempUserId", userId);
+        localStorage.setItem("userId", userId);
+      }
       if (token) {
         localStorage.setItem("auth_token", token);
         localStorage.setItem("token", token);
+      }
+      if (user) {
+        localStorage.setItem("auth_user", JSON.stringify(user));
+        sessionStorage.setItem("auth_user", JSON.stringify(user));
+        window.dispatchEvent(new Event("auth-changed"));
       }
 
       toast.success("Registration saved ✅");

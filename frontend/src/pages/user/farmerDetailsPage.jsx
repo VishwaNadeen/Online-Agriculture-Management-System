@@ -10,7 +10,7 @@ function readAuth() {
   const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
   const token = get("auth_token") || get("token") || get("user_token") || get("authToken") || "";
   const cachedUser = safeParse(get("auth_user"));
-  const userId = get("userId") || cachedUser?._id || "";
+  const userId = get("userId") || get("tempUserId") || cachedUser?._id || "";
   return { token, userId, cachedUser };
 }
 const valueOrDash = (v) => (v === null || v === undefined || v === "" ? "-" : String(v));

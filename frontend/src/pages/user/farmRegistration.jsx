@@ -357,6 +357,8 @@ export default function FarmerRegistration() {
         },
       });
       toast.success("Farmer details saved ✅");
+      // Clear tempUserId since registration is complete
+      localStorage.removeItem("tempUserId");
       navigate("/");
     } catch (error) {
       console.error(error);

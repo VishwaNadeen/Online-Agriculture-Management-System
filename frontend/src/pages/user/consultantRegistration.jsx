@@ -223,6 +223,8 @@ export default function ConsultantRegistration() {
         },
       });
       toast.success("Consultant details saved ✅");
+      // Clear tempUserId since registration is complete
+      localStorage.removeItem("tempUserId");
       navigate("/");
     } catch (error) {
       console.error(error);

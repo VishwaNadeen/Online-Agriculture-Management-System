@@ -16,7 +16,7 @@ function readAuth() {
       "";
     const rawUser = get("auth_user");
     const user = rawUser ? JSON.parse(rawUser) : null;
-    const userId = get("userId") || user?._id || "";
+    const userId = get("userId") || get("tempUserId") || user?._id || "";
     return { token, user, userId };
   } catch {
     return { token: "", user: null, userId: "" };

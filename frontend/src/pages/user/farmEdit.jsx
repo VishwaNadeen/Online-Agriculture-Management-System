@@ -11,7 +11,7 @@ function readAuth() {
   const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
   const token = get("auth_token") || get("token") || get("user_token") || get("authToken") || "";
   const cachedUser = safeParse(get("auth_user"));
-  const userId = (cachedUser?._id) || get("userId") || "";
+  const userId = (cachedUser?._id) || get("userId") || get("tempUserId") || "";
   return { token, userId, cachedUser };
 }
 const valueOrEmpty = (v) => (v == null ? "" : v);
