@@ -28,6 +28,7 @@ function resolveImageUrl(img) {
   return `${BASE_URL}${pathPart}`;
 }
 
+// Cloudinary thumbnail helper (no-op for non-Cloudinary URLs)
 function cloudThumb(url, size = 96) {
   if (!url) return "";
   const m = url.match(
