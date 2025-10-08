@@ -1,7 +1,8 @@
-// backend/middleware/auth.js
+// backend/middlewares/auth.js
 import jwt from "jsonwebtoken";
-import User from "../models/userModel.js"; // adjust path
+import User from "../models/userModel.js"; // adjust path if needed
 
+/* -------------------- core auth -------------------- */
 export async function auth(req, res, next) {
   try {
     const authHeader = req.headers.authorization || "";
@@ -22,11 +23,12 @@ export async function auth(req, res, next) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 }
-// ✅ add this line so routes can import { requireAuth }
-export { auth as requireAuth };
-export default auth; // optional, but handy
 
-// ✅ optionalAuth: do NOT require a token, but attach req.user if present
+// keep these exports for compatibility
+export { auth as requireAuth };
+export default auth;
+
+/* --------------- optional auth (non-blocking) --------------- */
 export async function optionalAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization || "";
@@ -40,16 +42,38 @@ export async function optionalAuth(req, res, next) {
     const user = await User.findById(userId).lean();
     if (user) req.user = user;
     return next();
-  } catch (e) {
-    // ignore invalid tokens for optional flows
+  } catch {
+    // ignore invalid/expired tokens for optional flows
     return next();
   }
 }
 
-// ✅ add selfOrAdmin (tiny helper)
+/* -------- self or admin helper (for user-owned resources) -------- */
 export const selfOrAdmin = (paramName = "id") => (req, res, next) => {
   if (String(req.user?._id) === String(req.params[paramName]) || req.user?.role === "admin") {
     return next();
   }
   return res.status(403).json({ message: "Forbidden: self or admin only" });
+};
+
+/* -------------------- role helpers -------------------- */
+// require a specific role (e.g., "admin")
+export const requireRole = (role) => (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+  if (req.user.role !== role) return res.status(403).json({ message: `Forbidden: ${role}s only` });
+  next();
+};
+
+// shorthand for admin-only
+export const requireAdmin = (req, res, next) => requireRole("admin")(req, res, next);
+
+// allow any of the provided roles
+export const requireAnyRole = (...roles) => (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+  if (!roles.includes(req.user.role)) {
+    return res
+      .status(403)
+      .json({ message: `Forbidden: roles [${roles.join(", ")}] only` });
+  }
+  next();
 };
