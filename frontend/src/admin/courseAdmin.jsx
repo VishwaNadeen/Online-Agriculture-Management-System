@@ -36,6 +36,16 @@ export default function CoursesAdmin() {
           Courses 
         </h1>
 
+        {/* === Added: Reports button (navigates to report page) === */}
+        <div className="mb-4">
+          <button
+            onClick={() => navigate("/admin/CourseReport")}
+            className="px-4 py-2 bg-emerald-700 text-white rounded-[10px] border border-emerald-600/50 shadow-lg shadow-emerald-700/20 hover:shadow-xl hover:shadow-emerald-700/30 transition transform duration-200 hover:scale-[1.02] active:scale-95"
+          >
+            Reports
+          </button>
+        </div>
+
         <div className="bg-white rounded-2xl shadow-xl border border-emerald-100 overflow-hidden">
           {isLoading ? (
             <div className="p-10 flex justify-center bg-gray-100">
@@ -159,7 +169,7 @@ export default function CoursesAdmin() {
                               title="Edit"
                               className="bg-emerald-700 p-[7px] text-3xl rounded-full text-amber-50 cursor-pointer hover:bg-emerald-800"
                               onClick={() => {
-                                navigate("/admin/updateCourse", {
+                                navigate("/admin/courseReport", {
                                   state: course, // pass whole object for prefill
                                 });
                               }}
@@ -183,13 +193,13 @@ export default function CoursesAdmin() {
       </div>
 
       {/* Floating Add Button */}
-    <Link
-  to={"/admin/addCourse"}
-  className="group fixed top-5 right-5 px-4 py-3 bg-gradient-to-r bg-emerald-700 text-white rounded-[10px] border border-emerald-600/50 shadow-lg shadow-emerald-700/20 hover:shadow-xl hover:shadow-emerald-700/30 transition transform duration-200 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 flex items-center gap-2"
->
-  <BiPlus className="text-2xl transition-transform duration-200 group-hover:rotate-60" />
-  <span className="font-medium hidden sm:block tracking-wide">Add Course</span>
-</Link>
+      <Link
+        to={"/admin/addCourse"}
+        className="group fixed top-5 right-5 px-4 py-3 bg-gradient-to-r bg-emerald-700 text-white rounded-[10px] border border-emerald-600/50 shadow-lg shadow-emerald-700/20 hover:shadow-xl hover:shadow-emerald-700/30 transition transform duration-200 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 flex items-center gap-2"
+      >
+        <BiPlus className="text-2xl transition-transform duration-200 group-hover:rotate-60" />
+        <span className="font-medium hidden sm:block tracking-wide">Add Course</span>
+      </Link>
 
     </div>
   );

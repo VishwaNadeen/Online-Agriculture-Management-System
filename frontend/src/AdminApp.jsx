@@ -10,6 +10,7 @@ import EventAdmin from "./admin/EventAdmin.jsx";
 import AddEvent from "./admin/AddEvent.jsx";
 import EditEvent from "./admin/EditEvent.jsx";
 import ConsultantAdmin from "./admin/consultantAdmin.jsx";
+import CoursesReport from "./admin/CourseReport.jsx";
 
 // Replace with your real pages
 
@@ -30,6 +31,7 @@ export default function AdminApp() {
         <Route path="users" element={<UsersAdmin />} />
         <Route path="courses" element={<CoursesAdmin></CoursesAdmin>} />
         <Route path="addCourse" element={<AddCourse></AddCourse>} />
+        <Route path="courseReport" element={<CoursesReport></CoursesReport>} />
         <Route path="updateCourse" element={<UpdateCourse></UpdateCourse>} />
         <Route path="appointments" element={<AppointmentsAdmin />} />
         <Route path="community" element={<CommunityAdmin />} />
