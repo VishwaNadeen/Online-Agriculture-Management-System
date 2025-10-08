@@ -201,6 +201,13 @@ export default function CoursesAdmin() {
         <span className="font-medium hidden sm:block tracking-wide">Add Course</span>
       </Link>
 
+      {/* Floating Reports Button — placed to the LEFT of Add Course */}
+      <button
+        onClick={() => navigate("/admin/CourseReport")}
+        className="fixed top-5 right-44 px-4 py-3 bg-emerald-700 text-white rounded-[10px] border border-emerald-600/50 shadow-lg shadow-emerald-700/20 hover:shadow-xl hover:shadow-emerald-700/30 transition transform duration-200 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70"
+      >
+        Reports
+      </button>
     </div>
   );
 }
