@@ -28,6 +28,17 @@ function resolveImageUrl(img) {
   return `${BASE_URL}${pathPart}`;
 }
 
+function cloudThumb(url, size = 96) {
+  if (!url) return "";
+  const m = url.match(
+    /(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.*)$/i
+  );
+  if (!m) return url;
+  const prefix = m[1];
+  const rest = m[2];
+  return `${prefix}c_fill,w_${size},h_${size},q_auto,f_auto/${rest}`;
+}
+
 // preview clamp helper
 const preview = (s = "", n = 140) =>
   s.length > n ? s.slice(0, n).trimEnd() + "…" : s;
@@ -78,7 +89,7 @@ function PostModal({ postId, onClose }) {
                 className="w-full rounded-lg border object-cover"
               />
             )}
-            <div className="text-gray-700">{post.description}</div>
+            <div className="text-gray-700">{post.comment}</div>
 
             <div className="mt-6">
               <h3 className="font-semibold mb-2">Comments</h3>
@@ -113,10 +124,10 @@ function PostModal({ postId, onClose }) {
 export default function CommentsAdmin() {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(new Set()); // Track deleting comments
+  const [deleting, setDeleting] = useState(new Set());
   const [expanded, setExpanded] = useState(() => new Set());
   const [q, setQ] = useState("");
-  const [openPostId, setOpenPostId] = useState(null); // <-- new state for modal
+  const [openPostId, setOpenPostId] = useState(null);
 
   const loadComments = async () => {
     try {
@@ -220,7 +231,16 @@ export default function CommentsAdmin() {
     );
   }, [comments, q]);
 
-  if (loading) return <div className="text-gray-600 p-6">Loading comments...</div>;
+  // 🔹 Updated loader with spinner
+  if (loading)
+    return (
+      <div className="p-12 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-emerald-700">
+          <span className="inline-block h-5 w-5 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+          <span className="font-medium">Loading comments…</span>
+        </div>
+      </div>
+    );
 
   return (
     <div className="p-6">
@@ -271,6 +291,7 @@ export default function CommentsAdmin() {
                 "";
               const avatar = resolveImageUrl(avatarRaw);
               const name = c.authorName || "Anonymous";
+              const thumb = cloudThumb(c.postImage, 64);
 
               return (
                 <div key={c._id} className="relative">
@@ -281,7 +302,9 @@ export default function CommentsAdmin() {
                           src={avatar}
                           alt="avatar"
                           className="h-10 w-10 rounded-full border object-cover"
-                          onError={(e) => (e.currentTarget.style.display = "none")}
+                          onError={(e) =>
+                            (e.currentTarget.style.display = "none")
+                          }
                         />
                       ) : (
                         <div className="h-10 w-10 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-700 font-bold">
@@ -289,7 +312,9 @@ export default function CommentsAdmin() {
                         </div>
                       )}
                       <div className="leading-tight">
-                        <div className="font-semibold text-emerald-900">{name}</div>
+                        <div className="font-semibold text-emerald-900">
+                          {name}
+                        </div>
                         {c.postCategory && (
                           <div className="mt-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                             {c.postCategory}
@@ -315,20 +340,21 @@ export default function CommentsAdmin() {
                       {fmtDateTime(c.createdAt)}
                     </div>
 
-                    {/* Comment + post image thumbnail */}
                     <div className="col-span-3 text-gray-800">
                       <div className="flex items-start gap-3">
                         {c.postImage ? (
                           <button
                             onClick={() => setOpenPostId(c.postId)}
                             className="shrink-0 block"
-                            title="Open post (with comments)"
+                            title="Open post (photo & comments)"
                           >
                             <img
-                              src={c.postImage}
+                              src={thumb}
                               alt="post"
                               className="h-12 w-12 rounded-md object-cover border border-emerald-200 hover:opacity-90"
-                              onError={(e) => (e.currentTarget.style.display = "none")}
+                              onError={(e) =>
+                                (e.currentTarget.src = c.postImage)
+                              }
                             />
                           </button>
                         ) : null}
@@ -377,8 +403,9 @@ export default function CommentsAdmin() {
         </div>
       </div>
 
-      {/* Popup Modal */}
-      {openPostId && <PostModal postId={openPostId} onClose={() => setOpenPostId(null)} />}
+      {openPostId && (
+        <PostModal postId={openPostId} onClose={() => setOpenPostId(null)} />
+      )}
     </div>
   );
 }
