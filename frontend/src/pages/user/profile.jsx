@@ -11,7 +11,7 @@ function readAuth() {
   const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
   const token = get("auth_token") || get("token") || get("user_token") || get("authToken") || "";
   const cachedUser = safeParse(get("auth_user"));
-  const userId = get("userId") || cachedUser?._id || "";
+  const userId = (cachedUser?._id) || get("userId") || "";
   return { token, userId, cachedUser };
 }
 const prettyDate = (d) => (d ? new Date(d).toLocaleDateString() : "-");

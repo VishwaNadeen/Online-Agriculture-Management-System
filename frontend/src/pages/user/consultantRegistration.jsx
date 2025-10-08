@@ -216,16 +216,23 @@ export default function ConsultantRegistration() {
 
     setLoading(true);
     try {
-      await axios.patch(`${BASE}/users/${userId}`, payload, {
+      const response = await axios.patch(`${BASE}/users/${userId}`, payload, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
+      
+      // Update the stored user data
+      const updatedUser = response.data;
+      localStorage.setItem("auth_user", JSON.stringify(updatedUser));
+      sessionStorage.setItem("auth_user", JSON.stringify(updatedUser));
+      window.dispatchEvent(new Event("auth-changed"));
+      
       toast.success("Consultant details saved ✅");
       navigate("/");
     } catch (error) {
-      console.error(error);
+      console.error("Consultant registration error:", error);
       const msg =
         error.response?.data?.message || error.message || "Failed to save details";
       setErr(msg);
