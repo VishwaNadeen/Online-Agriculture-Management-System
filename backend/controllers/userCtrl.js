@@ -11,9 +11,10 @@ const {
 } = process.env;
 
 /* ---------- helpers ---------- */
+// Always sign a JWT, falling back to a dev secret if JWT_SECRET is not provided.
+// This aligns with the auth middleware which also falls back to "dev_secret" for verification.
 const signTokenIfPossible = (user) => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) return null;
+  const secret = process.env.JWT_SECRET || "dev_secret";
   // support virtual admin id
   const sub = user._id || user.id || user.sub || "unknown";
   const role = user.role || "user";
