@@ -12,6 +12,10 @@ import EditEvent from "./admin/EditEvent.jsx";
 import ConsultantAdmin from "./admin/consultantAdmin.jsx";
 import CoursesReport from "./admin/CourseReport.jsx";
 
+import DiscoveryAll from "./admin/discoveryAll";
+import DiscoveryCreate from "./admin/DiscoveryCreate";
+import DiscoveryEdit from "./admin/DiscoveryEdit";
+
 // Replace with your real pages
 
 const AppointmentsAdmin = () => <div>Appointments page</div>;
@@ -41,8 +45,9 @@ export default function AdminApp() {
         <Route path="consultant" element={<ConsultantAdmin></ConsultantAdmin>} />
         <Route path="addevent" element={<AddEvent></AddEvent>} />
         <Route path="event/:id/editevent" element={<EditEvent></EditEvent>} />
-
-
+        <Route path="discoveries" element={<DiscoveryAll />} />
+        <Route path="discoveries/new" element={<DiscoveryCreate />} />
+        <Route path="discoveries/:idOrSlug/edit" element={<DiscoveryEdit />} />
         {/*Catch-all fallback */}
         <Route path="*" element={<Navigate to="." replace />} />
       </Route>

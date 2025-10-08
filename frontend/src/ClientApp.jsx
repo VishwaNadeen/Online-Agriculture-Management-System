@@ -71,7 +71,7 @@ export default function ClientApp() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/consultant" element={<Dashboard />} />
         <Route path="/dashboard/bookings" element={<Dashboard />} />
-       {/* <Route path="/appointments/me" element={<MyAppointments />} />
+        {/* <Route path="/appointments/me" element={<MyAppointments />} />
          <Route path="/my-appointments" element={<ListAppointment />} />*/}
          <Route path="/my-appointments" element={<MyAppointments />} />
 
@@ -80,7 +80,6 @@ export default function ClientApp() {
         <Route path="mine" element={<MyPosts />} />
         <Route path="/discoveries" element={<DiscoveryPage />} />
         
-
         {/* Chanaka */}
         <Route path="/coursepage" element={<CoursesPage />} />
         <Route path="/courses/:courseID" element={<CourseOverview />} />
