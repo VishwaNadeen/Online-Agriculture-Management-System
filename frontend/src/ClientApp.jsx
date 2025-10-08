@@ -29,6 +29,7 @@ import MyAppointments from "./pages/appointments/MyAppointments";
 //kalana
 import CommunityForum from "./pages/community/CommunityForum";
 import MyPosts from "./pages/community/MyPosts.jsx";
+import DiscoveryPage from "./pages/discoveries/DiscoveryPage";
 
 // Chanaka
 import CoursesPage from "./pages/courses/coursePage";
@@ -77,6 +78,7 @@ export default function ClientApp() {
         {/* kalana */}
         <Route path="/community" element={<CommunityForum />} />
         <Route path="mine" element={<MyPosts />} />
+        <Route path="/discoveries" element={<DiscoveryPage />} />
         
 
         {/* Chanaka */}

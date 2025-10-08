@@ -38,9 +38,11 @@ export default function AdminApp() {
         <Route path="settings" element={<SettingsAdmin />} />
         <Route path="comments" element={<CommentsAdmin />} />
         <Route path="event" element={<EventAdmin></EventAdmin>} />
-          <Route path="consultant" element={<ConsultantAdmin></ConsultantAdmin>} />
+        <Route path="consultant" element={<ConsultantAdmin></ConsultantAdmin>} />
         <Route path="addevent" element={<AddEvent></AddEvent>} />
         <Route path="event/:id/editevent" element={<EditEvent></EditEvent>} />
+
+
         {/*Catch-all fallback */}
         <Route path="*" element={<Navigate to="." replace />} />
       </Route>

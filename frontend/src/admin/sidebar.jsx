@@ -1,13 +1,8 @@
-// src/pages/admin/AdminHome.jsx
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { FaUsers, FaBook, FaCalendarAlt, FaComments, FaHome, FaSignOutAlt } from "react-icons/fa";
+import { FaUsers, FaBook, FaCalendarAlt, FaComments, FaHome, FaSignOutAlt, FaCompass, FaCalendar } from "react-icons/fa";
 
 export default function AdminHome() {
   const navigate = useNavigate();
-
-  const linkBase = "flex items-center gap-2 p-2 rounded";
-  const hover = "hover:bg-green-600";
-  const active = "bg-green-800";
 
   const handleLogout = () => {
     localStorage.clear();
@@ -16,72 +11,134 @@ export default function AdminHome() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar (locked) */}
-      <aside className="w-64 bg-green-700 text-white flex flex-col">
-        <div className="p-4 text-2xl font-bold text-center border-b border-green-600">
-          Admin Panel
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200">
+          <h1 className="text-xl font-bold text-gray-800">Admin Panel</h1>
+          <p className="text-xs text-gray-500 mt-1">Management Dashboard</p>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          {/* dashboard at /admin */}
+
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-1">
           <NavLink
             to=""
             end
-            className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? "bg-blue-50 text-blue-600 shadow-sm"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
           >
-            <FaHome /> Dashboard
+            <FaHome className="text-lg" />
+            <span>Dashboard</span>
           </NavLink>
 
           <NavLink
             to="users"
-            className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? "bg-blue-50 text-blue-600 shadow-sm"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
           >
-            <FaUsers /> Users
+            <FaUsers className="text-lg" />
+            <span>Users</span>
+          </NavLink>
+
+          <NavLink
+            to="discoveries"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? "bg-blue-50 text-blue-600 shadow-sm"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
+          >
+            <FaCompass className="text-lg" />
+            <span>Discovery</span>
           </NavLink>
 
           <NavLink
             to="courses"
-            className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? "bg-blue-50 text-blue-600 shadow-sm"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
           >
-            <FaBook /> Tutorials
+            <FaBook className="text-lg" />
+            <span>Tutorials</span>
           </NavLink>
 
           <NavLink
             to="consultant"
-            className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? "bg-blue-50 text-blue-600 shadow-sm"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
           >
-            <FaCalendarAlt />Consultant
+            <FaCalendarAlt className="text-lg" />
+            <span>Consultant</span>
           </NavLink>
 
           <NavLink
             to="comments"
-            className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? "bg-blue-50 text-blue-600 shadow-sm"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
           >
-            <FaComments /> Community
+            <FaComments className="text-lg" />
+            <span>Community</span>
           </NavLink>
 
           <NavLink
             to="event"
-            className={({ isActive }) => `${linkBase} ${hover} ${isActive ? active : ""}`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? "bg-blue-50 text-blue-600 shadow-sm"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`
+            }
           >
-            <FaComments /> Events
+            <FaCalendar className="text-lg" />
+            <span>Events</span>
           </NavLink>
         </nav>
 
-        {/* Logout button at bottom */}
-        <div className="p-4 border-t border-green-600">
+        {/* Logout button */}
+        <div className="p-4 border-t border-gray-200">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-red-600 hover:bg-red-700 text-white text-sm font-medium"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors duration-200 shadow-sm"
           >
-            <FaSignOutAlt /> Logout
+            <FaSignOutAlt />
+            <span>Logout</span>
           </button>
         </div>
       </aside>
 
-      {/* Right content area */}
-      <main className="flex-1 p-6 overflow-y-auto overflow-x-auto">
-        <Outlet />
+      {/* Main content area */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-8">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
