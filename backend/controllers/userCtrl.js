@@ -12,8 +12,8 @@ const {
 
 /* ---------- helpers ---------- */
 const signTokenIfPossible = (user) => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) return null;
+  // Align with auth middleware which verifies using JWT_SECRET || "dev_secret"
+  const secret = process.env.JWT_SECRET || "dev_secret";
   // support virtual admin id
   const sub = user._id || user.id || user.sub || "unknown";
   const role = user.role || "user";
