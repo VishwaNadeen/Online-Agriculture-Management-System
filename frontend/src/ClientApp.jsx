@@ -5,6 +5,7 @@ import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import Home from "./pages/home";
 import About from "./pages/about";
+import HelpCenter from "./pages/helpCenter";
 
 // Vishwa
 import UserRegistration from "./pages/user/userRegistration";
@@ -50,6 +51,7 @@ export default function ClientApp() {
         {/* public */}
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
+        <Route path="/helpCenter" element={<HelpCenter />} />
 
         {/* Vishwa */}
         <Route path="/signup" element={<UserRegistration />} />
