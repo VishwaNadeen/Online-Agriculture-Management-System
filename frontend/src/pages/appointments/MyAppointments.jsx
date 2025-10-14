@@ -213,31 +213,26 @@ function MyBookings() {
 
   const handleCancel = (appt) => {
     if (!appt?._id) return;
-    const status = (appt.status || "").toLowerCase();
-    const action = status === "completed" ? "delete" : "cancel";
+    const action = "delete";
     setConfirmModal({ isOpen: true, appt, action });
   };
 
   const confirmCancel = async () => {
-    const { appt, action } = confirmModal;
+    const { appt } = confirmModal;
     setConfirmModal({ isOpen: false, appt: null, action: "" });
     
     if (!appt?._id) return;
     
     try {
       setActionLoading(true);
-      if (action === "delete") {
-        await axios.delete(ENDPOINTS.remove(appt._id), { headers });
-      } else {
-        await axios.post(ENDPOINTS.cancel(appt._id), {}, { headers });
-      }
+      await axios.delete(ENDPOINTS.remove(appt._id), { headers });
       // Remove from UI immediately for smooth experience
       setRows((prev) => prev.filter((a) => a._id !== appt._id));
-      toast.success(`Appointment ${action}d successfully!`);
+      toast.success("Appointment deleted successfully!");
       // Quick refresh in background
       setTimeout(() => load(), 200);
     } catch (e) {
-      toast.error(e?.response?.data?.message || e.message || `Failed to ${action} appointment`);
+      toast.error(e?.response?.data?.message || e.message || "Failed to delete appointment");
       // Reload to restore state on error
       load();
     } finally {
@@ -291,10 +286,8 @@ function MyBookings() {
       {/* Confirmation Modal */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
-        title={confirmModal.action === "delete" ? "Delete Appointment" : "Cancel Appointment"}
-        message={confirmModal.action === "delete" 
-          ? "Are you sure you want to delete this completed appointment? This action cannot be undone." 
-          : "Are you sure you want to cancel this appointment?"}
+        title="Delete Appointment"
+        message="Are you sure you want to permanently delete this appointment? This action cannot be undone."
         confirmText="OK"
         cancelText="Cancel"
         confirmColor="blue"
@@ -477,12 +470,14 @@ function ConsultantDashboard({ user }) {
     try {
       setActionLoading(true);
       if (action === "accept") {
-        await axios.post(ENDPOINTS.confirm(requestId), {}, { headers });
-        toast.success("Appointment confirmed successfully!");
+        const res = await axios.post(ENDPOINTS.confirm(requestId), {}, { headers });
+        const sent = !!res?.data?.emailSent;
+        toast.success(sent ? "Appointment confirmed. Email sent to client." : "Appointment confirmed. Email not sent.");
       } else if (action === "decline") {
         const reason = window.prompt("Reason (optional):") || "";
-        await axios.post(ENDPOINTS.decline(requestId), { reason }, { headers });
-        toast.success("Appointment declined successfully!");
+        const res = await axios.post(ENDPOINTS.decline(requestId), { reason }, { headers });
+        const sent = !!res?.data?.emailSent;
+        toast.success(sent ? "Appointment declined. Email sent to client." : "Appointment declined. Email not sent.");
       }
       setTimeout(() => fetchConsultantAppointments(), 200);
     } catch (e) {

@@ -35,6 +35,30 @@ const DURATION_OPTIONS = [
   { value: 8, label: "8 hours (Full day)" },
 ];
 
+const SL_PROVINCES = [
+  "Western",
+  "Central",
+  "Southern",
+  "Northern",
+  "Eastern",
+  "North Western",
+  "North Central",
+  "Uva",
+  "Sabaragamuwa",
+];
+
+const SL_DISTRICTS = {
+  Western: ["Colombo", "Gampaha", "Kalutara"],
+  Central: ["Kandy", "Matale", "Nuwara Eliya"],
+  Southern: ["Galle", "Matara", "Hambantota"],
+  Northern: ["Jaffna", "Kilinochchi", "Mannar", "Vavuniya", "Mullaitivu"],
+  Eastern: ["Trincomalee", "Batticaloa", "Ampara"],
+  "North Western": ["Kurunegala", "Puttalam"],
+  "North Central": ["Anuradhapura", "Polonnaruwa"],
+  Uva: ["Badulla", "Monaragala"],
+  Sabaragamuwa: ["Ratnapura", "Kegalle"],
+};
+
 const PHONE_CODES = [
   { code: "+94", country: "Sri Lanka" },
   { code: "+1", country: "US/Canada" },
@@ -157,7 +181,7 @@ const validators = {
     const selected = new Date(value);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (selected < today) return "Appointment date cannot be in the past";
+    if (selected <= today) return "Appointment date must be in the future";
     const max = new Date();
     max.setFullYear(today.getFullYear() + 1);
     if (selected > max) return "Appointment date cannot be more than 1 year ahead";
@@ -268,6 +292,11 @@ export default function AppointmentForm({
   successToast = "Appointment booked successfully!",
 }) {
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  }, []);
   const navigate = useNavigate();
 
   const [errors, setErrors] = useState({});
@@ -285,7 +314,7 @@ export default function AppointmentForm({
 
   const [form, setForm] = useState(() => ({
     name: "", phone: "", email: "", state: "", city: "",
-    address: "", category: "", appointmentDate: todayStr,
+    address: "", category: "", appointmentDate: tomorrowStr,
     timeMode: "period", appointmentTime: "morning", durationHours: 1, notes: "",
     consultantId: "", consultantName: "",
     farmLat: null, farmLng: null, // NEW
@@ -387,6 +416,16 @@ export default function AppointmentForm({
     [form.category]
   );
 
+  const provinceOptions = useMemo(
+    () => ensureInOptions(SL_PROVINCES, form.state),
+    [form.state]
+  );
+
+  const cityOptions = useMemo(
+    () => ensureInOptions(SL_DISTRICTS[form.state] || [], form.city),
+    [form.state, form.city]
+  );
+
   const setField = useCallback((key, value) => {
     setForm((prev) => {
       let processedValue = value;
@@ -474,7 +513,7 @@ export default function AppointmentForm({
     setWarnings((prev) => ({ ...prev, [field]: undefined }));
   };
 
-  const resetForm = () => {
+ /* const resetForm = () => {
     setForm({
       name: "", phone: "", email: "", state: "", city: "",
       address: "", category: "", appointmentDate: todayStr,
@@ -489,7 +528,7 @@ export default function AppointmentForm({
     setWarnings({});
     setCountryCode("+94");
   };
-
+*/
   /* ==== NEW: when user picks on map, store coords ==== */
   const handlePickOnMap = async ({ lat, lng }) => {
     setForm((f) => ({ ...f, farmLat: lat, farmLng: lng }));
@@ -662,20 +701,30 @@ export default function AppointmentForm({
           </div>
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <Input
+            <Select
               id="state"
               label="Province"
               icon={MapPin}
               required
               value={form.state}
-              onChange={(e) => setField("state", e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setField("state", val);
+                if (!(SL_DISTRICTS[val] || []).includes(form.city)) {
+                  setField("city", "");
+                }
+              }}
               onBlur={() => handleBlur("state")}
               error={errors.state}
               success={success.state}
-              placeholder="Enter your province"
-            />
+            >
+              <option value="">Select Province</option>
+              {provinceOptions.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </Select>
 
-            <Input
+            <Select
               id="city"
               label="District / City"
               icon={MapPin}
@@ -685,8 +734,13 @@ export default function AppointmentForm({
               onBlur={() => handleBlur("city")}
               error={errors.city}
               success={success.city}
-              placeholder="Enter your district or city"
-            />
+              disabled={!form.state}
+            >
+              <option value="">{form.state ? "Select District / City" : "Select Province first"}</option>
+              {(cityOptions).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </Select>
           </div>
 
           {/* ==== NEW: Map Picker (click map to drop the pin) ==== */}
@@ -785,7 +839,7 @@ export default function AppointmentForm({
               icon={Calendar}
               required
               type="date"
-              min={todayStr}
+              min={tomorrowStr}
               max={new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0]}
               value={form.appointmentDate}
               onChange={(e) => setField("appointmentDate", e.target.value)}
