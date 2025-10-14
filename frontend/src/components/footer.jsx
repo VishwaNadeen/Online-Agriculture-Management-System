@@ -56,6 +56,7 @@ const Footer = () => {
             <ul className="space-y-3">
               {[
                 { to: "/", label: "Home" },
+                { to: "/discoveries", label: "Discoveries" },
                 { to: "/about", label: "About Us" },
                 { to: "/coursepage", label: "Tutorials" },
                 { to: "/community", label: "Community" },
@@ -84,7 +85,7 @@ const Footer = () => {
             <ul className="space-y-3">
               {[
                 { to: "#", label: "Blog" },
-                { to: "#", label: "Help Center" },
+                { to: "/helpCenter", label: "Help Center" },
                 { to: "#", label: "Privacy Policy" },
                 { to: "#", label: "Terms of Service" },
                 { to: "#", label: "FAQs" },
