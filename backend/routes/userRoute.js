@@ -63,8 +63,8 @@ router.get("/", userCtrl.list);
 router.get("/:id", validateId, userCtrl.get);
 
 /* ---------------- Protected Routes ---------------- */
-router.patch("/:id", validateId, requireAuth, selfOrAdmin, userCtrl.update);
-router.patch("/:id/password", validateId, requireAuth, selfOrAdmin, userCtrl.changePassword);
-router.delete("/:id", validateId, requireAuth, selfOrAdmin, userCtrl.remove);
+router.patch("/:id", validateId, requireAuth, selfOrAdmin(), userCtrl.update);
+router.patch("/:id/password", validateId, requireAuth, selfOrAdmin(), userCtrl.changePassword);
+router.delete("/:id", validateId, requireAuth, selfOrAdmin(), userCtrl.remove);
 
 export default router;
