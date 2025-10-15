@@ -43,8 +43,6 @@ router.post("/userRegistration", upload.single("profile"), async (req, res) => {
     if (req.file?.buffer) {
       const up = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname);
       payload.profilePicture = up.secure_url;
-      // If you need to delete/replace later, also store public_id:
-      // payload._profilePublicId = up.public_id;
     }
 
     req.body = payload; // forward normalized body to controller
