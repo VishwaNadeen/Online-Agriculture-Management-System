@@ -37,59 +37,32 @@ export default function AgriAnalytics() {
         // Check if current user is a consultant or admin
         const userStr = localStorage.getItem("auth_user") || sessionStorage.getItem("auth_user");
         const user = userStr ? JSON.parse(userStr) : null;
-        
-        console.log("Current user:", user);
         setCurrentUser(user);
         
         const isAdmin = user?.role === "admin";
         const isConsultant = user?.role === "consultant";
-        
-        console.log("Is Admin:", isAdmin, "Is Consultant:", isConsultant);
         
         // Admin sees all appointments, consultant sees their own
         let appts = [];
         let meRes = null;
         
         if (isAdmin) {
-          console.log("🟢 Fetching ALL appointments for admin...");
-          try {
-            appts = await ApptAPI.adminGetAll();
-            console.log("🟢 Admin appointments fetched:", appts.length, "appointments");
-            console.log("🟢 Sample appointment:", appts[0]);
-          } catch (err) {
-            console.error("🔴 Error fetching admin appointments:", err);
-            console.error("🔴 Error response:", err?.response?.data);
-            setError(`Failed to load appointments: ${err?.response?.data?.message || err.message}`);
-            appts = [];
-          }
+          // Admin: fetch ALL appointments across the system
+          appts = await ApptAPI.adminGetAll().catch((err) => {
+            console.error("Error loading appointments:", err?.response?.data?.message || err.message);
+            return [];
+          });
         } else if (isConsultant) {
-          console.log("🟡 Fetching consultant appointments...");
-          try {
-            appts = await ApptAPI.listAsConsultant();
-            console.log("🟡 Consultant appointments fetched:", appts.length);
-          } catch (err) {
-            console.error("🔴 Error fetching consultant appointments:", err);
-            appts = [];
-          }
-          
-          try {
-            meRes = await ConsultantAPI.getMe();
-            console.log("🟡 Consultant profile fetched:", meRes);
-          } catch (err) {
-            console.error("🔴 Error fetching consultant profile:", err);
-            meRes = null;
-          }
-        } else {
-          console.log("⚪ User is neither admin nor consultant, no appointments to fetch");
+          // Consultant: fetch only their assigned appointments
+          appts = await ApptAPI.listAsConsultant().catch(() => []);
+          meRes = await ConsultantAPI.getMe().catch(() => null);
         }
         
         if (!mounted) return;
         setMyAppointments(appts || []);
         setMe(meRes);
-        console.log("Final appointments set:", appts || []);
       } catch (e) {
         if (!mounted) return;
-        console.error("Load error:", e);
         setError(e?.response?.data?.message || e.message || "Failed to load data");
       } finally {
         if (mounted) setLoading(false);
@@ -374,45 +347,17 @@ export default function AgriAnalytics() {
           {error}
         </div>
       )}
-      
-      {/* Debug info - Always show this */}
-      <div className="mb-4 p-3 rounded-lg bg-gray-50 text-gray-700 text-xs border border-gray-200 font-mono">
-        <div><strong>🔍 DEBUG INFO:</strong></div>
-        <div>• User Role: <strong>{currentUser?.role || "NONE"}</strong></div>
-        <div>• User Name: {currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Not loaded"}</div>
-        <div>• Appointments Loaded: <strong>{myAppointments.length}</strong></div>
-        <div>• Loading State: {loading ? "⏳ Loading..." : "✅ Complete"}</div>
-        <div>• Error: {error || "None"}</div>
-        <div className="mt-2 text-xs">
-          💡 If you see "0 appointments" and you're an admin, check the backend console for logs starting with 🔵
-        </div>
-      </div>
-      
-      {!loading && !me && currentUser?.role === "admin" && (
-        <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-800 text-sm border border-blue-200">
-          <strong>Admin View:</strong> You are viewing all appointments across the system. Individual consultant profile details are not shown in admin mode.
-        </div>
-      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <div className="flex items-center space-x-3 mb-2">
             <Sprout className="w-8 h-8 text-green-600" />
-            <h1 className="text-3xl font-bold text-gray-900">
-              {currentUser?.role === "admin" ? "CONSULTANT APPOINTMENTS - ADMIN VIEW" : "AGRI ANALYTICS"}
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900">AGRI ANALYTICS</h1>
           </div>
-          <p className="text-gray-600">
-            {currentUser?.role === "admin" ? "All appointments across the platform" : "Insights for agriculture operations"}
-          </p>
+          <p className="text-gray-600">Insights for agriculture operations</p>
           {me && (
             <div className="mt-1 text-sm text-gray-700">
               Welcome, <span className="font-semibold">{me.name}</span> • {me.city} • {me.specialization}
-            </div>
-          )}
-          {!me && currentUser?.role === "admin" && (
-            <div className="mt-1 text-sm text-gray-700">
-              Logged in as: <span className="font-semibold">{currentUser.firstName} {currentUser.lastName}</span> (Admin)
             </div>
           )}
         </div>
@@ -519,9 +464,7 @@ export default function AgriAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">
-              {currentUser?.role === "admin" ? "All Appointments" : "Upcoming Appointments"}
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h3>
             <div className="flex items-center space-x-2">
               <Search className="w-4 h-4 text-gray-400" />
               <input
@@ -626,9 +569,7 @@ export default function AgriAnalytics() {
       {/* Appointments */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">
-            {currentUser?.role === "admin" ? "Today's All Appointments" : "Today's Appointments"}
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900">Today&apos;s Appointments</h3>
           <a href="/appointments" className="text-sm text-green-600 hover:text-green-700">See All</a>
         </div>
         <div className="space-y-4">
