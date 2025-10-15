@@ -33,9 +33,15 @@ export default function AgriAnalytics() {
       setLoading(true);
       setError("");
       try {
+        // Check if current user is a consultant or admin
+        const userStr = localStorage.getItem("auth_user") || sessionStorage.getItem("auth_user");
+        const currentUser = userStr ? JSON.parse(userStr) : null;
+        const isConsultant = currentUser?.role === "consultant";
+        
+        // Only fetch consultant-specific data if user is a consultant
         const [appts, meRes] = await Promise.all([
           ApptAPI.listAsConsultant().catch(() => []),
-          ConsultantAPI.getMe().catch(() => null),
+          isConsultant ? ConsultantAPI.getMe().catch(() => null) : Promise.resolve(null),
         ]);
         if (!mounted) return;
         setMyAppointments(appts || []);
@@ -327,8 +333,8 @@ export default function AgriAnalytics() {
         </div>
       )}
       {!loading && !me && (
-        <div className="mb-4 p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm border border-yellow-200">
-          Please log in as a consultant to view your analytics and profile.
+        <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-800 text-sm border border-blue-200">
+          You are viewing the consultant analytics dashboard as an admin. Consultant-specific profile details are not available.
         </div>
       )}
       {/* Header */}
