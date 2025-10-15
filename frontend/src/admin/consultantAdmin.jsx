@@ -51,27 +51,36 @@ export default function AgriAnalytics() {
         let meRes = null;
         
         if (isAdmin) {
-          console.log("Fetching all appointments for admin...");
-          appts = await ApptAPI.listAll({ limit: 1000 }).catch((err) => {
-            console.error("Error fetching all appointments:", err);
-            return [];
-          });
-          console.log("Admin appointments fetched:", appts);
+          console.log("🟢 Fetching ALL appointments for admin...");
+          try {
+            appts = await ApptAPI.adminGetAll();
+            console.log("🟢 Admin appointments fetched:", appts.length, "appointments");
+            console.log("🟢 Sample appointment:", appts[0]);
+          } catch (err) {
+            console.error("🔴 Error fetching admin appointments:", err);
+            console.error("🔴 Error response:", err?.response?.data);
+            setError(`Failed to load appointments: ${err?.response?.data?.message || err.message}`);
+            appts = [];
+          }
+        } else if (isConsultant) {
+          console.log("🟡 Fetching consultant appointments...");
+          try {
+            appts = await ApptAPI.listAsConsultant();
+            console.log("🟡 Consultant appointments fetched:", appts.length);
+          } catch (err) {
+            console.error("🔴 Error fetching consultant appointments:", err);
+            appts = [];
+          }
+          
+          try {
+            meRes = await ConsultantAPI.getMe();
+            console.log("🟡 Consultant profile fetched:", meRes);
+          } catch (err) {
+            console.error("🔴 Error fetching consultant profile:", err);
+            meRes = null;
+          }
         } else {
-          console.log("Fetching consultant appointments...");
-          appts = await ApptAPI.listAsConsultant().catch((err) => {
-            console.error("Error fetching consultant appointments:", err);
-            return [];
-          });
-          console.log("Consultant appointments fetched:", appts);
-        }
-        
-        if (isConsultant) {
-          meRes = await ConsultantAPI.getMe().catch((err) => {
-            console.error("Error fetching consultant profile:", err);
-            return null;
-          });
-          console.log("Consultant profile fetched:", meRes);
+          console.log("⚪ User is neither admin nor consultant, no appointments to fetch");
         }
         
         if (!mounted) return;
@@ -366,15 +375,18 @@ export default function AgriAnalytics() {
         </div>
       )}
       
-      {/* Debug info */}
-      {!loading && (
-        <div className="mb-4 p-3 rounded-lg bg-gray-50 text-gray-700 text-xs border border-gray-200">
-          <strong>Debug:</strong> User Role: {currentUser?.role || "none"} | 
-          Appointments Loaded: {myAppointments.length} | 
-          Loading: {loading ? "Yes" : "No"}
-          {currentUser && ` | User: ${currentUser.firstName} ${currentUser.lastName}`}
+      {/* Debug info - Always show this */}
+      <div className="mb-4 p-3 rounded-lg bg-gray-50 text-gray-700 text-xs border border-gray-200 font-mono">
+        <div><strong>🔍 DEBUG INFO:</strong></div>
+        <div>• User Role: <strong>{currentUser?.role || "NONE"}</strong></div>
+        <div>• User Name: {currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "Not loaded"}</div>
+        <div>• Appointments Loaded: <strong>{myAppointments.length}</strong></div>
+        <div>• Loading State: {loading ? "⏳ Loading..." : "✅ Complete"}</div>
+        <div>• Error: {error || "None"}</div>
+        <div className="mt-2 text-xs">
+          💡 If you see "0 appointments" and you're an admin, check the backend console for logs starting with 🔵
         </div>
-      )}
+      </div>
       
       {!loading && !me && currentUser?.role === "admin" && (
         <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-800 text-sm border border-blue-200">

@@ -49,6 +49,15 @@ export const ApptAPI = {
     return Array.isArray(data) ? data : data?.appointments || [];
   },
 
+  // NEW: admin-specific endpoint to get ALL appointments
+  adminGetAll: async () => {
+    const { data } = await axios.get(`${URL}/admin/all`, {
+      headers: authHeaders(),
+      withCredentials: true,
+    });
+    return Array.isArray(data) ? data : [];
+  },
+
   // Get one (controller enforces owner-or-admin)
   get: async (id) => {
     const { data } = await axios.get(`${URL}/${id}`, {
