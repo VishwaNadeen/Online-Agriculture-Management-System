@@ -26,6 +26,49 @@ export default function AgriAnalytics() {
   const [myAppointments, setMyAppointments] = useState([]); // assigned to me as consultant
   const [me, setMe] = useState(null);
   
+  const authInfo = useMemo(() => {
+    try {
+      const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
+      const raw = get("auth_user");
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || get("role") || "";
+      return { user, role };
+    } catch {
+      return { user: null, role: "" };
+    }
+  }, []);
+  const isAdmin = (authInfo.role || authInfo.user?.role) === "admin";
+
+  // compute start/end ISO strings for the selected tab to query backend with real ranges
+  const getDateRange = (label) => {
+    const now = new Date();
+    const start = new Date(now);
+    const end = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    switch (label) {
+      case "Today":
+        break;
+      case "Yesterday": {
+        start.setDate(start.getDate() - 1);
+        end.setDate(end.getDate() - 1);
+        break;
+      }
+      case "Last 7 days": {
+        start.setDate(end.getDate() - 6);
+        start.setHours(0, 0, 0, 0);
+        break;
+      }
+      case "Last 30 days": {
+        start.setDate(end.getDate() - 29);
+        start.setHours(0, 0, 0, 0);
+        break;
+      }
+      default:
+        return null;
+    }
+    return { start: start.toISOString(), end: end.toISOString() };
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -33,8 +76,10 @@ export default function AgriAnalytics() {
       setLoading(true);
       setError("");
       try {
+        const range = getDateRange(activeTab);
+        const params = range ? { startDate: range.start, endDate: range.end } : {};
         const [appts, meRes] = await Promise.all([
-          ApptAPI.listAsConsultant().catch(() => []),
+          (isAdmin ? ApptAPI.listAll(params) : ApptAPI.listAsConsultant(params)).catch(() => []),
           ConsultantAPI.getMe().catch(() => null),
         ]);
         if (!mounted) return;
@@ -51,7 +96,7 @@ export default function AgriAnalytics() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isAdmin, activeTab]);
 
   // date range helper based on activeTab/select
   const dateInRange = (date) => {
@@ -298,7 +343,7 @@ export default function AgriAnalytics() {
     URL.revokeObjectURL(url);
   };
 
-  // ✅ FIXED: include `icon: Icon`
+ 
   const StatCard = ({ title, value, change, icon: Icon, suffix = "" }) => {
     const isPositive = change > 0;
     return (
@@ -326,7 +371,7 @@ export default function AgriAnalytics() {
           {error}
         </div>
       )}
-      {!loading && !me && (
+      {!loading && !me && !isAdmin && (
         <div className="mb-4 p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm border border-yellow-200">
           Please log in as a consultant to view your analytics and profile.
         </div>
@@ -342,6 +387,11 @@ export default function AgriAnalytics() {
           {me && (
             <div className="mt-1 text-sm text-gray-700">
               Welcome, <span className="font-semibold">{me.name}</span> • {me.city} • {me.specialization}
+            </div>
+          )}
+          {!me && isAdmin && (
+            <div className="mt-1 text-sm text-gray-700">
+              Welcome, <span className="font-semibold">Admin</span>
             </div>
           )}
         </div>
@@ -533,8 +583,11 @@ export default function AgriAnalytics() {
               )}
             </div>
           )}
-          {!loading && !me && (
+          {!loading && !me && !isAdmin && (
             <p className="text-sm text-gray-500">No consultant profile available.</p>
+          )}
+          {!loading && !me && isAdmin && (
+            <p className="text-sm text-gray-500">Admin account. Consultant profile is not required.</p>
           )}
         </div>
       </div>
