@@ -7,6 +7,11 @@ export const ConsultantAPI = {
     const { data } = await api.get("/consultants/me");
     return data;
   },
+  // Public by ID (admin can also use this)
+  getById: async (id) => {
+    const { data } = await api.get(`/consultants/${id}`);
+    return data;
+  },
   // Lightweight list (cards)
   list: async (params = {}) => {
     const { data } = await api.get("/consultants", { params });

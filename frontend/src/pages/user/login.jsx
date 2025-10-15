@@ -77,7 +77,7 @@ export default function Login() {
       const isConsultant = role === "consultant" || roles.includes("consultant");
 
       if (isAdmin) {
-        navigate("/admin", { replace: true });
+        navigate("/admin/consultant", { replace: true });
         return;
       }
       if (isConsultant) {

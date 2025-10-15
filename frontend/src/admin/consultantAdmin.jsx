@@ -23,8 +23,11 @@ export default function AgriAnalytics() {
   const [error, setError] = useState("");
 
   // live data
-  const [myAppointments, setMyAppointments] = useState([]); // assigned to me as consultant
+  const [myAppointments, setMyAppointments] = useState([]); // assigned to me as consultant or all as admin
   const [me, setMe] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isConsultant, setIsConsultant] = useState(false);
+  const [consultants, setConsultants] = useState([]); // for admin directory sample
   
 
   useEffect(() => {
@@ -38,8 +41,12 @@ export default function AgriAnalytics() {
         const user = raw ? JSON.parse(raw) : null;
         const role = (user?.role || "").toString().toLowerCase();
         const roles = Array.isArray(user?.roles) ? user.roles.map((r) => String(r).toLowerCase()) : [];
-        const isConsultant = role === "consultant" || roles.includes("consultant");
-        if (!isConsultant) {
+        const consultantFlag = role === "consultant" || roles.includes("consultant");
+        const adminFlag = role === "admin" || roles.includes("admin") || String(user?.email || "").toLowerCase().includes("admin");
+        setIsConsultant(consultantFlag);
+        setIsAdmin(adminFlag);
+        // For admin, we will show aggregate consultant appointments even if not a consultant
+        if (!consultantFlag && !adminFlag) {
           if (mounted) {
             setMyAppointments([]);
             setMe(null);
@@ -51,13 +58,23 @@ export default function AgriAnalytics() {
         // ignore parse errors; proceed to API calls
       }
       try {
-        const [appts, meRes] = await Promise.all([
-          ApptAPI.listAsConsultant().catch(() => []),
-          ConsultantAPI.getMe().catch(() => null),
-        ]);
+        const raw = localStorage.getItem("auth_user") || sessionStorage.getItem("auth_user");
+        const user = raw ? JSON.parse(raw) : null;
+        const role = (user?.role || "").toString().toLowerCase();
+        const roles = Array.isArray(user?.roles) ? user.roles.map((r) => String(r).toLowerCase()) : [];
+        const consultantFlag = role === "consultant" || roles.includes("consultant");
+        const adminFlag = role === "admin" || roles.includes("admin") || String(user?.email || "").toLowerCase().includes("admin");
+
+        const apptsPromise = adminFlag
+          ? ApptAPI.listAll().catch(() => [])
+          : ApptAPI.listAsConsultant().catch(() => []);
+        const mePromise = consultantFlag ? ConsultantAPI.getMe().catch(() => null) : Promise.resolve(null);
+        const consultantsPromise = adminFlag ? ConsultantAPI.list({ limit: 8 }).catch(() => []) : Promise.resolve([]);
+        const [appts, meRes, consultantList] = await Promise.all([apptsPromise, mePromise, consultantsPromise]);
         if (!mounted) return;
         setMyAppointments(appts || []);
         setMe(meRes);
+        setConsultants(Array.isArray(consultantList) ? consultantList : (consultantList?.items || []));
       } catch (e) {
         if (!mounted) return;
         setError(e?.response?.data?.message || e.message || "Failed to load data");
@@ -346,7 +363,8 @@ export default function AgriAnalytics() {
       )}
       {!loading && !me && (
         <div className="mb-4 p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm border border-yellow-200">
-          Please log in as a consultant to view your analytics and profile.
+          You are viewing consultant analytics. {" "}
+          <span className="font-medium">Consultant profile</span> details are only shown for consultant accounts.
         </div>
       )}
       {/* Header */}
@@ -503,56 +521,78 @@ export default function AgriAnalytics() {
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">My Consultant Details</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{isAdmin ? "Consultants" : "My Consultant Details"}</h3>
           </div>
-          {!me && loading && (
-            <p className="text-sm text-gray-500">Loading profile...</p>
-          )}
-          {!loading && me && (
-            <div className="space-y-3">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">🌿</div>
-                <div>
-                  <h4 className="font-medium text-gray-900">{me.name}</h4>
-                  <p className="text-sm text-gray-600">{me.city || "-"}</p>
-                </div>
-              </div>
+          {isAdmin ? (
+            <div className="space-y-4">
+              {consultants.length === 0 && (
+                <p className="text-sm text-gray-500">No consultants found.</p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500">Email</p>
-                  <p className="text-sm text-gray-900">{me.email || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Phone</p>
-                  <p className="text-sm text-gray-900">{me.phone || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Specialization</p>
-                  <p className="text-sm text-gray-900">{me.specialization || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Category</p>
-                  <p className="text-sm text-gray-900">{me.category || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Experience</p>
-                  <p className="text-sm text-gray-900">{me.yearsExp != null ? `${me.yearsExp} yrs` : "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Languages</p>
-                  <p className="text-sm text-gray-900">{Array.isArray(me.languages) ? me.languages.join(", ") : me.languages || "-"}</p>
-                </div>
+                {consultants.map((c) => (
+                  <div key={c.id} className="border border-gray-100 rounded-lg p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-green-100 grid place-items-center text-lg">🌿</div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{c.name}</div>
+                      <div className="text-xs text-gray-600">{c.city} • {c.category}</div>
+                    </div>
+                    <a href={`/consultants/${c.id}`} className="text-sm text-green-600 hover:text-green-700">View</a>
+                  </div>
+                ))}
               </div>
-              {me.bio && (
-                <div>
-                  <p className="text-xs text-gray-500">Bio</p>
-                  <p className="text-sm text-gray-900">{me.bio}</p>
+            </div>
+          ) : (
+            <>
+              {!me && loading && (
+                <p className="text-sm text-gray-500">Loading profile...</p>
+              )}
+              {!loading && me && (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">🌿</div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">{me.name}</h4>
+                      <p className="text-sm text-gray-600">{me.city || "-"}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Email</p>
+                      <p className="text-sm text-gray-900">{me.email || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Phone</p>
+                      <p className="text-sm text-gray-900">{me.phone || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Specialization</p>
+                      <p className="text-sm text-gray-900">{me.specialization || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Category</p>
+                      <p className="text-sm text-gray-900">{me.category || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Experience</p>
+                      <p className="text-sm text-gray-900">{me.yearsExp != null ? `${me.yearsExp} yrs` : "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Languages</p>
+                      <p className="text-sm text-gray-900">{Array.isArray(me.languages) ? me.languages.join(", ") : me.languages || "-"}</p>
+                    </div>
+                  </div>
+                  {me.bio && (
+                    <div>
+                      <p className="text-xs text-gray-500">Bio</p>
+                      <p className="text-sm text-gray-900">{me.bio}</p>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
-          {!loading && !me && (
-            <p className="text-sm text-gray-500">No consultant profile available.</p>
+              {!loading && !me && (
+                <p className="text-sm text-gray-500">No consultant profile available for this account.</p>
+              )}
+            </>
           )}
         </div>
       </div>

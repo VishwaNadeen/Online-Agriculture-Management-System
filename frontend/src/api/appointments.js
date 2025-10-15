@@ -29,6 +29,16 @@ export const ApptAPI = {
     return Array.isArray(data) ? data : data?.appointments || [];
   },
 
+  // NEW: admin/all (requires admin; backend enforces via JWT)
+  listAll: async (params = {}) => {
+    const { data } = await axios.get(`${URL}`, {
+      params,
+      headers: authHeaders(),
+      withCredentials: true,
+    });
+    return Array.isArray(data) ? data : data?.appointments || [];
+  },
+
   // NEW: consultant's own assigned appointments
   listAsConsultant: async (params = {}) => {
     const { data } = await axios.get(`${URL}/my-consultant`, {
