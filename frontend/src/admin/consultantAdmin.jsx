@@ -32,6 +32,24 @@ export default function AgriAnalytics() {
     async function load() {
       setLoading(true);
       setError("");
+      // Early guard: if not a consultant, don't call consultant APIs
+      try {
+        const raw = localStorage.getItem("auth_user") || sessionStorage.getItem("auth_user");
+        const user = raw ? JSON.parse(raw) : null;
+        const role = (user?.role || "").toString().toLowerCase();
+        const roles = Array.isArray(user?.roles) ? user.roles.map((r) => String(r).toLowerCase()) : [];
+        const isConsultant = role === "consultant" || roles.includes("consultant");
+        if (!isConsultant) {
+          if (mounted) {
+            setMyAppointments([]);
+            setMe(null);
+            setLoading(false);
+          }
+          return;
+        }
+      } catch (_) {
+        // ignore parse errors; proceed to API calls
+      }
       try {
         const [appts, meRes] = await Promise.all([
           ApptAPI.listAsConsultant().catch(() => []),

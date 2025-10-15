@@ -70,8 +70,18 @@ export default function Login() {
 
       window.dispatchEvent(new Event("auth-changed"));
 
-      if (user?.role === "admin") {
+      // Role-aware post-login routing
+      const role = (user?.role || "").toString().toLowerCase();
+      const roles = Array.isArray(user?.roles) ? user.roles.map(r => String(r).toLowerCase()) : [];
+      const isAdmin = role === "admin" || roles.includes("admin") || String(user?.email || "").toLowerCase().includes("admin");
+      const isConsultant = role === "consultant" || roles.includes("consultant");
+
+      if (isAdmin) {
         navigate("/admin", { replace: true });
+        return;
+      }
+      if (isConsultant) {
+        navigate("/admin/consultant", { replace: true });
         return;
       }
 
