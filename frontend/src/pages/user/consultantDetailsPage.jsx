@@ -113,15 +113,87 @@ function Chips({ items }) {
 /* ---------------- page ---------------- */
 export default function ConsultantDetailsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const publicView = !!(location.state && location.state.publicView);
+  const passedConsultant = location.state?.consultant || null;
   const [{ token, userId, cachedUser }, setAuth] = useState(() => readAuth());
-  const [user, setUser] = useState(cachedUser);
-  const [loading, setLoading] = useState(!cachedUser);
+  // Seed with passed consultant so the correct avatar/name render instantly in public view
+  const seededFromPassed = (() => {
+    if (!publicView || !passedConsultant) return null;
+    const full = passedConsultant.name || "";
+    const [firstName, ...rest] = full.split(" ");
+    return {
+      firstName: firstName || full,
+      lastName: rest.join(" ") || "",
+      role: "consultant",
+      createdAt: passedConsultant.createdAt || new Date().toISOString(),
+      profilePicture: passedConsultant.profilePicture || passedConsultant.avatar || passedConsultant.image || null,
+      email: passedConsultant.email,
+      phone: passedConsultant.phone,
+      address: passedConsultant.address,
+      consultant: {
+        bio: passedConsultant.about || passedConsultant.bio,
+      },
+    };
+  })();
+  const [user, setUser] = useState(publicView ? seededFromPassed : cachedUser);
+  const [loading, setLoading] = useState(publicView ? true : !cachedUser);
   const [pageErr, setPageErr] = useState("");
 
-  useEffect(() => { if (!token || !userId) navigate("/login"); }, [token, userId, navigate]);
+  // In public view, do not force login
+  useEffect(() => {
+    if (publicView) return;
+    if (!token || !userId) navigate("/login");
+  }, [publicView, token, userId, navigate]);
 
   useEffect(() => {
     let abort = false;
+    // In public mode, fetch full consultant profile by ID
+    if (publicView) {
+      async function fetchPublicProfile() {
+        if (!passedConsultant?.id) {
+          setLoading(false);
+          return;
+        }
+        
+        try {
+          setLoading(true);
+          const res = await fetch(`${BASE}/consultants/${passedConsultant.id}`);
+          if (!res.ok) throw new Error("Failed to load consultant profile");
+          const data = await res.json();
+          
+          if (!abort) {
+            // Map to expected user structure
+            const mapped = {
+              firstName: data.firstName,
+              lastName: data.lastName,
+              role: data.role,
+              createdAt: data.createdAt,
+              profilePicture: data.profilePicture,
+              email: data.email,
+              phone: data.phone,
+              dateOfBirth: data.dateOfBirth,
+              gender: data.gender,
+              username: data.username,
+              status: data.status,
+              address: data.address,
+              consultant: data.consultant,
+            };
+            setUser(mapped);
+          }
+        } catch (e) {
+          if (!abort) {
+            setPageErr(e.message || "Failed to load consultant profile");
+          }
+        } finally {
+          if (!abort) setLoading(false);
+        }
+      }
+      
+      fetchPublicProfile();
+      return () => { abort = true; };
+    }
+
     async function fetchUser() {
       if (!userId) return;
       try {
@@ -147,7 +219,7 @@ export default function ConsultantDetailsPage() {
     }
     fetchUser();
     return () => { abort = true; };
-  }, [userId, token]);
+  }, [publicView, passedConsultant, userId, token]);
 
   useEffect(() => {
     const onAuthChanged = () => setAuth(readAuth());
@@ -212,32 +284,34 @@ export default function ConsultantDetailsPage() {
             <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
               {/* Single role chip only */}
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 capitalize">
-                {user.role || "user"}
+                {user.role || "consultant"}
               </span>
               {/* Member since text (same as Profile page) */}
               <span className="text-xs text-gray-600">Member since {prettyDate(user.createdAt)}</span>
             </div>
 
-            <div className="mt-3">
-              <button
-                onClick={() => navigate(editPath)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition font-medium"
-                aria-label="Edit Consultant Profile"
-                title="Edit Consultant Profile"
-              >
-                <PencilIcon className="w-5 h-5" />
-                Edit Consultant Profile
-              </button>
-            </div>
+            {!publicView && (
+              <div className="mt-3">
+                <button
+                  onClick={() => navigate(editPath)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition font-medium"
+                  aria-label="Edit Consultant Profile"
+                  title="Edit Consultant Profile"
+                >
+                  <PencilIcon className="w-5 h-5" />
+                  Edit Consultant Profile
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Tabs */}
-          <CenterTabs active="consult" isConsultant={true} />
+          {!publicView && <CenterTabs active="consult" isConsultant={true} />}
 
-          {/* Message if not a consultant yet */}
-          {!consultantActive && (
+          {/* Message if not a consultant yet (only show in private view) */}
+          {!publicView && !consultantActive && (
             <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm px-4 py-3">
-              You haven’t set up a consultant profile yet. Click <b>Edit Consultant Profile</b> to add your details.
+              You haven't set up a consultant profile yet. Click <b>Edit Consultant Profile</b> to add your details.
             </div>
           )}
 
@@ -248,101 +322,156 @@ export default function ConsultantDetailsPage() {
 
           {/* Content */}
           <div className="px-6 pb-8 pt-4">
-            {/* Overview */}
-            <Section
-              title="Overview"
-              right={
-                consultant?.primarySpecialization ? (
-                  <span className="text-sm text-emerald-700 font-medium">
-                    {consultant.primarySpecialization}
-                  </span>
-                ) : null
-              }
-            >
-              <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                {consultant?.bio ? consultant.bio : <span className="text-gray-500">No bio yet.</span>}
-              </div>
-            </Section>
+            {publicView ? (
+              // Public view: Only Basic Details and Address
+              <>
+                {/* Basic Details - matching profile page style */}
+                <Section title="Basic Details">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
+                    <Detail label="Email" value={user.email} />
+                    <Detail label="Phone" value={user.phone} />
+                    <Detail label="Date of Birth" value={prettyDate(user.dateOfBirth)} />
+                    <Detail label="Gender" value={user.gender} />
+                    <Detail label="Username" value={user.username} />
+                    <Detail label="Status" value={user.status || "Active"} />
+                  </dl>
+                </Section>
 
-            {/* Expertise & Experience */}
-            <Section title="Expertise & Experience">
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
-                <Detail label="Primary Specialization" value={consultant.primarySpecialization} />
-                <div>
-                  <dt className="font-medium text-emerald-900">Secondary Expertise</dt>
-                  <dd className="mt-1"><Chips items={prettyList(consultant.secondaryExpertise)} /></dd>
-                </div>
-                <Detail label="Years of Experience" value={consultant.yearsOfExperience} />
-                <Detail label="Highest Qualification" value={consultant.highestQualification} />
-                <div>
-                  <dt className="font-medium text-emerald-900">Certifications</dt>
-                  <dd className="mt-1"><Chips items={prettyList(consultant.certifications)} /></dd>
-                </div>
-                <Detail label="Organization" value={consultant.organizationName} />
-              </dl>
-            </Section>
+                {/* Address */}
+                <Section title="Address">
+                  {user.address && (user.address.line1 || user.address.city || user.address.country) ? (
+                    <div className="text-sm text-gray-700 leading-relaxed">
+                      {user.address.line1 && <div>{user.address.line1}</div>}
+                      {user.address.line2 && <div>{user.address.line2}</div>}
+                      <div>
+                        {[user.address.city, user.address.stateProvince, user.address.postalCode].filter(Boolean).join(", ")}
+                      </div>
+                      <div>{user.address.country || ""}</div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500">No address provided.</div>
+                  )}
+                </Section>
+              </>
+            ) : (
+              // Private view: All consultant details
+              <>
+                {/* Basic Details - matching profile page style */}
+                <Section title="Basic Details">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
+                    <Detail label="Email" value={user.email} />
+                    <Detail label="Phone" value={user.phone} />
+                    <Detail label="Date of Birth" value={prettyDate(user.dateOfBirth)} />
+                    <Detail label="Gender" value={user.gender} />
+                    <Detail label="Username" value={user.username} />
+                    <Detail label="Status" value={user.status || "Active"} />
+                  </dl>
+                </Section>
 
-            {/* Services & Fees */}
-            <Section title="Services & Fees">
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
-                <div>
-                  <dt className="font-medium text-emerald-900">Consultation Types</dt>
-                  <dd className="mt-1"><Chips items={prettyList(consultant.consultationTypes)} /></dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-emerald-900">Available Services</dt>
-                  <dd className="mt-1"><Chips items={prettyList(consultant.availableServices)} /></dd>
-                </div>
-                <Detail label="Fee Structure" value={consultant.feeStructure} />
-              </dl>
-            </Section>
+                {/* Address */}
+                <Section title="Address">
+                  {user.address && (user.address.line1 || user.address.city || user.address.country) ? (
+                    <div className="text-sm text-gray-700 leading-relaxed">
+                      {user.address.line1 && <div>{user.address.line1}</div>}
+                      {user.address.line2 && <div>{user.address.line2}</div>}
+                      <div>
+                        {[user.address.city, user.address.stateProvince, user.address.postalCode].filter(Boolean).join(", ")}
+                      </div>
+                      <div>{user.address.country || ""}</div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500">No address provided.</div>
+                  )}
+                </Section>
 
-            {/* Coverage & Languages */}
-            <Section title="Coverage & Languages">
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
-                <div>
-                  <dt className="font-medium text-emerald-900">Service Regions</dt>
-                  <dd className="mt-1"><Chips items={prettyList(consultant.serviceRegions)} /></dd>
-                </div>
-                <Detail label="Coverage Radius (km)" value={consultant.coverageRadiusKm} />
-                <div>
-                  <dt className="font-medium text-emerald-900">Languages</dt>
-                  <dd className="mt-1"><Chips items={prettyList(consultant.languages)} /></dd>
-                </div>
-              </dl>
-            </Section>
+                {/* Overview/Bio */}
+                <Section title="About">
+                  <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {consultant?.bio ? consultant.bio : <span className="text-gray-500">No bio provided.</span>}
+                  </div>
+                </Section>
 
-            {/* Availability */}
-            <Section title="Availability">
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
-                <div>
-                  <dt className="font-medium text-emerald-900">Available Days</dt>
-                  <dd className="mt-1"><Chips items={prettyList(consultant.availableDays)} /></dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-emerald-900">Time Slots</dt>
-                  <dd className="mt-1"><Chips items={prettyList(consultant.availableTimeSlots)} /></dd>
-                </div>
-                <Detail label="Notice Period" value={consultant.noticePeriod} />
-              </dl>
-            </Section>
+                {/* Expertise */}
+                <Section title="Expertise & Experience">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
+                    <Detail label="Primary Specialization" value={consultant.primarySpecialization} />
+                    <div>
+                      <dt className="font-medium text-emerald-900">Secondary Expertise</dt>
+                      <dd className="mt-1"><Chips items={prettyList(consultant.secondaryExpertise)} /></dd>
+                    </div>
+                    <Detail label="Years of Experience" value={consultant.yearsOfExperience} />
+                    <Detail label="Highest Qualification" value={consultant.highestQualification} />
+                    <div>
+                      <dt className="font-medium text-emerald-900">Certifications</dt>
+                      <dd className="mt-1"><Chips items={prettyList(consultant.certifications)} /></dd>
+                    </div>
+                    <Detail label="Organization" value={consultant.organizationName} />
+                  </dl>
+                </Section>
 
-            {/* Social Links */}
-            <Section title="Social Links">
-              {prettyList(consultant.socialLinks) ? (
-                <ul className="list-disc list-inside text-sm text-emerald-700">
-                  {consultant.socialLinks.map((url, i) => (
-                    <li key={i} className="truncate">
-                      <a className="underline hover:no-underline" href={url} target="_blank" rel="noreferrer">
-                        {url}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-sm text-gray-500">No social links added.</div>
-              )}
-            </Section>
+                {/* Services & Fees */}
+                <Section title="Services & Fees">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
+                    <div>
+                      <dt className="font-medium text-emerald-900">Consultation Types</dt>
+                      <dd className="mt-1"><Chips items={prettyList(consultant.consultationTypes)} /></dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-emerald-900">Available Services</dt>
+                      <dd className="mt-1"><Chips items={prettyList(consultant.availableServices)} /></dd>
+                    </div>
+                    <Detail label="Fee Structure" value={consultant.feeStructure} />
+                  </dl>
+                </Section>
+
+                {/* Coverage & Languages */}
+                <Section title="Coverage & Languages">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
+                    <div>
+                      <dt className="font-medium text-emerald-900">Service Regions</dt>
+                      <dd className="mt-1"><Chips items={prettyList(consultant.serviceRegions)} /></dd>
+                    </div>
+                    <Detail label="Coverage Radius (km)" value={consultant.coverageRadiusKm} />
+                    <div>
+                      <dt className="font-medium text-emerald-900">Languages</dt>
+                      <dd className="mt-1"><Chips items={prettyList(consultant.languages)} /></dd>
+                    </div>
+                  </dl>
+                </Section>
+
+                {/* Availability */}
+                <Section title="Availability">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 text-sm">
+                    <div>
+                      <dt className="font-medium text-emerald-900">Available Days</dt>
+                      <dd className="mt-1"><Chips items={prettyList(consultant.availableDays)} /></dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-emerald-900">Time Slots</dt>
+                      <dd className="mt-1"><Chips items={prettyList(consultant.availableTimeSlots)} /></dd>
+                    </div>
+                    <Detail label="Notice Period" value={consultant.noticePeriod} />
+                  </dl>
+                </Section>
+
+                {/* Social Links */}
+                <Section title="Social Links">
+                  {prettyList(consultant.socialLinks) ? (
+                    <ul className="list-disc list-inside text-sm text-emerald-700">
+                      {consultant.socialLinks.map((url, i) => (
+                        <li key={i} className="truncate">
+                          <a className="underline hover:no-underline" href={url} target="_blank" rel="noreferrer">
+                            {url}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-gray-500">No social links added.</div>
+                  )}
+                </Section>
+              </>
+            )}
           </div>
         </div>
       </div>

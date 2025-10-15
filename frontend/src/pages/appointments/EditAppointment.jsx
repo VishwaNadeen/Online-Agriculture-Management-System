@@ -1,6 +1,7 @@
 // src/pages/appointments/EditAppointment.jsx
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { toast } from "react-hot-toast";
 import AppointmentForm from "./AppointmentForm.jsx";
 import { ApptAPI } from "../../api/appointments.js";
 
@@ -68,15 +69,28 @@ const readError = (e) => {
 export default function EditAppointment() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [initial, setInitial] = useState(null);
+  const location = useLocation();
+  const navAppt = location.state?.appt || null;
+
+  // If we have appointment in navigation state, seed the form instantly
+  const seededInitial = (() => {
+    if (!navAppt) return null;
+    const dateYMD = toYMD(navAppt.appointmentDate || navAppt.appointmentDateISO || navAppt.date);
+    const timeHHMM = navAppt.appointmentTime?.slice?.(0, 5) || "";
+    return { ...navAppt, appointmentDate: dateYMD, appointmentTime: timeHHMM };
+  })();
+
+  const [initial, setInitial] = useState(seededInitial);
   const [serverMsg, setServerMsg] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!seededInitial);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    // scroll to top for better UX when arriving from list
+    window.scrollTo({ top: 0, behavior: "smooth" });
     (async () => {
       try {
-        setLoading(true);
+        if (!seededInitial) setLoading(true);
         setServerMsg(null);
         const appt = await ApptAPI.get(id);
 
@@ -114,7 +128,11 @@ export default function EditAppointment() {
       await ApptAPI.update(id, payload);
 
       setServerMsg({ type: "success", text: "Appointment updated." });
+      toast.success("Appointment updated successfully!");
       navigate("/my-appointments");
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }, 100);
     } catch (e) {
       setServerMsg({ type: "error", text: readError(e) });
     } finally {
@@ -151,6 +169,7 @@ export default function EditAppointment() {
         submitLabel={submitting ? "Saving…" : "Save Changes"}
         serverMsg={serverMsg}
         setServerMsg={setServerMsg}
+        suppressSuccessFlow={true}
         disabled={submitting}
       />
     </div>

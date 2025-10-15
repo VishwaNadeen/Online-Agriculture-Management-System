@@ -48,7 +48,7 @@ export default function CreateAppointment() {
         const timePart = (payload.timeMode === "period" ? "09:00" : timeValue) || "09:00";
         const iso = new Date(`${datePart}T${timePart}:00`);
         return Number.isNaN(iso.getTime()) ? "" : iso.toISOString();
-      })();
+      })(); 
 
       const body = {
         name: (payload.fullName || payload.name || "").trim(),
@@ -86,7 +86,7 @@ export default function CreateAppointment() {
       for (const k of required) {
         if (!body[k]) throw new Error(`Missing required field: ${k}`);
       }
-
+//
       const appt = await ApptAPI.create(body);
       setServerMsg({ type: "success", text: "Appointment created successfully." });
       navigate("/my-appointments");
@@ -104,28 +104,28 @@ export default function CreateAppointment() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 ">
-     
+    <div className="min-h-screen bg-green-50/95">
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        {serverMsg && (
+          <div
+            className={`mt-4 rounded-xl border px-6 py-4 text-sm ${
+              serverMsg.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-rose-200 bg-rose-50 text-rose-800"
+            }`}
+          >
+            {serverMsg.text}
+          </div>
+        )}
 
-      {serverMsg && (
-        <div
-          className={`mt-4 rounded-xl border px-6 py-4 text-sm ${
-            serverMsg.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
-          }`}
-        >
-          {serverMsg.text}
-        </div>
-      )}
-
-      <AppointmentForm
-        initialValues={prefill}
-        onSubmit={handleCreate}
-        submitLabel="Schedule Consultation"
-        serverMsg={serverMsg}
-        setServerMsg={setServerMsg}
-      />
+        <AppointmentForm
+          initialValues={prefill}
+          onSubmit={handleCreate}
+          submitLabel="Schedule Consultation"
+          serverMsg={serverMsg}
+          setServerMsg={setServerMsg}
+        />
+      </div>
     </div>
   );
 }
