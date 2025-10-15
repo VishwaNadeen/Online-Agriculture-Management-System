@@ -37,20 +37,50 @@ export default function AgriAnalytics() {
         // Check if current user is a consultant or admin
         const userStr = localStorage.getItem("auth_user") || sessionStorage.getItem("auth_user");
         const user = userStr ? JSON.parse(userStr) : null;
+        
+        console.log("Current user:", user);
         setCurrentUser(user);
+        
         const isAdmin = user?.role === "admin";
         const isConsultant = user?.role === "consultant";
         
+        console.log("Is Admin:", isAdmin, "Is Consultant:", isConsultant);
+        
         // Admin sees all appointments, consultant sees their own
-        const [appts, meRes] = await Promise.all([
-          isAdmin ? ApptAPI.listAll({ limit: 1000 }).catch(() => []) : ApptAPI.listAsConsultant().catch(() => []),
-          isConsultant ? ConsultantAPI.getMe().catch(() => null) : Promise.resolve(null),
-        ]);
+        let appts = [];
+        let meRes = null;
+        
+        if (isAdmin) {
+          console.log("Fetching all appointments for admin...");
+          appts = await ApptAPI.listAll({ limit: 1000 }).catch((err) => {
+            console.error("Error fetching all appointments:", err);
+            return [];
+          });
+          console.log("Admin appointments fetched:", appts);
+        } else {
+          console.log("Fetching consultant appointments...");
+          appts = await ApptAPI.listAsConsultant().catch((err) => {
+            console.error("Error fetching consultant appointments:", err);
+            return [];
+          });
+          console.log("Consultant appointments fetched:", appts);
+        }
+        
+        if (isConsultant) {
+          meRes = await ConsultantAPI.getMe().catch((err) => {
+            console.error("Error fetching consultant profile:", err);
+            return null;
+          });
+          console.log("Consultant profile fetched:", meRes);
+        }
+        
         if (!mounted) return;
         setMyAppointments(appts || []);
         setMe(meRes);
+        console.log("Final appointments set:", appts || []);
       } catch (e) {
         if (!mounted) return;
+        console.error("Load error:", e);
         setError(e?.response?.data?.message || e.message || "Failed to load data");
       } finally {
         if (mounted) setLoading(false);
@@ -335,6 +365,17 @@ export default function AgriAnalytics() {
           {error}
         </div>
       )}
+      
+      {/* Debug info */}
+      {!loading && (
+        <div className="mb-4 p-3 rounded-lg bg-gray-50 text-gray-700 text-xs border border-gray-200">
+          <strong>Debug:</strong> User Role: {currentUser?.role || "none"} | 
+          Appointments Loaded: {myAppointments.length} | 
+          Loading: {loading ? "Yes" : "No"}
+          {currentUser && ` | User: ${currentUser.firstName} ${currentUser.lastName}`}
+        </div>
+      )}
+      
       {!loading && !me && currentUser?.role === "admin" && (
         <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-800 text-sm border border-blue-200">
           <strong>Admin View:</strong> You are viewing all appointments across the system. Individual consultant profile details are not shown in admin mode.
@@ -479,7 +520,10 @@ export default function AgriAnalytics() {
             </div>
           </div>
           <div className="space-y-4">
-            {(myAppointments || []).slice(0, 6).map((p) => (
+            {loading && (
+              <p className="text-sm text-gray-500">Loading appointments...</p>
+            )}
+            {!loading && (myAppointments || []).slice(0, 6).map((p) => (
               <div key={p._id} className="border border-gray-100 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-medium text-gray-900 text-sm">{p.name} • {p.category}</h4>
@@ -499,7 +543,15 @@ export default function AgriAnalytics() {
               </div>
             ))}
             {!loading && (myAppointments || []).length === 0 && (
-              <p className="text-sm text-gray-500">No appointments yet.</p>
+              <div className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
+                <p className="font-semibold mb-2">No appointments found.</p>
+                <p className="text-xs">This could mean:</p>
+                <ul className="text-xs list-disc list-inside mt-1">
+                  <li>No appointments have been created yet</li>
+                  <li>Your account doesn't have access to view appointments</li>
+                  <li>There's a connection issue with the server</li>
+                </ul>
+              </div>
             )}
           </div>
         </div>
@@ -568,7 +620,10 @@ export default function AgriAnalytics() {
           <a href="/appointments" className="text-sm text-green-600 hover:text-green-700">See All</a>
         </div>
         <div className="space-y-4">
-          {(myAppointments || [])
+          {loading && (
+            <p className="text-sm text-gray-500">Loading today's appointments...</p>
+          )}
+          {!loading && (myAppointments || [])
             .filter((a) => {
               const d = new Date(a.appointmentDate);
               const now = new Date();
@@ -598,16 +653,23 @@ export default function AgriAnalytics() {
                 </div>
               </div>
             ))}
-          {!loading && (myAppointments || []).every((a) => {
+          {!loading && (myAppointments || []).filter((a) => {
             const d = new Date(a.appointmentDate);
             const now = new Date();
-            return !(
+            return (
               d.getFullYear() === now.getFullYear() &&
               d.getMonth() === now.getMonth() &&
               d.getDate() === now.getDate()
             );
-          }) && (myAppointments || []).length === 0 && (
-            <p className="text-sm text-gray-500">No appointments today.</p>
+          }).length === 0 && (
+            <p className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
+              No appointments scheduled for today.
+              {(myAppointments || []).length > 0 && (
+                <span className="block text-xs mt-1">
+                  Total appointments in system: {myAppointments.length}
+                </span>
+              )}
+            </p>
           )}
         </div>
       </div>

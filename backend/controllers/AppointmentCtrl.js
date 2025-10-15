@@ -283,7 +283,9 @@ export async function listMyConsultantAppointments(req, res) {
 export async function getAllAppointments(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page ?? "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit ?? "10", 10)));
+    // Allow higher limit for admins (up to 10000)
+    const maxLimit = isAdmin(req) ? 10000 : 100;
+    const limit = Math.min(maxLimit, Math.max(1, parseInt(req.query.limit ?? "10", 10)));
     const skip = (page - 1) * limit;
 
     const baseFilter = {};
@@ -292,10 +294,15 @@ export async function getAllAppointments(req, res) {
     const criteria = buildReadCriteria(req, baseFilter);
     if (!criteria) return res.status(401).json({ message: "Not authenticated" });
 
+    console.log("📋 getAllAppointments - criteria:", JSON.stringify(criteria));
+    console.log("📋 getAllAppointments - limit:", limit, "isAdmin:", isAdmin(req));
+
     const [items, total] = await Promise.all([
       AppointmentModel.find(criteria).sort({ appointmentDate: -1 }).skip(skip).limit(limit).lean(),
       AppointmentModel.countDocuments(criteria),
     ]);
+
+    console.log("📋 getAllAppointments - found:", items.length, "items, total:", total);
 
     return res.status(200).json({
       appointments: items,
