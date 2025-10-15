@@ -39,6 +39,16 @@ export const ApptAPI = {
     return Array.isArray(data) ? data : data?.appointments || [];
   },
 
+  // NEW: get all appointments (admin gets all, others get filtered by backend)
+  listAll: async (params = {}) => {
+    const { data } = await axios.get(URL, {
+      params,
+      headers: authHeaders(),
+      withCredentials: true,
+    });
+    return Array.isArray(data) ? data : data?.appointments || [];
+  },
+
   // Get one (controller enforces owner-or-admin)
   get: async (id) => {
     const { data } = await axios.get(`${URL}/${id}`, {

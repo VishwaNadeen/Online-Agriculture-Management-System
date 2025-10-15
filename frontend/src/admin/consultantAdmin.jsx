@@ -25,6 +25,7 @@ export default function AgriAnalytics() {
   // live data
   const [myAppointments, setMyAppointments] = useState([]); // assigned to me as consultant
   const [me, setMe] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   
 
   useEffect(() => {
@@ -35,12 +36,14 @@ export default function AgriAnalytics() {
       try {
         // Check if current user is a consultant or admin
         const userStr = localStorage.getItem("auth_user") || sessionStorage.getItem("auth_user");
-        const currentUser = userStr ? JSON.parse(userStr) : null;
-        const isConsultant = currentUser?.role === "consultant";
+        const user = userStr ? JSON.parse(userStr) : null;
+        setCurrentUser(user);
+        const isAdmin = user?.role === "admin";
+        const isConsultant = user?.role === "consultant";
         
-        // Only fetch consultant-specific data if user is a consultant
+        // Admin sees all appointments, consultant sees their own
         const [appts, meRes] = await Promise.all([
-          ApptAPI.listAsConsultant().catch(() => []),
+          isAdmin ? ApptAPI.listAll({ limit: 1000 }).catch(() => []) : ApptAPI.listAsConsultant().catch(() => []),
           isConsultant ? ConsultantAPI.getMe().catch(() => null) : Promise.resolve(null),
         ]);
         if (!mounted) return;
@@ -332,9 +335,9 @@ export default function AgriAnalytics() {
           {error}
         </div>
       )}
-      {!loading && !me && (
+      {!loading && !me && currentUser?.role === "admin" && (
         <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-800 text-sm border border-blue-200">
-          You are viewing the consultant analytics dashboard as an admin. Consultant-specific profile details are not available.
+          <strong>Admin View:</strong> You are viewing all appointments across the system. Individual consultant profile details are not shown in admin mode.
         </div>
       )}
       {/* Header */}
@@ -342,12 +345,21 @@ export default function AgriAnalytics() {
         <div>
           <div className="flex items-center space-x-3 mb-2">
             <Sprout className="w-8 h-8 text-green-600" />
-            <h1 className="text-3xl font-bold text-gray-900">AGRI ANALYTICS</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {currentUser?.role === "admin" ? "CONSULTANT APPOINTMENTS - ADMIN VIEW" : "AGRI ANALYTICS"}
+            </h1>
           </div>
-          <p className="text-gray-600">Insights for agriculture operations</p>
+          <p className="text-gray-600">
+            {currentUser?.role === "admin" ? "All appointments across the platform" : "Insights for agriculture operations"}
+          </p>
           {me && (
             <div className="mt-1 text-sm text-gray-700">
               Welcome, <span className="font-semibold">{me.name}</span> • {me.city} • {me.specialization}
+            </div>
+          )}
+          {!me && currentUser?.role === "admin" && (
+            <div className="mt-1 text-sm text-gray-700">
+              Logged in as: <span className="font-semibold">{currentUser.firstName} {currentUser.lastName}</span> (Admin)
             </div>
           )}
         </div>
@@ -454,7 +466,9 @@ export default function AgriAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {currentUser?.role === "admin" ? "All Appointments" : "Upcoming Appointments"}
+            </h3>
             <div className="flex items-center space-x-2">
               <Search className="w-4 h-4 text-gray-400" />
               <input
@@ -548,7 +562,9 @@ export default function AgriAnalytics() {
       {/* Appointments */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Today&apos;s Appointments</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {currentUser?.role === "admin" ? "Today's All Appointments" : "Today's Appointments"}
+          </h3>
           <a href="/appointments" className="text-sm text-green-600 hover:text-green-700">See All</a>
         </div>
         <div className="space-y-4">
