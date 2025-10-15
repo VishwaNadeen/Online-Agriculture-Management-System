@@ -30,23 +30,43 @@ router.get("/my-consultant", listMyConsultantAppointments);
 // Admin-specific route to get ALL appointments (no filters) - MUST BE BEFORE /:id
 router.get("/admin/all", async (req, res) => {
   try {
-    console.log("🔵 /admin/all called by user:", req.user?.role);
+    console.log("\n🔵 ========================================");
+    console.log("🔵 /admin/all endpoint called");
+    console.log("🔵 User object:", JSON.stringify(req.user, null, 2));
+    console.log("🔵 User role:", req.user?.role);
+    console.log("🔵 ========================================\n");
     
     // Check if user is admin
     const isAdmin = req.user?.role === "admin";
     if (!isAdmin) {
+      console.log("❌ Access denied - user is not admin");
       return res.status(403).json({ message: "Admin access only" });
     }
     
     const AppointmentModel = (await import("../models/AppointmentModel.js")).default;
-    const appointments = await AppointmentModel.find({}).sort({ appointmentDate: -1 }).limit(10000).lean();
     
-    console.log("🔵 Found", appointments.length, "total appointments for admin");
+    // Get total count first
+    const totalCount = await AppointmentModel.countDocuments({});
+    console.log("🔵 Total appointments in database:", totalCount);
+    
+    const appointments = await AppointmentModel.find({})
+      .sort({ appointmentDate: -1 })
+      .limit(10000)
+      .lean();
+    
+    console.log("🔵 Fetched", appointments.length, "appointments for admin");
+    
+    if (appointments.length > 0) {
+      console.log("🔵 Sample appointment:", JSON.stringify(appointments[0], null, 2));
+    } else {
+      console.log("⚠️  No appointments found in database");
+    }
     
     return res.status(200).json(appointments);
   } catch (err) {
     console.error("❌ /admin/all error:", err);
-    return res.status(500).json({ message: "Server error" });
+    console.error("❌ Error stack:", err.stack);
+    return res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
