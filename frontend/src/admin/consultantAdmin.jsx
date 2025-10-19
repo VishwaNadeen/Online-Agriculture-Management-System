@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Users,
   TrendingUp,
@@ -21,10 +22,12 @@ export default function AgriAnalytics() {
   const [activeTab, setActiveTab] = useState("Today"); // Today | Yesterday | Last 7 days | Last 30 days | Weekly | Monthly
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   // live data
   const [myAppointments, setMyAppointments] = useState([]); // assigned to me as consultant
   const [me, setMe] = useState(null);
+  const [allConsultants, setAllConsultants] = useState([]);
   
   const authInfo = useMemo(() => {
     try {
@@ -78,13 +81,23 @@ export default function AgriAnalytics() {
       try {
         const range = getDateRange(activeTab);
         const params = range ? { startDate: range.start, endDate: range.end } : {};
-        const [appts, meRes] = await Promise.all([
+        const promises = [
           (isAdmin ? ApptAPI.listAll(params) : ApptAPI.listAsConsultant(params)).catch(() => []),
           ConsultantAPI.getMe().catch(() => null),
-        ]);
+        ];
+
+        if (isAdmin) {
+          promises.push(ConsultantAPI.list().catch(() => []));
+        }
+
+        const [appts, meRes, consultants] = await Promise.all(promises);
+
         if (!mounted) return;
         setMyAppointments(appts || []);
         setMe(meRes);
+        if (isAdmin && consultants) {
+          setAllConsultants(consultants);
+        }
       } catch (e) {
         if (!mounted) return;
         setError(e?.response?.data?.message || e.message || "Failed to load data");
@@ -136,11 +149,8 @@ export default function AgriAnalytics() {
     }
   };
 
-  // Appointments filtered by active date range
-  const filteredAppointments = useMemo(
-    () => (myAppointments || []).filter((a) => dateInRange(a.appointmentDate)),
-    [myAppointments, activeTab]
-  );
+  // The backend already filters appointments by date range, so we can use the state directly.
+  const filteredAppointments = myAppointments;
 
   // helper functions: compute stats from appointments (no payments required)
   const pickUnique = (arr, key) => {
@@ -414,9 +424,9 @@ export default function AgriAnalytics() {
             <Filter className="w-4 h-4" />
             <span>Filter</span>
           </button>
-          <button onClick={handleDownloadPDF} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700">
+          <button onClick={() => navigate("/admin/consultantReport")} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700">
             <Download className="w-4 h-4" />
-            <span>Download Report (PDF)</span>
+            <span>Reports</span>
           </button>
         </div>
       </div>
@@ -535,59 +545,98 @@ export default function AgriAnalytics() {
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">My Consultant Details</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {isAdmin ? "All Consultants" : "My Consultant Details"}
+            </h3>
           </div>
-          {!me && loading && (
-            <p className="text-sm text-gray-500">Loading profile...</p>
-          )}
-          {!loading && me && (
-            <div className="space-y-3">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">🌿</div>
-                <div>
-                  <h4 className="font-medium text-gray-900">{me.name}</h4>
-                  <p className="text-sm text-gray-600">{me.city || "-"}</p>
+
+          {/* Admin View: List all consultants */}
+          {isAdmin && (
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {(allConsultants || []).map((c) => (
+                <div key={c._id} className="border border-gray-100 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="font-medium text-gray-900">{c.name}</h4>
+                      <p className="text-sm text-gray-600">{c.specialization || "-"}</p>
+                    </div>
+                    <span className="text-xs text-gray-500">{c.city || "-"}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="flex items-center space-x-2 text-gray-700">
+                      <span>Email:</span>
+                      <span>{c.email || "-"}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-gray-700">
+                      <span>Phone:</span>
+                      <span>{c.phone || "-"}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-gray-700">
+                      <span>Category:</span>
+                      <span>{c.category || "-"}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-gray-700">
+                      <span>Experience:</span>
+                      <span>{c.yearsExp != null ? `${c.yearsExp} yrs` : "-"}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500">Email</p>
-                  <p className="text-sm text-gray-900">{me.email || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Phone</p>
-                  <p className="text-sm text-gray-900">{me.phone || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Specialization</p>
-                  <p className="text-sm text-gray-900">{me.specialization || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Category</p>
-                  <p className="text-sm text-gray-900">{me.category || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Experience</p>
-                  <p className="text-sm text-gray-900">{me.yearsExp != null ? `${me.yearsExp} yrs` : "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Languages</p>
-                  <p className="text-sm text-gray-900">{Array.isArray(me.languages) ? me.languages.join(", ") : me.languages || "-"}</p>
-                </div>
-              </div>
-              {me.bio && (
-                <div>
-                  <p className="text-xs text-gray-500">Bio</p>
-                  <p className="text-sm text-gray-900">{me.bio}</p>
-                </div>
+              ))}
+              {!loading && (allConsultants || []).length === 0 && (
+                <p className="text-sm text-gray-500">No consultants found.</p>
               )}
             </div>
           )}
-          {!loading && !me && !isAdmin && (
-            <p className="text-sm text-gray-500">No consultant profile available.</p>
-          )}
-          {!loading && !me && isAdmin && (
-            <p className="text-sm text-gray-500">Admin account. Consultant profile is not required.</p>
+
+          {/* Non-Admin View: Show own profile */}
+          {!isAdmin && (
+            <>
+              {!me && loading && <p className="text-sm text-gray-500">Loading profile...</p>}
+              {!loading && me && (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">🌿</div>
+                    <div>
+                      <h4 className="font-medium text-gray-900">{me.name}</h4>
+                      <p className="text-sm text-gray-600">{me.city || "-"}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Email</p>
+                      <p className="text-sm text-gray-900">{me.email || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Phone</p>
+                      <p className="text-sm text-gray-900">{me.phone || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Specialization</p>
+                      <p className="text-sm text-gray-900">{me.specialization || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Category</p>
+                      <p className="text-sm text-gray-900">{me.category || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Experience</p>
+                      <p className="text-sm text-gray-900">{me.yearsExp != null ? `${me.yearsExp} yrs` : "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Languages</p>
+                      <p className="text-sm text-gray-900">{Array.isArray(me.languages) ? me.languages.join(", ") : me.languages || "-"}</p>
+                    </div>
+                  </div>
+                  {me.bio && (
+                    <div>
+                      <p className="text-xs text-gray-500">Bio</p>
+                      <p className="text-sm text-gray-900">{me.bio}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!loading && !me && <p className="text-sm text-gray-500">No consultant profile available.</p>}
+            </>
           )}
         </div>
       </div>

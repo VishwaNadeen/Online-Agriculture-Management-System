@@ -5,6 +5,8 @@ import { requireAuth } from "../middlewares/auth.js";
 
 const router = Router();
 
+const escapeRegExp = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /**
  * GET /consultants
  * Query: ?city=Kandy&category=Soil%20Testing&q=ruwan&limit=12&page=1
@@ -21,8 +23,16 @@ router.get("/", async (req, res) => {
     } = req.query;
 
     const match = { role: "consultant" };
-    if (city) match["address.city"] = city;
-    if (category) match["consultant.primarySpecialization"] = category;
+    if (city) match["address.city"] = new RegExp(`^${escapeRegExp(city)}$`, "i");
+
+    const categoryFilter = category
+      ? {
+          $or: [
+            { "consultant.primarySpecialization": { $regex: new RegExp(`^${escapeRegExp(category)}$`, "i") } },
+            { "consultant.secondaryExpertise": { $regex: new RegExp(escapeRegExp(category), "i") } },
+          ],
+        }
+      : null;
 
     const textOrName =
       q?.trim()
@@ -37,6 +47,7 @@ router.get("/", async (req, res) => {
 
     const pipeline = [
       { $match: match },
+      ...(categoryFilter ? [{ $match: categoryFilter }] : []),
       ...(textOrName ? [{ $match: textOrName }] : []),
       {
         $project: {
@@ -62,7 +73,16 @@ router.get("/", async (req, res) => {
 
     const [items, total] = await Promise.all([
       User.aggregate(pipeline).exec(),
-      User.countDocuments(match),
+      (async () => {
+        const countPipeline = [
+          { $match: match },
+          ...(categoryFilter ? [{ $match: categoryFilter }] : []),
+          ...(textOrName ? [{ $match: textOrName }] : []),
+          { $count: "n" },
+        ];
+        const r = await User.aggregate(countPipeline).exec();
+        return r?.[0]?.n || 0;
+      })(),
     ]);
 
     const mapped = items.map((u) => ({
