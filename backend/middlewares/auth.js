@@ -15,6 +15,20 @@ export async function auth(req, res, next) {
     const userId = decoded.id || decoded._id || decoded.sub || decoded.userId;
     if (!userId) return res.status(401).json({ message: "Invalid token payload" });
 
+    // Handle env-admin user (virtual user not in database)
+    if (userId === "env-admin") {
+      req.user = {
+        _id: "env-admin",
+        id: "env-admin",
+        sub: "env-admin",
+        role: "admin",
+        firstName: "Admin",
+        lastName: "User",
+        email: process.env.ADMIN_EMAIL || "admin@example.com"
+      };
+      return next();
+    }
+
     req.user = await User.findById(userId).lean();
     if (!req.user) return res.status(401).json({ message: "Invalid token user" });
 

@@ -294,6 +294,8 @@ const remove = async (req, res) => {
     const isSelf = requesterId && String(requesterId) === String(id);
     const isAdmin = requesterRole === "admin";
 
+    // Only require password for self-deletion by non-admin users
+    // Note: env-admin cannot delete themselves since they don't exist in the database
     if (isSelf && !isAdmin) {
       const { currentPassword } = req.body || {};
       if (!currentPassword) {
@@ -304,6 +306,7 @@ const remove = async (req, res) => {
         return res.status(401).json({ message: "Password is incorrect." });
       }
     }
+    // Admin users can delete anyone without requiring the target user's password
 
     await User.findByIdAndDelete(id);
     return res.json({ message: "User deleted" });
