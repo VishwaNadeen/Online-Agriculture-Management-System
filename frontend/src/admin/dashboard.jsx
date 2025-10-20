@@ -86,10 +86,10 @@ export default function Dashboard() {
       eventsRes,
     ] = await Promise.all([
       safeGet("/api/users"),               // userRoutes.js -> router.get("/")
-      safeGet("/api/courses"),             // courseRoutes.js -> courserouter.get("/")
+      safeGet("/courses"),                 // server mounts at "/courses"
       safeGet("/api/appointments", true),  // appointmentRoutes.js is protected (router.use(requireAuth))
-      safeGet("/api/community"),           // your community router -> router.get("/")
-      safeGet("/api/events"),              // EventRoute.js -> router.get("/")
+      safeGet("/community"),               // server mounts at "/community"
+      safeGet("/events"),                  // server mounts at "/events"
     ]);
 
     setStats({
@@ -110,7 +110,7 @@ export default function Dashboard() {
     { title: "Tutorials",       ...stats.courses,      icon: FaBook,        to: "/admin/courses" },
     { title: "Appointments",    ...stats.appointments, icon: FaCalendarAlt, to: "/admin/appointments" },
     { title: "Community Posts", ...stats.community,    icon: FaComments,    to: "/admin/comments" },
-    { title: "Events",          ...stats.events,       icon: FaCalendar,    to: "/admin/events" },
+    { title: "Events",          ...stats.events,       icon: FaCalendar,    to: "/admin/event" },
   ]), [stats]);
 
   return (
