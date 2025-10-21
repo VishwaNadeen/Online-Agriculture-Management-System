@@ -6,8 +6,6 @@ import { BiEdit, BiPlus, BiTrash } from "react-icons/bi";
 import { Link, useNavigate } from "react-router-dom";
 import Loader from "../components/loader";
 
-
-
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
 export default function CoursesAdmin() {
@@ -32,31 +30,33 @@ export default function CoursesAdmin() {
   }, [isLoading]);
 
   return (
-    <div className="w-full min-h-screen bg-emerald-50 relative">
+    <div className="w-full min-h-screen bg-gray-100 relative">
       <div className="max-w-7xl mx-auto px-4 py-6">
         <h1 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-4">
-          Courses (Admin)
+          Courses 
         </h1>
 
         <div className="bg-white rounded-2xl shadow-xl border border-emerald-100 overflow-hidden">
           {isLoading ? (
-            <div className="p-10 flex justify-center">
+            <div className="p-10 flex justify-center bg-gray-100">
               <Loader></Loader>
             </div>
           ) : (
             <div className="overflow-auto">
+              {/* table width kept reasonable */}
               <table className="min-w-[1000px] w-full">
                 <thead className="bg-emerald-100/70 border-b border-emerald-200">
                   <tr className="text-left text-emerald-900">
                     <th className="p-3 text-sm font-semibold">Course ID</th>
                     <th className="p-3 text-sm font-semibold">Name</th>
-                    <th className="p-3 text-sm font-semibold">Alt Titles</th>
+                    {/* Alt Titles removed */}
                     <th className="p-3 text-sm font-semibold">Category</th>
                     <th className="p-3 text-sm font-semibold">Level</th>
                     <th className="p-3 text-sm font-semibold">Lang</th>
                     <th className="p-3 text-sm font-semibold">Thumbnail</th>
                     <th className="p-3 text-sm font-semibold">Videos</th>
                     <th className="p-3 text-sm font-semibold">PDFs</th>
+                    {/* Texts added back */}
                     <th className="p-3 text-sm font-semibold">Texts</th>
                     <th className="p-3 text-sm font-semibold">Published</th>
                     <th className="p-3 text-sm font-semibold">Active</th>
@@ -69,7 +69,7 @@ export default function CoursesAdmin() {
                     const {
                       courseID,
                       courseName,
-                      altTitles,
+                      altTitles, // unused (Alt Titles column removed)
                       category,
                       level,
                       language,
@@ -88,9 +88,7 @@ export default function CoursesAdmin() {
                       >
                         <td className="p-3 text-sm text-emerald-900">{courseID}</td>
                         <td className="p-3 text-sm text-emerald-900">{courseName}</td>
-                        <td className="p-3 text-sm text-emerald-700">
-                          {Array.isArray(altTitles) ? altTitles.join(", ") : altTitles}
-                        </td>
+                        {/* Alt Titles cell removed */}
                         <td className="p-3 text-sm text-emerald-700">{category}</td>
                         <td className="p-3 text-sm text-emerald-700">{level}</td>
                         <td className="p-3 text-sm text-emerald-700 uppercase">{language}</td>
@@ -111,6 +109,7 @@ export default function CoursesAdmin() {
                         <td className="p-3 text-sm text-emerald-700 text-center">
                           {pdfLessons.length}
                         </td>
+                        {/* Texts count cell added back */}
                         <td className="p-3 text-sm text-emerald-700 text-center">
                           {textLessons.length}
                         </td>
@@ -184,13 +183,14 @@ export default function CoursesAdmin() {
       </div>
 
       {/* Floating Add Button */}
-      <Link
-        to={"/admin/addCourse"}
-        className="fixed bottom-5 right-5 px-4 py-3 bg-amber-300 text-black rounded-full shadow-2xl border border-amber-400 hover:bg-amber-200 transition flex items-center gap-2"
-      >
-        <BiPlus className="text-2xl" />
-        <span className="font-medium hidden sm:block">Add Course</span>
-      </Link>
+    <Link
+  to={"/admin/addCourse"}
+  className="group fixed top-5 right-5 px-4 py-3 bg-gradient-to-r bg-emerald-700 text-white rounded-[10px] border border-emerald-600/50 shadow-lg shadow-emerald-700/20 hover:shadow-xl hover:shadow-emerald-700/30 transition transform duration-200 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-300/70 flex items-center gap-2"
+>
+  <BiPlus className="text-2xl transition-transform duration-200 group-hover:rotate-60" />
+  <span className="font-medium hidden sm:block tracking-wide">Add Course</span>
+</Link>
+
     </div>
   );
 }

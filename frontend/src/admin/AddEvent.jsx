@@ -4,25 +4,8 @@ import { useNavigate, Link } from "react-router-dom";
 import { EventAPI } from "../api/events";
 import toast from "react-hot-toast";
 
-// Helper function to read auth from storage
-function readAuthFromStorage() {
-  const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
-  const token = get("auth_token") || get("token") || get("user_token") || get("authToken") || "";
-  let user = null;
-  const rawUser = get("auth_user");
-  if (rawUser) {
-    try {
-      user = JSON.parse(rawUser);
-    } catch {
-      user = null;
-    }
-  }
-  return { token, user };
-}
-
 const AddEvent = () => {
   const navigate = useNavigate();
-  const { user } = readAuthFromStorage();
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -37,16 +20,6 @@ const AddEvent = () => {
     registrationDeadline: ""
   });
 
-  const isAdmin = user?.role === 'admin' || user?.email?.includes('admin');
-
-  // Redirect if not admin
-  React.useEffect(() => {
-    if (!user || !isAdmin) {
-      toast.error("Access denied. Admin privileges required.");
-      navigate('/events');
-    }
-  }, [user, isAdmin, navigate]);
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -57,7 +30,7 @@ const AddEvent = () => {
 
   const validateForm = () => {
     const required = ['title', 'description', 'trainerName', 'date', 'time', 'location', 'capacity', 'registrationDeadline'];
-    const missing = required.filter(field => !formData[field].trim());
+    const missing = required.filter(field => !String(formData[field] || "").trim());
     
     if (missing.length > 0) {
       toast.error(`Please fill in: ${missing.join(', ')}`);
@@ -80,14 +53,14 @@ const AddEvent = () => {
     }
     
     if (regDeadline <= today) {
-      toast.error("Registration deadline must be in the future");
+      toast.error("Registration deadline must be in the future...");
       return false;
     }
 
     // Validate capacity
     const capacity = parseInt(formData.capacity);
     if (isNaN(capacity) || capacity <= 0) {
-      toast.error("Capacity must be a positive number");
+      toast.error("Capacity must be a positive number...");
       return false;
     }
 
@@ -104,24 +77,18 @@ const AddEvent = () => {
       await EventAPI.create({
         ...formData,
         capacity: parseInt(formData.capacity),
-        createdBy: user?.firstName && user?.lastName 
-          ? `${user.firstName} ${user.lastName}` 
-          : user?.email || 'Admin'
+        createdBy: 'Admin'
       });
       
       toast.success('Event created successfully!');
-      navigate('/events');
+      navigate('/admin/event');
     } catch (error) {
       console.error('Error creating event:', error);
-      toast.error(error.response?.data?.message || 'Failed to create event');
+      toast.error(error?.response?.data?.message || 'Failed to create event');
     } finally {
       setSubmitting(false);
     }
   };
-
-  if (!user || !isAdmin) {
-    return null; // Will redirect in useEffect
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
@@ -130,7 +97,7 @@ const AddEvent = () => {
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
             <Link
-              to="/events"
+              to="/admin/event"
               className="p-2 text-gray-600 hover:text-emerald-600 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -333,7 +300,7 @@ const AddEvent = () => {
               </button>
               
               <Link
-                to="/events"
+                to="/admin/event"
                 className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-center"
               >
                 Cancel
