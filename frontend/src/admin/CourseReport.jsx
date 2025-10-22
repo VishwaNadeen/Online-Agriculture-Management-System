@@ -3,6 +3,7 @@ import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import Loader from "../components/loader";
+import { createGreenGrowLetterShell } from "../utils/pdf/greenGrowLetterShell";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const SITE_NAME = import.meta.env.VITE_SITE_NAME || "Green Grow";
@@ -44,38 +45,8 @@ export default function CoursesReport() {
     return { total, published, active, totals };
   }, [courses]);
 
-  // ---------- Load jsPDF + autoTable only when needed ----------
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const exists = Array.from(document.getElementsByTagName("script")).some(
-        (s) => s.src && s.src.includes(src)
-      );
-      if (exists) return resolve();
-      const s = document.createElement("script");
-      s.src = src;
-      s.async = true;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error(`Failed to load ${src}`));
-      document.body.appendChild(s);
-    });
-  }
-
-  async function ensurePdfLibs() {
-    if (!window.jspdf || !window.jspdf.jsPDF) {
-      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-    }
-    if (!window.jspdf?.jsPDF?.API?.autoTable) {
-      await loadScript(
-        "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"
-      );
-    }
-    if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API?.autoTable) {
-      throw new Error("PDF libraries failed to load");
-    }
-  }
-
-  // ============== Report generation (direct PDF download) ==============
-  async function downloadPDF() {
+  // PDF generation function
+  const downloadPDF = async () => {
     try {
       if (isLoading) {
         toast.error("Please wait until data loads");
@@ -87,13 +58,7 @@ export default function CoursesReport() {
       }
 
       setIsDownloading(true);
-      await ensurePdfLibs();
 
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-
-      const left = 14;
-      let y = 16;
       const nowStr = new Date().toLocaleString(undefined, {
         year: "numeric",
         month: "short",
@@ -101,68 +66,84 @@ export default function CoursesReport() {
         hour: "2-digit",
         minute: "2-digit",
       });
-      const pageWidth = doc.internal.pageSize.getWidth();
 
-      // Header
+      const { doc, margins, contentWidth, addPage, save } =
+        await createGreenGrowLetterShell({
+          brandName: SITE_NAME,
+          brandAccent: [4, 120, 87],
+          brandPrimary: [17, 24, 39],
+          addressLines: ["123 Harvest Lane, Agricultural District, Colombo 05, Sri Lanka"],
+          contactLine: "Contact: +94 11 234 5678",
+          emailLine: "Email: support@greengrow.lk",
+          rightTitle: "COURSES REPORT",
+          rightSubTitle: `Generated on ${nowStr}`,
+          footerNoteLeft: "This is a computer-generated report.",
+          footerNoteRight: "greengrow.lk | +94 11 234 5678",
+        });
+
+      // ===== Body =====
+      let y = Math.max(margins.top, 36);
+      const pageH = doc.internal.pageSize.getHeight();
+      const pageW = doc.internal.pageSize.getWidth();
+
+      // Title (center)
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text(SITE_NAME, left, y);
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "normal");
-      doc.text("Courses Report", left, (y += 8));
-      doc.setFontSize(10);
-      doc.text(`Generated on: ${nowStr}`, pageWidth - left, 16, { align: "right" });
-
-      // Divider
-      y += 6;
-      doc.setDrawColor(200);
-      doc.line(left, y, pageWidth - left, y);
-      y += 6;
-
-      // Summary
-      doc.setFontSize(11);
-      doc.text(`Total Courses: ${reportStats.total}`, left, y);
-      y += 6;
-      doc.text(`Published: ${reportStats.published}`, left, y);
-      y += 6;
-      doc.text(`Active: ${reportStats.active}`, left, y);
-      y += 6;
-      doc.text(
-        `Materials — Videos: ${reportStats.totals.videos}, PDFs: ${reportStats.totals.pdfs}, Texts: ${reportStats.totals.texts}`,
-        left,
-        y
-      );
+      doc.setFontSize(14);
+      doc.setTextColor(17, 24, 39);
+      doc.text(`${SITE_NAME} — Courses Summary`, pageW / 2, y, { align: "center" });
       y += 8;
 
-      // Table
-      const head = [
-        [
-          "#",
-          "Course ID",
-          "Name",
-          "Category",
-          "Level",
-          "Lang",
-          "Videos",
-          "PDFs",
-          "Texts",
-          "Published",
-          "Active",
-        ],
-      ];
+      // Divider (center)
+      doc.setDrawColor(4, 120, 87);
+      doc.setLineWidth(0.6);
+      const dividerWidth = contentWidth * 0.6;
+      const dividerX = (pageW - dividerWidth) / 2;
+      doc.line(dividerX, y, dividerX + dividerWidth, y);
+      y += 10;
 
+      // Summary (center)
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(17, 24, 39);
+
+      doc.text(`Total Courses: ${reportStats.total}`, pageW / 2, y, { align: "center" });
+      y += 6;
+      doc.text(
+        `Published: ${reportStats.published}    Active: ${reportStats.active}`,
+        pageW / 2,
+        y,
+        { align: "center" }
+      );
+      y += 6;
+      doc.text(
+        `Videos: ${reportStats.totals.videos}    PDFs: ${reportStats.totals.pdfs}    Texts: ${reportStats.totals.texts}`,
+        pageW / 2,
+        y,
+        { align: "center" }
+      );
+      y += 12;
+
+      // Table
+      if (y > pageH - margins.bottom - 20) {
+        addPage();
+        y = Math.max(margins.top, 36);
+      }
+
+      const head = [
+        ["#", "Course ID", "Name", "Category", "Level", "Language", "Videos", "PDFs", "Texts", "Published", "Active"],
+      ];
       const body = courses.map((c, i) => [
         String(i + 1),
         c?.courseID ?? "",
         c?.courseName ?? "",
         c?.category ?? "",
         c?.level ?? "",
-        (c?.language ?? "").toUpperCase(),
+        c?.language ?? "",
         Array.isArray(c?.videoTutorials) ? c.videoTutorials.length : 0,
         Array.isArray(c?.pdfLessons) ? c.pdfLessons.length : 0,
         Array.isArray(c?.textLessons) ? c.textLessons.length : 0,
-        String(!!c?.isPublished),
-        String(!!c?.isActive),
+        c?.isPublished ? "Yes" : "No",
+        c?.isActive ? "Yes" : "No",
       ]);
 
       doc.setFontSize(10);
@@ -170,66 +151,49 @@ export default function CoursesReport() {
         startY: y,
         head,
         body,
-        styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
-        headStyles: { fillColor: [235, 250, 244], textColor: 0 },
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          overflow: "linebreak",
+          textColor: [17, 24, 39],
+          halign: "left",
+        },
+        headStyles: {
+          fillColor: [236, 253, 245],
+          textColor: [4, 120, 87],
+          lineWidth: 0.2,
+          lineColor: [209, 213, 219],
+          fontStyle: "bold",
+          halign: "center",
+        },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
         columnStyles: {
-          0: { cellWidth: 10 }, // #
-          1: { cellWidth: 26 }, // Course ID
-          2: { cellWidth: 40 }, // Name
-          3: { cellWidth: 28 }, // Category
-          4: { cellWidth: 20 }, // Level
-          5: { cellWidth: 14 }, // Lang
-          6: { cellWidth: 16 }, // Videos
-          7: { cellWidth: 14 }, // PDFs
-          8: { cellWidth: 14 }, // Texts
-          9: { cellWidth: 20 }, // Published
-          10: { cellWidth: 16 }, // Active
+          0: { cellWidth: 8, halign: "center" },
+          1: { cellWidth: 20, halign: "center" },
+          2: { cellWidth: 50 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 20, halign: "center" },
+          6: { cellWidth: 15, halign: "center" },
+          7: { cellWidth: 15, halign: "center" },
+          8: { cellWidth: 15, halign: "center" },
+          9: { cellWidth: 20, halign: "center" },
+          10: { cellWidth: 20, halign: "center" },
         },
         theme: "striped",
+        margin: { left: 18, right: 42 },
+        tableWidth: "auto",
       });
 
-      // Signature block
-      let sigY = doc.lastAutoTable.finalY + 12;
-      const pageHeight = doc.internal.pageSize.getHeight();
-      if (sigY + 40 > pageHeight) {
-        doc.addPage();
-        sigY = 20;
-      }
-
-      doc.setFontSize(10);
-      doc.setTextColor(0);
-      doc.text("Prepared by:", left, sigY);
-      doc.text("Authorized Signature:", pageWidth - left - 60, sigY);
-
-      // signature lines
-      doc.line(left, sigY + 18, left + 60, sigY + 18);
-      doc.line(pageWidth - left - 60, sigY + 18, pageWidth - left, sigY + 18);
-
-      doc.setFontSize(9);
-      doc.text(`${SITE_NAME} Admin`, left, sigY + 24);
-
-      // Footer note
-      const noteY = sigY + 34;
-      const note = `This report was generated by ${SITE_NAME}. Data reflects the current state of the courses catalog as of ${nowStr}.`;
-      doc.setTextColor(60);
-      doc.text(doc.splitTextToSize(note, pageWidth - left * 2), left, noteY);
-
-      // Save
-      const dt = new Date();
-      const ts = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(
-        dt.getDate()
-      ).padStart(2, "0")}_${String(dt.getHours()).padStart(2, "0")}${String(dt.getMinutes()).padStart(2, "0")}`;
-      const filename = `${SITE_NAME.replace(/\s+/g, "_")}_Courses_Report_${ts}.pdf`;
-
-      doc.save(filename);
-      toast.success(`PDF downloaded as "${filename}". Saved to your default Downloads folder.`);
+      save(`${SITE_NAME.replace(/\s+/g, "_")}_Courses_Report.pdf`);
+      toast.success(`PDF downloaded successfully!`);
     } catch (err) {
       console.error(err);
       toast.error("PDF download failed.");
     } finally {
       setIsDownloading(false);
     }
-  }
+  };
 
   // For on-page display only
   const nowStr = useMemo(
@@ -245,7 +209,7 @@ export default function CoursesReport() {
   );
 
   return (
-    <div className="w-full min-h-screen bg-gray-100">
+    <div className="w-full min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Header actions */}
         <div className="flex items-center justify-between mb-4">

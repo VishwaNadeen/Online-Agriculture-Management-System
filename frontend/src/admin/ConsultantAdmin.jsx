@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
+import AdminLoader from "../components/AdminLoader";
 import { 
   FaUserMd, 
   FaCalendarCheck, 
@@ -276,15 +277,11 @@ export default function ConsultantAdmin() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600"></div>
-      </div>
-    );
+    return <AdminLoader message="Loading consultant data..." />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

@@ -172,7 +172,7 @@ export default function AddCourse() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center p-4">
+    <div className="min-h-screen w-full flex items-center justify-center p-4">
       <div className="w-full max-w-5xl bg-white rounded-2xl shadow-xl p-6 md:p-8">
         <h1 className="text-2xl md:text-3xl font-bold text-emerald-800 mb-6">
           Add New Course
