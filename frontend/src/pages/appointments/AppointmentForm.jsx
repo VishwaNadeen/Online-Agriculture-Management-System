@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Clock, MapPin, FileText, User, Phone, Mail, Briefcase } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 /* ==== NEW: react-leaflet / leaflet imports for map picker ==== */
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
@@ -33,6 +34,30 @@ const DURATION_OPTIONS = [
   { value: 6, label: "6 hours (Half day)" },
   { value: 8, label: "8 hours (Full day)" },
 ];
+
+const SL_PROVINCES = [
+  "Western",
+  "Central",
+  "Southern",
+  "Northern",
+  "Eastern",
+  "North Western",
+  "North Central",
+  "Uva",
+  "Sabaragamuwa",
+];
+
+const SL_DISTRICTS = {
+  Western: ["Colombo", "Gampaha", "Kalutara"],
+  Central: ["Kandy", "Matale", "Nuwara Eliya"],
+  Southern: ["Galle", "Matara", "Hambantota"],
+  Northern: ["Jaffna", "Kilinochchi", "Mannar", "Vavuniya", "Mullaitivu"],
+  Eastern: ["Trincomalee", "Batticaloa", "Ampara"],
+  "North Western": ["Kurunegala", "Puttalam"],
+  "North Central": ["Anuradhapura", "Polonnaruwa"],
+  Uva: ["Badulla", "Monaragala"],
+  Sabaragamuwa: ["Ratnapura", "Kegalle"],
+};
 
 const PHONE_CODES = [
   { code: "+94", country: "Sri Lanka" },
@@ -113,7 +138,8 @@ const validators = {
     if (!value?.trim()) return "Full name is required";
     if (value.length < 2) return "Name must be at least 2 characters";
     if (value.length > 50) return "Name must be less than 50 characters";
-    if (!/^[a-zA-Z0-9\s\-'.]+$/.test(value)) return "Use letters, numbers, spaces, - and ' only";
+    if (!/^[a-zA-Z\s\-'.]+$/.test(value)) return "Name can only contain letters, spaces, hyphens, and apostrophes";
+    if (/\d/.test(value)) return "Name cannot contain numbers";
     return null;
   },
 
@@ -155,7 +181,7 @@ const validators = {
     const selected = new Date(value);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (selected < today) return "Appointment date cannot be in the past";
+    if (selected <= today) return "Appointment date must be in the future";
     const max = new Date();
     max.setFullYear(today.getFullYear() + 1);
     if (selected > max) return "Appointment date cannot be more than 1 year ahead";
@@ -262,8 +288,15 @@ export default function AppointmentForm({
   onSubmit,
   submitLabel = "Schedule Consultation",
   setServerMsg,
+  suppressSuccessFlow = false, // when true, parent handles toast/navigation
+  successToast = "Appointment booked successfully!",
 }) {
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  }, []);
   const navigate = useNavigate();
 
   const [errors, setErrors] = useState({});
@@ -274,13 +307,14 @@ export default function AppointmentForm({
   const [countryCode, setCountryCode] = useState("+94");
   const [mounted, setMounted] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [nameInputWarning, setNameInputWarning] = useState(false);
 
   /* ==== NEW: coords for map-picked location ==== */
   const [mapBusy, setMapBusy] = useState(false);
 
   const [form, setForm] = useState(() => ({
     name: "", phone: "", email: "", state: "", city: "",
-    address: "", category: "", appointmentDate: todayStr,
+    address: "", category: "", appointmentDate: tomorrowStr,
     timeMode: "period", appointmentTime: "morning", durationHours: 1, notes: "",
     consultantId: "", consultantName: "",
     farmLat: null, farmLng: null, // NEW
@@ -294,6 +328,38 @@ export default function AppointmentForm({
   useEffect(() => {
     setForm((p) => ({ ...p, ...initialValues }));
   }, [initialValues]);
+
+  // When editing, split an incoming full phone (e.g., "+94XXXXXXXXX")
+  // into the countryCode select and the local number input.
+  useEffect(() => {
+    const raw = initialValues?.phone || "";
+    if (!raw) return;
+    // extract digits only
+    const digits = String(raw).replace(/\D/g, "");
+    if (!digits) return;
+    // match a known country code prefix
+    const known = PHONE_CODES.map((p) => p.code.replace("+", "")).sort((a,b)=>b.length-a.length);
+    const match = known.find((cc) => digits.startsWith(cc));
+    if (match) {
+      const local = digits.slice(match.length);
+      setCountryCode("+" + match);
+      setForm((p) => ({ ...p, phone: formatPhoneNumber(local) }));
+    } else {
+      // fallback: keep last up to 10-12 digits as local
+      const local = digits.length > 12 ? digits.slice(-10) : digits;
+      setForm((p) => ({ ...p, phone: formatPhoneNumber(local) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValues?.phone]);
+
+  // Ensure valid default for period mode so validation doesn't complain while UI shows a label
+  useEffect(() => {
+    if (form.timeMode === "period" && !PERIOD_OPTIONS.includes(form.appointmentTime)) {
+      setForm((p) => ({ ...p, appointmentTime: PERIOD_OPTIONS[0] }));
+      setErrors((e) => ({ ...e, appointmentTime: undefined }));
+      setSuccess((s) => ({ ...s, appointmentTime: getSuccessMessages.appointmentTime?.(PERIOD_OPTIONS[0], form) }));
+    }
+  }, [form.timeMode, form.appointmentTime]);
 
   const debouncedValidation = useMemo(
     () =>
@@ -348,6 +414,16 @@ export default function AppointmentForm({
   const categoryOptions = useMemo(
     () => ensureInOptions(CATEGORY_OPTIONS, form.category),
     [form.category]
+  );
+
+  const provinceOptions = useMemo(
+    () => ensureInOptions(SL_PROVINCES, form.state),
+    [form.state]
+  );
+
+  const cityOptions = useMemo(
+    () => ensureInOptions(SL_DISTRICTS[form.state] || [], form.city),
+    [form.state, form.city]
   );
 
   const setField = useCallback((key, value) => {
@@ -408,13 +484,21 @@ export default function AppointmentForm({
     try {
       setSubmitting(true);
       await onSubmit(payload);
-      // Show success animation and reload shortly after
-      setShowSuccess(true);
-      setTimeout(() => {
-        // Reload current page
-        navigate(0);
-      }, 1400);
+      if (!suppressSuccessFlow) {
+        // Show success animation
+        setShowSuccess(true);
+        toast.success(successToast);
+        setTimeout(() => {
+          // Navigate to My Appointments page and scroll to top
+          navigate("/my-appointments");
+          // Scroll to top smoothly after navigation
+          setTimeout(() => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }, 100);
+        }, 1200);
+      }
     } catch (err) {
+      toast.error(err.message || "Failed to schedule appointment");
       setServerMsg?.({ type: "error", text: err.message || "Failed to schedule appointment" });
     } finally {
       setSubmitting(false);
@@ -429,7 +513,7 @@ export default function AppointmentForm({
     setWarnings((prev) => ({ ...prev, [field]: undefined }));
   };
 
-  const resetForm = () => {
+ /* const resetForm = () => {
     setForm({
       name: "", phone: "", email: "", state: "", city: "",
       address: "", category: "", appointmentDate: todayStr,
@@ -444,7 +528,7 @@ export default function AppointmentForm({
     setWarnings({});
     setCountryCode("+94");
   };
-
+*/
   /* ==== NEW: when user picks on map, store coords ==== */
   const handlePickOnMap = async ({ lat, lng }) => {
     setForm((f) => ({ ...f, farmLat: lat, farmLng: lng }));
@@ -488,19 +572,13 @@ export default function AppointmentForm({
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-emerald-50 px-4 py-12 relative overflow-hidden">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200 rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-300 rounded-full blur-3xl opacity-20 translate-y-1/2 -translate-x-1/2" />
-
       <form
         onSubmit={handleSubmit}
-        className={`relative z-10 bg-white shadow-2xl p-8 rounded-3xl border border-emerald-100/50 max-w-4xl w-full space-y-6 transition-all duration-1000 ${
+        className={`relative z-10 bg-white shadow-md p-8 rounded-3xl max-w-4xl w-full space-y-6 transition-all duration-1000 ${
           mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         }`}
         noValidate
       >
-        {/* Decorative top accent */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 rounded-t-3xl" />
 
         {/* Header */}
         <div className="text-center mb-8">
@@ -530,10 +608,22 @@ export default function AppointmentForm({
               icon={User}
               required
               value={form.name}
-              onChange={(e) => setField("name", e.target.value)}
+              onChange={(e) => {
+                const input = e.target.value;
+                // Check if user tried to enter numbers or invalid chars
+                const hasInvalidChars = /[^a-zA-Z\s\-'.]/.test(input);
+                if (hasInvalidChars) {
+                  setNameInputWarning(true);
+                  setTimeout(() => setNameInputWarning(false), 2000);
+                }
+                // Only allow letters, spaces, hyphens, and apostrophes
+                const filtered = input.replace(/[^a-zA-Z\s\-'.]/g, '');
+                setField("name", filtered);
+              }}
               onBlur={() => handleBlur("name")}
               error={errors.name}
               success={success.name}
+              warning={nameInputWarning ? "Numbers and special characters are not allowed in name" : warnings.name}
               placeholder="Enter your full name"
             />
 
@@ -611,20 +701,30 @@ export default function AppointmentForm({
           </div>
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <Input
+            <Select
               id="state"
               label="Province"
               icon={MapPin}
               required
               value={form.state}
-              onChange={(e) => setField("state", e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setField("state", val);
+                if (!(SL_DISTRICTS[val] || []).includes(form.city)) {
+                  setField("city", "");
+                }
+              }}
               onBlur={() => handleBlur("state")}
               error={errors.state}
               success={success.state}
-              placeholder="Enter your province"
-            />
+            >
+              <option value="">Select Province</option>
+              {provinceOptions.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </Select>
 
-            <Input
+            <Select
               id="city"
               label="District / City"
               icon={MapPin}
@@ -634,8 +734,13 @@ export default function AppointmentForm({
               onBlur={() => handleBlur("city")}
               error={errors.city}
               success={success.city}
-              placeholder="Enter your district or city"
-            />
+              disabled={!form.state}
+            >
+              <option value="">{form.state ? "Select District / City" : "Select Province first"}</option>
+              {(cityOptions).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </Select>
           </div>
 
           {/* ==== NEW: Map Picker (click map to drop the pin) ==== */}
@@ -662,7 +767,7 @@ export default function AppointmentForm({
               </div>
             </div>
 
-            <div className="w-full h-72 rounded-xl overflow-hidden border-2 border-emerald-300">
+            <div className="w-full h-72 rounded-xl overflow-hidden border-2 border-gray-200">
               <MapContainer
                 center={[7.8731, 80.7718]} // Sri Lanka
                 zoom={7}
@@ -734,7 +839,7 @@ export default function AppointmentForm({
               icon={Calendar}
               required
               type="date"
-              min={todayStr}
+              min={tomorrowStr}
               max={new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0]}
               value={form.appointmentDate}
               onChange={(e) => setField("appointmentDate", e.target.value)}

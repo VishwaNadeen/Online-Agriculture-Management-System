@@ -5,7 +5,6 @@ import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import Home from "./pages/home";
 import About from "./pages/about";
-import HelpCenter from "./pages/helpCenter";
 
 // Vishwa
 import UserRegistration from "./pages/user/userRegistration";
@@ -18,6 +17,7 @@ import ProfileEdit from "./pages/user/profileEdit.jsx";
 import FarmEdit from "./pages/user/farmEdit.jsx";
 import Consultant from "./pages/user/ConsultantDetailsPage.jsx";
 import ConsultantEdit from "./pages/user/consultantedit.jsx";
+import ConsultantPublicProfile from "./pages/consultants/ConsultantPublicProfile.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -30,7 +30,6 @@ import MyAppointments from "./pages/appointments/MyAppointments";
 //kalana
 import CommunityForum from "./pages/community/CommunityForum";
 import MyPosts from "./pages/community/MyPosts.jsx";
-import DiscoveryPage from "./pages/discoveries/DiscoveryPage";
 
 // Chanaka
 import CoursesPage from "./pages/courses/coursePage";
@@ -41,8 +40,6 @@ import EventPage from "./pages/event/EventsPage.jsx";
 import EventDetail from "./pages/event/EventDetail.jsx";
 import MyEvents from "./pages/event/MyEvents.jsx";
 
-
-
 export default function ClientApp() {
   return (
     <>
@@ -51,7 +48,7 @@ export default function ClientApp() {
         {/* public */}
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
-        <Route path="/helpCenter" element={<HelpCenter />} />
+        <Route path="/consultants/:id" element={<ConsultantPublicProfile />} />
 
         {/* Vishwa */}
         <Route path="/signup" element={<UserRegistration />} />
@@ -73,15 +70,15 @@ export default function ClientApp() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/consultant" element={<Dashboard />} />
         <Route path="/dashboard/bookings" element={<Dashboard />} />
-        {/* <Route path="/appointments/me" element={<MyAppointments />} />
+       {/* <Route path="/appointments/me" element={<MyAppointments />} />
          <Route path="/my-appointments" element={<ListAppointment />} />*/}
          <Route path="/my-appointments" element={<MyAppointments />} />
 
         {/* kalana */}
         <Route path="/community" element={<CommunityForum />} />
         <Route path="mine" element={<MyPosts />} />
-        <Route path="/discoveries" element={<DiscoveryPage />} />
         
+
         {/* Chanaka */}
         <Route path="/coursepage" element={<CoursesPage />} />
         <Route path="/courses/:courseID" element={<CourseOverview />} />
@@ -90,7 +87,6 @@ export default function ClientApp() {
         <Route path="/events" element={<EventPage />} />
         <Route path="/events/:id" element={<EventDetail />} />
         <Route path="/my-events" element={<MyEvents />} />
-       
 
       </Routes>
       <Footer />

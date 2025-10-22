@@ -46,7 +46,12 @@ export default function AppointmentCard({
       : appt?.consultant?.firstName || appt?.consultantName || "Consultant";
 
   const canConsultantAct = role === "consultant" && status === "pending";
-  const canFarmerCancel = role === "farmer" && ["pending", "confirmed"].includes(status);
+  // User can only cancel if status is pending (not confirmed by consultant)
+  const canFarmerCancel = role === "farmer" && status === "pending";
+  // User can only edit if status is pending or confirmed (not completed)
+  const canFarmerEdit = role === "farmer" && ["pending", "confirmed"].includes(status) && status !== "completed";
+  // User can delete if completed
+  const canFarmerDelete = role === "farmer" && status === "completed";
 
   return (
     <div
@@ -120,7 +125,7 @@ export default function AppointmentCard({
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-3 mt-5">
+      <div className="flex flex-wrap gap-3 mt-5 justify-end">
        {/*} <button
           onClick={(e) => { e.stopPropagation(); onOpen?.(appt); }}
           className="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200"
@@ -128,8 +133,8 @@ export default function AppointmentCard({
           View
         </button>*/}
 
-        {/* farmer: edit */}
-        {role === "farmer" && onEdit && (
+        {/* farmer: edit (only if pending or confirmed, not completed) */}
+        {canFarmerEdit && onEdit && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(appt); }}
            className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -139,7 +144,7 @@ export default function AppointmentCard({
           </button>
         )}
 
-        {/* farmer: cancel */}
+        {/* farmer: cancel (only if pending, not confirmed) */}
         {canFarmerCancel && onCancel && (
           <button
             onClick={(e) => { e.stopPropagation(); onCancel(appt); }}
@@ -147,6 +152,17 @@ export default function AppointmentCard({
 
           >
             Cancel
+          </button>
+        )}
+
+        {/* farmer: delete (only if completed) */}
+        {canFarmerDelete && onCancel && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onCancel(appt); }}
+           className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+
+          >
+            Delete
           </button>
         )}
 

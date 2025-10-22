@@ -51,6 +51,7 @@ router.get("/", async (req, res) => {
           "consultant.feeStructure": 1,
           "consultant.availableTimeSlots": 1,
           "consultant.bio": 1,
+          profilePicture: 1,
           createdAt: 1,
         },
       },
@@ -75,12 +76,69 @@ router.get("/", async (req, res) => {
       about: u.consultant?.bio || "",
       specializations: u.consultant?.secondaryExpertise || [],
       slots: u.consultant?.availableTimeSlots || [],
+      profilePicture: u.profilePicture || null,
     }));
 
     res.json({ total, items: mapped });
   } catch (err) {
     console.error("GET /consultants failed:", err);
     res.status(500).json({ message: "Failed to load consultants" });
+  }
+});
+
+/**
+ * GET /consultants/:id
+ * Returns full public consultant profile by ID
+ */
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const u = await User.findById(id).lean();
+    
+    if (!u || u.role !== "consultant") {
+      return res.status(404).json({ message: "Consultant not found" });
+    }
+
+    const profile = {
+      id: String(u._id),
+      firstName: u.firstName,
+      lastName: u.lastName,
+      name: `${u.firstName} ${u.lastName}`,
+      email: u.email,
+      phone: u.phone,
+      profilePicture: u.profilePicture || null,
+      dateOfBirth: u.dateOfBirth,
+      gender: u.gender,
+      username: u.username,
+      status: u.status,
+      role: u.role,
+      createdAt: u.createdAt,
+      address: u.address,
+      consultant: {
+        bio: u.consultant?.bio || "",
+        primarySpecialization: u.consultant?.primarySpecialization || "",
+        secondaryExpertise: u.consultant?.secondaryExpertise || [],
+        yearsOfExperience: u.consultant?.yearsOfExperience || 0,
+        highestQualification: u.consultant?.highestQualification || "",
+        certifications: u.consultant?.certifications || [],
+        organizationName: u.consultant?.organizationName || "",
+        consultationTypes: u.consultant?.consultationTypes || [],
+        availableServices: u.consultant?.availableServices || [],
+        feeStructure: u.consultant?.feeStructure || "",
+        serviceRegions: u.consultant?.serviceRegions || [],
+        coverageRadiusKm: u.consultant?.coverageRadiusKm || null,
+        languages: u.consultant?.languages || [],
+        availableDays: u.consultant?.availableDays || [],
+        availableTimeSlots: u.consultant?.availableTimeSlots || [],
+        noticePeriod: u.consultant?.noticePeriod || "",
+        socialLinks: u.consultant?.socialLinks || [],
+      },
+    };
+
+    res.json(profile);
+  } catch (err) {
+    console.error("GET /consultants/:id failed:", err);
+    res.status(500).json({ message: "Failed to load consultant profile" });
   }
 });
 
