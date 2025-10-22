@@ -1,253 +1,249 @@
-// src/pages/Courses/CoursesPage.jsx
+// src/pages/Courses/CourseOverview.jsx
 import axios from "axios";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import { useParams } from "react-router-dom";
 import Loader from "../../components/loader";
-import CourseCard from "../../components/courses/courseCard";
 
-export default function CoursesPage() {
-  const [courses, setCourses] = useState([]);
-  const [isLoading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  // filters + search
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("All");
-  const [level, setLevel] = useState("All");
-  const [showSuggest, setShowSuggest] = useState(false);
-
-  const searchWrapRef = useRef(null);
-  const searchInputRef = useRef(null);
+export default function CourseOverview() {
+  const params = useParams(); // expects route like /courses/:courseID
+  const [course, setCourse] = useState(null);
+  const [status, setStatus] = useState("loading");
 
   useEffect(() => {
-    if (isLoading) {
+    if (status === "loading") {
       const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
       axios
-        .get(`${BASE}/courses`)
+        .get(`${BASE}/courses/${params.courseID}`)
         .then((res) => {
-          setCourses(Array.isArray(res.data) ? res.data : []);
-          setLoading(false);
+          setCourse(res.data);
+          setStatus("success");
         })
-        .catch((err) => {
-          setError(
-            err?.response?.data?.message ||
-              err?.message ||
-              "Failed to load courses"
-          );
-          setLoading(false);
+        .catch(() => {
+          setStatus("error");
+          toast.error("Failed to fetch course details.");
         });
     }
-  }, [isLoading]);
+  }, [status, params.courseID]);
 
-  // close suggestions on outside click
-  useEffect(() => {
-    function onDocClick(e) {
-      if (!searchWrapRef.current) return;
-      if (!searchWrapRef.current.contains(e.target)) {
-        setShowSuggest(false);
-      }
-    }
-    document.addEventListener("click", onDocClick);
-    return () => document.removeEventListener("click", onDocClick);
-  }, []);
+  const fmtDate = (d) =>
+    d ? new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" }) : "-";
 
-  // categories + levels
-  const categories = useMemo(() => {
-    const set = new Set((courses || []).map((c) => c?.category).filter(Boolean));
-    return ["All", ...Array.from(set)];
-  }, [courses]);
+  // --- NEW: reliable downloader (fetch -> blob -> temporary link) ---
+  const handlePdfDownload = async (url, name) => {
+    try {
+      if (!url) throw new Error("Missing URL");
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Network error");
+      const blob = await res.blob();
 
-  const levels = useMemo(() => {
-    const set = new Set((courses || []).map((c) => c?.level).filter(Boolean));
-    const ordered = ["Beginner", "Intermediate", "Advanced"].filter((x) =>
-      set.has(x)
-    );
-    const others = Array.from(set).filter((x) => !ordered.includes(x));
-    return ["All", ...ordered, ...others];
-  }, [courses]);
-
-  // suggestions (for search bar)
-  const suggestions = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length < 2) return [];
-    const pool = (courses || []).filter(Boolean);
-    const ranked = pool
-      .map((c) => ({
-        course: c,
-        score:
-          (c.courseName?.toLowerCase().includes(q) ? 2 : 0) +
-          (c.description?.toLowerCase().includes(q) ? 1 : 0) +
-          (Array.isArray(c.tags) &&
-          c.tags.some((t) => String(t).toLowerCase().includes(q))
-            ? 1
-            : 0),
-      }))
-      .filter((r) => r.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6);
-    return ranked.map((r) => r.course);
-  }, [query, courses]);
-
-  // filter visible courses
-  const visibleCourses = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return (courses || []).filter((c) => {
-      const okCat = category === "All" || c?.category === category;
-      const okLvl = level === "All" || c?.level === level;
-      if (!q) return okCat && okLvl;
-
-      const inName = c?.courseName?.toLowerCase?.().includes(q);
-      const inDesc = c?.description?.toLowerCase?.().includes(q);
-      const inTags = Array.isArray(c?.tags)
-        ? c.tags.some((t) => String(t).toLowerCase().includes(q))
-        : false;
-
-      return okCat && okLvl && (inName || inDesc || inTags);
-    });
-  }, [courses, category, level, query]);
-
-  const applySuggestion = (c) => {
-    setQuery(c?.courseName || "");
-    setShowSuggest(false);
-    // Optional: scroll to grid after selecting a suggestion
-  };
-
-  // Clickable search icon action
-  const handleSearchIconClick = () => {
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-    if (query.trim().length >= 2) {
-      setShowSuggest(true);
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const baseName = (name || "lesson").toString().trim() || "lesson";
+      const fileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Download started");
+    } catch (e) {
+      toast.error("Failed to download PDF.");
     }
   };
 
   return (
     <div className="w-full h-full">
-      {isLoading ? (
-        <Loader />
-      ) : error ? (
+      {status === "loading" && <Loader />}
+
+      {status === "error" && (
         <div className="max-w-4xl mx-auto mt-10 p-4 rounded-xl bg-red-50 text-red-700 border border-red-200">
-          {error}
+          Error loading course.
         </div>
-      ) : courses.length === 0 ? (
-        <div className="max-w-4xl mx-auto mt-10 p-4 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-center">
-          No courses found.
-        </div>
-      ) : (
-        <>
-          {/* --- Top filters row (Search + Category + Level) --- */}
-          <div
-            className="w-full max-w-6xl mx-auto px-4 pt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4"
-            ref={searchWrapRef}
-          >
-            {/* Search */}
-            <div className="relative w-full sm:flex-1">
-              <label className="block text-sm font-semibold text-emerald-900 mb-1">
-                Search
-              </label>
+      )}
 
-              {/* Clickable icon */}
-              <button
-                type="button"
-                onClick={handleSearchIconClick}
-                aria-label=" Search"
-                className="absolute left-3 top-[38px] sm:top-[38px] h-5 w-5 text-emerald-700 hover:text-emerald-900"
-                tabIndex={-1}
-              >
-                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m1.1-4.4a7.75 7.75 0 11-15.5 0 7.75 7.75 0 0115.5 0z" />
-                </svg>
-              </button>
-
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setShowSuggest(true);
-                }}
-                onFocus={() =>
-                  query.trim().length >= 2 && setShowSuggest(true)
+      {status === "success" && course && (
+        <div className="w-full h-full">
+          {/* ===== Top hero: FULL-WIDTH media with overlay content (stats panel removed) ===== */}
+          <div className="w-full">
+            <div className="relative w-full">
+              <img
+                src={
+                  (course.thumbnail || "").trim() || 
+                  "https://images.unsplash.com/photo-1604335399105-a0d7f1b8cc4b?q=80&w=1200&auto=format&fit=crop"
                 }
-                placeholder="Search courses..."
-                className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500 pl-10"
+                alt={course.courseName || "Course thumbnail"}
+                className="w-full h-[360px] md:h-[480px] lg:h-[520px] object-cover"
+                loading="lazy"
               />
+              {/* Dark gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
 
-              {showSuggest && suggestions.length > 0 && (
-                <div className="absolute z-20 mt-2 w-full rounded-xl border border-emerald-200 bg-white shadow-lg overflow-hidden">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s.courseID || s._id}
-                      type="button"
-                      onClick={() => applySuggestion(s)}
-                      className="w-full text-left px-4 py-2 hover:bg-emerald-50"
-                    >
-                      <div className="font-medium text-emerald-900 line-clamp-1">
-                        {s.courseName}
-                      </div>
-                      <div className="text-xs text-gray-600 line-clamp-1">
-                        {s.category} • {s.level || "Beginner"}
-                      </div>
-                    </button>
-                  ))}
+              {/* Overlay content */}
+              <div className="absolute inset-0 flex flex-col justify-end p-5 md:p-8">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200">
+                    {course.category || "Agriculture"}
+                  </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/90 text-gray-800 border">
+                    {course.level || "Beginner"}
+                  </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/90 text-gray-800 border">
+                    {(course.language || "en").toUpperCase()}
+                  </span>
                 </div>
-              )}
-            </div>
 
-            {/* Category */}
-            <div className="w-full sm:w-48">
-              <label className="block text-sm font-semibold text-emerald-900 mb-1">
-                Category
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <h1 className="text-white font-extrabold text-2xl md:text-4xl leading-tight drop-shadow-sm">
+                  {course.courseName}
+                </h1>
 
-            {/* Level */}
-            <div className="w-full sm:w-48">
-              <label className="block text-sm font-semibold text-emerald-900 mb-1">
-                Level
-              </label>
-              <select
-                value={level}
-                onChange={(e) => setLevel(e.target.value)}
-                className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                {levels.map((lvl) => (
-                  <option key={lvl} value={lvl}>
-                    {lvl}
-                  </option>
-                ))}
-              </select>
+                {Array.isArray(course.altTitles) && course.altTitles.length > 0 && (
+                  <p className="text-sm text-white/80 mt-1">{course.altTitles.join(" | ")}</p>
+                )}
+
+                <p className="text-base md:text-lg text-white/90 mt-3 leading-relaxed line-clamp-4">
+                  {course.description}
+                </p>
+
+                <div className="mt-4 text-xs text-white/80">
+                  Created: {fmtDate(course.createdAt)}{" "}
+                  {course.publishedAt ? `• Published: ${fmtDate(course.publishedAt)}` : ""}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Grid of courses */}
-          {visibleCourses.length === 0 ? (
-            <div className="max-w-4xl mx-auto mt-10 p-4 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-center">
-              No courses match your filters.
-            </div>
-          ) : (
-            <div className="w-full flex flex-wrap gap-[40px] justify-center items-center py-[40px]">
-              {visibleCourses.map((course) => (
-                <CourseCard
-                  key={course.courseID || course._id}
-                  course={course}
-                />
-              ))}
-            </div>
-          )}
-        </>
+          {/* ===== Content sections ===== */}
+          <div className="max-w-6xl mx-auto px-4 md:px-6 py-10 space-y-10">
+            {/* Videos */}
+            <section>
+              <h2 className="text-xl md:text-2xl font-bold text-emerald-900 mb-4">Video Tutorials</h2>
+              {Array.isArray(course.videoTutorials) && course.videoTutorials.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {course.videoTutorials.map((v, i) => (
+                    <div
+                      key={`vid-${i}`}
+                      className="group rounded-xl border border-emerald-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition"
+                    >
+                      <div className="relative h-44 md:h-48">
+                        <img
+                          src={v.thumbnail || "https://via.placeholder.com/640x360?text=Video"}
+                          alt={v.name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        {/* Centered play overlay */}
+                        <a
+                          href={v.url}
+                          className="absolute inset-0 flex items-center justify-center"
+                        >
+                          <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-600/90 text-white shadow-lg group-hover:scale-105 transition transform">
+                            <svg
+                              className="w-6 h-6"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-5.197-3.028A1 1 0 008 9.028v5.944a1 1 0 001.555.832l5.197-3.028a1 1 0 000-1.664z" />
+                            </svg>
+                          </span>
+                        </a>
+                        {/* Subtle bottom gradient for readability on hover */}
+                        <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                      </div>
+                      <div className="p-3">
+                        <p className="font-semibold text-emerald-900 line-clamp-2">{v.name}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-600">No videos added yet.</p>
+              )}
+            </section>
+
+            {/* PDFs */}
+            <section>
+              <h2 className="text-xl md:text-2xl font-bold text-emerald-900 mb-4">PDF Lessons</h2>
+              {Array.isArray(course.pdfLessons) && course.pdfLessons.length > 0 ? (
+                <div className="rounded-xl border border-emerald-200 bg-white overflow-hidden">
+                  <ul className="divide-y">
+                    {course.pdfLessons.map((p, i) => (
+                      <li key={`pdf-${i}`} className="flex items-center justify-between px-4 py-3">
+                        <div className="min-w-0 pr-3">
+                          <p className="font-medium text-emerald-900 truncate">{p.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{p.url}</p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            type="button"
+                            className="px-3 py-1.5 rounded-lg border text-sm hover:bg-emerald-50"
+                            onClick={() => handlePdfDownload(p.url, p.name)}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700"
+                            onClick={() => handlePdfDownload(p.url, p.name)}
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-gray-600">No PDFs added yet.</p>
+              )}
+            </section>
+
+            {/* Text lessons */}
+            <section>
+              <h2 className="text-xl md:text-2xl font-bold text-emerald-900 mb-4">Text Lessons</h2>
+              {Array.isArray(course.textLessons) && course.textLessons.length > 0 ? (
+                <div className="space-y-3">
+                  {course.textLessons.map((t, i) => (
+                    <details
+                      key={`txt-${i}`}
+                      className="group rounded-xl border border-emerald-200 bg-white p-4 open:shadow-md"
+                    >
+                      <summary className="cursor-pointer list-none flex items-center justify-between">
+                        <span className="font-semibold text-emerald-900">{t.name}</span>
+                        <svg
+                          className="h-5 w-5 text-emerald-700 transition-transform group-open:rotate-180"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </summary>
+                      <div className="mt-3 text-gray-800 whitespace-pre-wrap leading-relaxed">
+                        {t.content}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-600">No text lessons added yet.</p>
+              )}
+            </section>
+
+            {/* Footer meta (concise) */}
+            <section className="pt-2 text-sm text-gray-600">
+              <div className="flex flex-wrap gap-3">
+                <span>Created at: {fmtDate(course.createdAt)}</span>
+                {course.updatedAt && <span>Last updated: {fmtDate(course.updatedAt)}</span>}
+                {course.publishedAt && <span>Published at: {fmtDate(course.publishedAt)}</span>}
+              </div>
+            </section>
+          </div>
+        </div>
       )}
     </div>
   );
