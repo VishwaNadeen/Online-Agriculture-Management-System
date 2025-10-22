@@ -19,7 +19,7 @@ import { ApptAPI } from "../api/appointments";
 import { ConsultantAPI } from "../api/consultants";
 
 export default function AgriAnalytics() {
-  const [activeTab, setActiveTab] = useState("Today"); // Today | Yesterday | Last 7 days | Last 30 days | Weekly | Monthly
+  const [activeTab, setActiveTab] = useState("All Time"); // All Time | Today | Yesterday | Last 7 days | Last 30 days
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -28,6 +28,13 @@ export default function AgriAnalytics() {
   const [myAppointments, setMyAppointments] = useState([]); // assigned to me as consultant
   const [me, setMe] = useState(null);
   const [allConsultants, setAllConsultants] = useState([]);
+  const [selectedConsultant, setSelectedConsultant] = useState(null);
+  
+  // Advanced filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("date"); // date, name, status
+  const [sortOrder, setSortOrder] = useState("desc"); // asc, desc
   
   const authInfo = useMemo(() => {
     try {
@@ -40,7 +47,7 @@ export default function AgriAnalytics() {
       return { user: null, role: "" };
     }
   }, []);
-  const isAdmin = (authInfo.role || authInfo.user?.role) === "admin";
+  const isAdmin = (authInfo.role || "").toLowerCase() === "admin";
 
   // compute start/end ISO strings for the selected tab to query backend with real ranges
   const getDateRange = (label) => {
@@ -97,6 +104,9 @@ export default function AgriAnalytics() {
         setMe(meRes);
         if (isAdmin && consultants) {
           setAllConsultants(consultants);
+          if (consultants.length > 0) {
+            setSelectedConsultant(consultants[0]);
+          }
         }
       } catch (e) {
         if (!mounted) return;
@@ -113,6 +123,9 @@ export default function AgriAnalytics() {
 
   // date range helper based on activeTab/select
   const dateInRange = (date) => {
+    // Show all data when "All Time" is selected
+    if (activeTab === "All Time") return true;
+    
     if (!date) return false;
     const d = new Date(date);
     const now = new Date();
@@ -149,8 +162,61 @@ export default function AgriAnalytics() {
     }
   };
 
-  // The backend already filters appointments by date range, so we can use the state directly.
-  const filteredAppointments = myAppointments;
+  const filteredAppointments = useMemo(() => {
+    let filtered = myAppointments || [];
+    
+    // Date range filter
+    filtered = filtered.filter((a) => dateInRange(a.appointmentDate));
+    
+    // Consultant filter (admin only)
+    if (isAdmin && selectedConsultant) {
+      filtered = filtered.filter((a) => a.consultantId === selectedConsultant._id);
+    }
+    
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((a) => 
+        (a.name || "").toLowerCase().includes(query) ||
+        (a.email || "").toLowerCase().includes(query) ||
+        (a.phone || "").toLowerCase().includes(query) ||
+        (a.city || "").toLowerCase().includes(query) ||
+        (a.category || "").toLowerCase().includes(query)
+      );
+    }
+    
+    // Status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((a) => (a.status || "").toLowerCase() === statusFilter);
+    }
+    
+    // Sort
+    filtered = [...filtered].sort((a, b) => {
+      let compareA, compareB;
+      
+      switch (sortBy) {
+        case "name":
+          compareA = (a.name || "").toLowerCase();
+          compareB = (b.name || "").toLowerCase();
+          break;
+        case "status":
+          compareA = (a.status || "").toLowerCase();
+          compareB = (b.status || "").toLowerCase();
+          break;
+        case "date":
+        default:
+          compareA = new Date(a.appointmentDate || 0).getTime();
+          compareB = new Date(b.appointmentDate || 0).getTime();
+          break;
+      }
+      
+      if (compareA < compareB) return sortOrder === "asc" ? -1 : 1;
+      if (compareA > compareB) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+    
+    return filtered;
+  }, [myAppointments, activeTab, isAdmin, selectedConsultant, searchQuery, statusFilter, sortBy, sortOrder, dateInRange]);
 
   // helper functions: compute stats from appointments (no payments required)
   const pickUnique = (arr, key) => {
@@ -414,16 +480,22 @@ export default function AgriAnalytics() {
               value={activeTab}
               onChange={(e) => setActiveTab(e.target.value)}
             >
+              <option value="All Time">All Time</option>
               <option value="Today">Today</option>
               <option value="Yesterday">Yesterday</option>
               <option value="Last 7 days">Last 7 days</option>
               <option value="Last 30 days">Last 30 days</option>
             </select>
           </div>
-          <button className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium">
-            <Filter className="w-4 h-4" />
-            <span>Filter</span>
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setStatusFilter(statusFilter === "all" ? "confirmed" : statusFilter === "confirmed" ? "pending" : statusFilter === "pending" ? "completed" : "all")}
+              className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50 transition"
+            >
+              <Filter className="w-4 h-4" />
+              <span>Status: {statusFilter === "all" ? "All" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}</span>
+            </button>
+          </div>
           <button onClick={() => navigate("/admin/consultantReport")} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700">
             <Download className="w-4 h-4" />
             <span>Reports</span>
@@ -433,7 +505,7 @@ export default function AgriAnalytics() {
 
       {/* Tabs */}
       <div className="flex space-x-1 mb-8 bg-gray-100 p-1 rounded-lg w-fit">
-        {["Today", "Yesterday", "Last 7 days", "Last 30 days"].map((tab) => (
+        {["All Time", "Today", "Yesterday", "Last 7 days", "Last 30 days"].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -487,7 +559,7 @@ export default function AgriAnalytics() {
             <div className="w-32 h-32 mx-auto relative">
               <div className="w-full h-full rounded-full border-8 border-green-500" />
               <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className="text-2xl font-bold text-gray-900">8,510</span>
+                <span className="text-2xl font-bold text-gray-900">{dashboardData.activeFarms}</span>
                 <span className="text-xs text-gray-600">Total Farms</span>
               </div>
             </div>
@@ -513,13 +585,41 @@ export default function AgriAnalytics() {
               <Search className="w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search..."
-                className="text-sm border-none bg-gray-50 rounded-lg px-3 py-1 focus:outline-none focus:bg-white focus:ring-2 focus:ring-green-500"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, email, city..."
+                className="text-sm border-none bg-gray-50 rounded-lg px-3 py-1 focus:outline-none focus:bg-white focus:ring-2 focus:ring-green-500 w-48"
               />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-gray-600">
+                  ×
+                </button>
+              )}
             </div>
           </div>
-          <div className="space-y-4">
-            {(myAppointments || []).slice(0, 6).map((p) => (
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              <span className="font-semibold">{filteredAppointments.length}</span> of <span className="font-semibold">{(myAppointments || []).length}</span> appointments
+              {searchQuery && <span className="ml-2 text-xs text-blue-600">(filtered by search)</span>}
+              {statusFilter !== "all" && <span className="ml-2 text-xs text-blue-600">(status: {statusFilter})</span>}
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setSortBy(sortBy === "date" ? "name" : sortBy === "name" ? "status" : "date")}
+                className="text-xs text-gray-600 hover:text-gray-900 flex items-center space-x-1"
+              >
+                <span>Sort: {sortBy === "date" ? "Date" : sortBy === "name" ? "Name" : "Status"}</span>
+              </button>
+              <button
+                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                className="text-xs text-gray-600 hover:text-gray-900"
+              >
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {filteredAppointments.map((p) => (
               <div key={p._id} className="border border-gray-100 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-medium text-gray-900 text-sm">{p.name} • {p.category}</h4>
@@ -541,50 +641,85 @@ export default function AgriAnalytics() {
             {!loading && (myAppointments || []).length === 0 && (
               <p className="text-sm text-gray-500">No appointments yet.</p>
             )}
+            {!loading && (myAppointments || []).length > 0 && filteredAppointments.length === 0 && (
+              <p className="text-sm text-gray-500">No appointments match your filters.</p>
+            )}
           </div>
         </div>
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">
-              {isAdmin ? "All Consultants" : "My Consultant Details"}
+              {isAdmin ? "Consultant Details" : "My Consultant Details"}
             </h3>
           </div>
 
-          {/* Admin View: List all consultants */}
+          {/* Admin View: Selected consultant details + list */}
           {isAdmin && (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {(allConsultants || []).map((c) => (
-                <div key={c._id} className="border border-gray-100 rounded-lg p-4">
-                  <div className="flex items-start justify-between">
+            <div className="space-y-4">
+              {selectedConsultant ? (
+                <div className="border border-gray-100 rounded-lg p-4 bg-green-50">
+                  <div className="flex items-center space-x-4 mb-3">
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">🌿</div>
                     <div>
-                      <h4 className="font-medium text-gray-900">{c.name}</h4>
-                      <p className="text-sm text-gray-600">{c.specialization || "-"}</p>
-                    </div>
-                    <span className="text-xs text-gray-500">{c.city || "-"}</span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <div className="flex items-center space-x-2 text-gray-700">
-                      <span>Email:</span>
-                      <span>{c.email || "-"}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-700">
-                      <span>Phone:</span>
-                      <span>{c.phone || "-"}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-700">
-                      <span>Category:</span>
-                      <span>{c.category || "-"}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-gray-700">
-                      <span>Experience:</span>
-                      <span>{c.yearsExp != null ? `${c.yearsExp} yrs` : "-"}</span>
+                      <h4 className="font-medium text-gray-900">{selectedConsultant.name}</h4>
+                      <p className="text-sm text-gray-600">{selectedConsultant.city || "-"}</p>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Email</p>
+                      <p className="text-sm text-gray-900">{selectedConsultant.email || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Phone</p>
+                      <p className="text-sm text-gray-900">{selectedConsultant.phone || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Specialization</p>
+                      <p className="text-sm text-gray-900">{selectedConsultant.specialization || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Category</p>
+                      <p className="text-sm text-gray-900">{selectedConsultant.category || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Experience</p>
+                      <p className="text-sm text-gray-900">{selectedConsultant.yearsExp != null ? `${selectedConsultant.yearsExp} yrs` : "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Languages</p>
+                      <p className="text-sm text-gray-900">{Array.isArray(selectedConsultant.languages) ? selectedConsultant.languages.join(", ") : selectedConsultant.languages || "-"}</p>
+                    </div>
+                  </div>
+                  {selectedConsultant.bio && (
+                    <div className="mt-3">
+                      <p className="text-xs text-gray-500">Bio</p>
+                      <p className="text-sm text-gray-900">{selectedConsultant.bio}</p>
+                    </div>
+                  )}
                 </div>
-              ))}
-              {!loading && (allConsultants || []).length === 0 && (
-                <p className="text-sm text-gray-500">No consultants found.</p>
+              ) : (
+                <p className="text-sm text-gray-500">Select a consultant to view details.</p>
               )}
+
+              <div className="space-y-2 max-h-60 overflow-y-auto mt-4">
+                <h4 className="text-md font-semibold text-gray-800 mb-2">All Consultants ({(allConsultants || []).length})</h4>
+                {(allConsultants || []).map((c) => (
+                  <button
+                    key={c._id}
+                    onClick={() => setSelectedConsultant(c)}
+                    className={`w-full text-left border rounded-lg p-3 transition hover:bg-gray-50 ${
+                      selectedConsultant?._id === c._id ? "border-green-300 bg-green-50" : "border-gray-100"
+                    }`}
+                  >
+                    <h5 className="font-medium text-gray-800 text-sm">{c.name}</h5>
+                    <p className="text-xs text-gray-500">{c.specialization || "-"}</p>
+                  </button>
+                ))}
+                {!loading && (allConsultants || []).length === 0 && (
+                  <p className="text-sm text-gray-500">No consultants found.</p>
+                )}
+              </div>
             </div>
           )}
 
