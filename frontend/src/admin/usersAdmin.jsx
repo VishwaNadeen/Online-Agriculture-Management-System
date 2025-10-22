@@ -1,13 +1,16 @@
-// src/admin/users/UsersAdmin.jsx
+// src/admin/usersAdmin.jsx
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { FiSearch, FiTrash2, FiDownload } from "react-icons/fi";
-import { createGreenGrowLetterShell } from "../utils/pdf/greenGrowLetterShell";
+import {
+  ensurePdfStackReady,
+  createGreenGrowLetterShell,
+} from "../utils/pdf/greenGrowLetterShell";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const SITE_NAME = import.meta.env.VITE_SITE_NAME || "Green Grow";
 
-/* read token the same way you do elsewhere (for DELETE auth) */
+/* read token (for DELETE auth) */
 function readAuthToken() {
   const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
   return (
@@ -79,44 +82,10 @@ function initials(name = "") {
     .join("");
 }
 
-/* --------- small script loader (for Chart.js & autoTable) ---------- */
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const exists = Array.from(document.getElementsByTagName("script")).some(
-      (s) => s.src && s.src.includes(src)
-    );
-    if (exists) return resolve();
-    const s = document.createElement("script");
-    s.src = src;
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error(`Failed to load ${src}`));
-    document.body.appendChild(s);
-  });
-}
-
-async function ensureAutoTable() {
-  // greenGrowLetterShell loads jsPDF; we only ensure autoTable here
-  if (!window.jspdf?.jsPDF?.API?.autoTable) {
-    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js");
-  }
-  if (!window.jspdf?.jsPDF?.API?.autoTable) {
-    throw new Error("autoTable failed to load");
-  }
-}
-
-async function ensureChartJs() {
-  if (!window.Chart) {
-    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js");
-  }
-  if (!window.Chart) throw new Error("Chart.js failed to load");
-}
-
-/* --------- stats builders for charts --------- */
+/* --------- stats (for summary only) --------- */
 function buildStats(users) {
   const total = users.length;
 
-  // Role distribution (farmer/consultant/admin/user)
   const roleCounts = users.reduce((acc, u) => {
     const r = (u.role || "user").toLowerCase();
     acc[r] = (acc[r] || 0) + 1;
@@ -125,7 +94,6 @@ function buildStats(users) {
   const roleLabels = ["user", "farmer", "consultant", "admin"];
   const roleData = roleLabels.map((k) => roleCounts[k] || 0);
 
-  // Status distribution (ACTIVE/PENDING/INACTIVE)
   const statusCounts = users.reduce((acc, u) => {
     const s = (u.status || "ACTIVE").toUpperCase();
     acc[s] = (acc[s] || 0) + 1;
@@ -134,58 +102,11 @@ function buildStats(users) {
   const statusLabels = ["ACTIVE", "PENDING", "INACTIVE"];
   const statusData = statusLabels.map((k) => statusCounts[k] || 0);
 
-  // Monthly signups (last 12 months)
-  const now = new Date();
-  const months = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: d.toLocaleString(undefined, { month: "short", year: "2-digit" }),
-    });
-  }
-  const monthIndex = months.reduce((acc, m, idx) => ((acc[m.key] = idx), acc), {});
-  const monthly = new Array(12).fill(0);
-  users.forEach((u) => {
-    const dt = new Date(u.createdAt || u.createdDate || u.created_at || u.created_on);
-    if (!Number.isNaN(dt)) {
-      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
-      if (key in monthIndex) monthly[monthIndex[key]]++;
-    }
-  });
-
   return {
     total,
     role: { labels: roleLabels.map((s) => s.toUpperCase()), data: roleData },
     status: { labels: statusLabels, data: statusData },
-    monthly: { labels: months.map((m) => m.label), data: monthly },
   };
-}
-
-/* --------- make a chart image (off-screen) --------- */
-async function renderChartToDataURL({ type, labels, data, title }) {
-  await ensureChartJs();
-
-  const canvas = document.createElement("canvas");
-  canvas.width = 900;
-  canvas.height = type === "bar" ? 520 : 460;
-  const ctx = canvas.getContext("2d");
-
-  // eslint-disable-next-line no-undef
-  const chart = new Chart(ctx, {
-    type,
-    data: { labels, datasets: [{ label: title, data, borderWidth: 1 }] },
-    options: {
-      responsive: false,
-      plugins: { legend: { display: type !== "bar" }, title: { display: true, text: title } },
-      scales: type === "bar" ? { y: { beginAtZero: true, ticks: { precision: 0 } } } : {},
-    },
-  });
-
-  await new Promise((r) => setTimeout(r, 30));
-  const url = canvas.toDataURL("image/png", 1.0);
-  chart.destroy();
-  return url;
 }
 
 export default function UsersAdmin() {
@@ -196,6 +117,7 @@ export default function UsersAdmin() {
   const [role, setRole] = useState("ALL");
   const [status, setStatus] = useState("ALL");
   const [downloading, setDownloading] = useState(false);
+  const [pdfReady, setPdfReady] = useState(false);
 
   const loadUsers = async () => {
     setError("");
@@ -213,7 +135,17 @@ export default function UsersAdmin() {
     }
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => {
+    loadUsers();
+    (async () => {
+      try {
+        await ensurePdfStackReady();
+        setPdfReady(true);
+      } catch (e) {
+        console.error("Failed to preload PDF deps:", e);
+      }
+    })();
+  }, []);
 
   const filtered = useMemo(() => {
     let rows = [...users];
@@ -248,79 +180,61 @@ export default function UsersAdmin() {
 
   const count = filtered.length;
 
-  /* ---------------- PDF Download using Green Grow Letter Shell ---------------- */
   const downloadUsersReport = async () => {
     try {
       if (loading) { alert("Please wait until data loads."); return; }
       if (!Array.isArray(users) || users.length === 0) { alert("No users to export."); return; }
-
+      if (!pdfReady) { await ensurePdfStackReady(); setPdfReady(true); }
       setDownloading(true);
 
-      // Create the letter shell (header + footer); jsPDF is loaded inside it
-      const { doc, margins, contentWidth, addPage, save } = await createGreenGrowLetterShell();
-
-      // Ensure autoTable is available (for the users table)
-      await ensureAutoTable();
-
-      // Build stats & charts (optional but nice)
+      // Stats for summary
       const stats = buildStats(users);
       const nowStr = new Date().toLocaleString(undefined, {
         year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit",
       });
 
-      // Render charts as images
-      const roleChart = await renderChartToDataURL({
-        type: "doughnut", labels: stats.role.labels, data: stats.role.data, title: "Users by Role",
-      });
-      const statusChart = await renderChartToDataURL({
-        type: "doughnut", labels: stats.status.labels, data: stats.status.data, title: "Users by Status",
-      });
-      const monthlyChart = await renderChartToDataURL({
-        type: "bar", labels: stats.monthly.labels, data: stats.monthly.data, title: "Monthly Sign-ups (Last 12 Months)",
-      });
+      // Shell (header + footer)
+      const { doc, margins, contentWidth, addPage, save } =
+        await createGreenGrowLetterShell({
+          brandName: SITE_NAME,
+          brandAccent: [4, 120, 87],
+          brandPrimary: [17, 24, 39],
+          addressLines: ["123 Harvest Lane, Agricultural District, Colombo 05, Sri Lanka"],
+          contactLine: "Contact: +94 11 234 5678",
+          emailLine: "Email: support@greengrow.lk",
+          rightTitle: "Users Report",
+          rightSubTitle: `Generated on ${nowStr}`,
+          footerNoteLeft: "This is a computer-generated report.",
+          footerNoteRight: "greengrow.lk | +94 11 234 5678",
+        });
 
-      /* ==== BODY CONTENT (inside shell margins) ==== */
-      let y = margins.top;
+      // ===== Body =====
+      let y = Math.max(margins.top, 36);
       const x = margins.left;
+      const pageH = doc.internal.pageSize.getHeight();
 
-      // Title & meta
+      // Section title
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text(`${SITE_NAME} — Users Report`, x, y); y += 6;
+      doc.setFontSize(12);
+      doc.setTextColor(17, 24, 39);
+      doc.text(`${SITE_NAME} — Users Summary`, x, y); y += 6;
 
-      doc.setDrawColor(4, 120, 87); // emerald-700 line
+      // Divider
+      doc.setDrawColor(4, 120, 87);
       doc.setLineWidth(0.6);
       doc.line(x, y, x + contentWidth, y); y += 7;
 
+      // Summary (Totals only)
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.text(`Generated on: ${nowStr}`, x, y);
-      y += 8;
-
-      // Summary bullets
-      doc.setFontSize(11);
-      doc.text(`Total Users: ${stats.total}`, x, y); y += 6;
-      doc.text(`By Role (USER/FARMER/CONSULTANT/ADMIN): ${stats.role.data.join(" / ")}`, x, y); y += 6;
-      doc.text(`By Status (ACTIVE/PENDING/INACTIVE): ${stats.status.data.join(" / ")}`, x, y); y += 10;
-
-      // Charts row (two doughnuts)
-      const doughnutW = (contentWidth - 6) / 2;
-      const doughnutH = doughnutW * 0.62;
-      if (y + doughnutH > (doc.internal.pageSize.getHeight() - margins.bottom)) { addPage(); y = margins.top; }
-      doc.addImage(roleChart, "PNG", x, y, doughnutW, doughnutH);
-      doc.addImage(statusChart, "PNG", x + doughnutW + 6, y, doughnutW, doughnutH);
-      y += doughnutH + 8;
-
-      // Monthly bar chart
-      const barW = contentWidth;
-      const barH = barW * 0.42;
-      if (y + barH > (doc.internal.pageSize.getHeight() - margins.bottom)) { addPage(); y = margins.top; }
-      doc.addImage(monthlyChart, "PNG", x, y, barW, barH);
-      y += barH + 10;
+      const farmers = stats.role.data[1] || 0;
+      const consultants = stats.role.data[2] || 0;
+      doc.text(`Total Users: ${stats.total}`, x, y); y += 5;
+      doc.text(`Farmers: ${farmers}    Consultants: ${consultants}`, x, y); y += 9;
 
       // Users table
-      if (y > (doc.internal.pageSize.getHeight() - margins.bottom - 20)) { addPage(); y = margins.top; }
-      const head = [[ "#", "Name", "Email", "Phone", "Role", "Status", "Joined" ]];
+      if (y > (pageH - margins.bottom - 20)) { addPage(); y = Math.max(margins.top, 36); }
+      const head = [["#", "Name", "Email", "Phone", "Role", "Status", "Joined"]];
       const body = users.map((u, i) => [
         String(i + 1),
         `${u.firstName || ""} ${u.lastName || ""}`.trim(),
@@ -337,7 +251,8 @@ export default function UsersAdmin() {
         head,
         body,
         styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
-        headStyles: { fillColor: [209, 250, 229], textColor: 0 }, // emerald-100
+        headStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], lineWidth: 0.2, lineColor: [209, 213, 219] },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
         columnStyles: {
           0: { cellWidth: 8 },
           1: { cellWidth: 40 },
@@ -351,7 +266,6 @@ export default function UsersAdmin() {
         margin: { left: margins.left, right: margins.right },
       });
 
-      // Save
       save(`${SITE_NAME.replace(/\s+/g, "_")}_Users_Report.pdf`);
     } catch (err) {
       console.error(err);
@@ -370,23 +284,23 @@ export default function UsersAdmin() {
             <h1 className="text-2xl md:text-3xl font-bold text-green-700">Green Grow Users</h1>
             <p className="text-gray-600">Manage farmers and consultants.</p>
           </div>
-          <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
+        <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
             {count} {count === 1 ? "user" : "users"}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={downloadUsersReport}
-            disabled={downloading || loading || users.length === 0}
+            disabled={downloading || loading || users.length === 0 || !pdfReady}
             className={`px-3 py-2 rounded-lg border shadow-sm inline-flex items-center gap-2 ${
-              downloading || loading || users.length === 0
+              downloading || loading || users.length === 0 || !pdfReady
                 ? "bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed"
                 : "bg-emerald-700 text-white border-emerald-600/50 hover:shadow-emerald-700/30"
             }`}
             title="Download Users Report (PDF)"
           >
             <FiDownload />
-            {downloading ? "Preparing…" : "Download report"}
+            {downloading ? "Preparing…" : !pdfReady ? "Preparing deps…" : "Download report"}
           </button>
           <button
             onClick={loadUsers}
@@ -432,7 +346,7 @@ export default function UsersAdmin() {
         </select>
       </div>
 
-      {/* Table Card */}
+      {/* Table */}
       <div className="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -484,10 +398,7 @@ export default function UsersAdmin() {
               )}
 
               {!loading && !error && filtered.map((u, idx) => (
-                <tr
-                  key={u._id}
-                  className={idx % 2 ? "bg-white" : "bg-gray-50/40 hover:bg-gray-50"}
-                >
+                <tr key={u._id} className={idx % 2 ? "bg-white" : "bg-gray-50/40 hover:bg-gray-50"}>
                   <Td>
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold ring-1 ring-emerald-200">
@@ -501,9 +412,7 @@ export default function UsersAdmin() {
                       </div>
                     </div>
                   </Td>
-                  <Td className="max-w-[260px]">
-                    <div className="truncate">{u.email}</div>
-                  </Td>
+                  <Td className="max-w-[260px]"><div className="truncate">{u.email}</div></Td>
                   <Td className="whitespace-nowrap">{u.phone || "-"}</Td>
                   <Td><RoleBadge role={u.role} /></Td>
                   <Td><StatusBadge status={u.status} /></Td>
@@ -524,7 +433,6 @@ export default function UsersAdmin() {
         </div>
       </div>
 
-      {/* Footer hint */}
       <div className="text-xs text-gray-500">
         Showing <span className="font-medium">{count}</span> {count === 1 ? "record" : "records"}.
       </div>
