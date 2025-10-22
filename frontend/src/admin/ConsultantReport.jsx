@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import Loader from "../components/loader";
 import { ApptAPI } from "../api/appointments";
 import { ConsultantAPI } from "../api/consultants";
+import { createGreenGrowLetterShell } from "../utils/pdf/greenGrowLetterShell";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const SITE_NAME = import.meta.env.VITE_SITE_NAME || "Green Grow";
@@ -37,34 +38,19 @@ export default function ConsultantReport() {
     return { total, confirmed, completed, uniqueClients };
   }, [items]);
 
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const exists = Array.from(document.getElementsByTagName("script")).some(
-        (s) => s.src && s.src.includes(src)
-      );
-      if (exists) return resolve();
-      const s = document.createElement("script");
-      s.src = src;
-      s.async = true;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error(`Failed to load ${src}`));
-      document.body.appendChild(s);
-    });
-  }
-
-  async function ensurePdfLibs() {
-    if (!window.jspdf || !window.jspdf.jsPDF) {
-      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  // Helper function to format dates consistently
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+      });
+    } catch {
+      return "";
     }
-    if (!window.jspdf?.jsPDF?.API?.autoTable) {
-      await loadScript(
-        "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"
-      );
-    }
-    if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API?.autoTable) {
-      throw new Error("PDF libraries failed to load");
-    }
-  }
+  };
 
   async function downloadPDF() {
     try {
@@ -78,13 +64,7 @@ export default function ConsultantReport() {
       }
 
       setIsDownloading(true);
-      await ensurePdfLibs();
 
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-
-      const left = 14;
-      let y = 16;
       const nowStr = new Date().toLocaleString(undefined, {
         year: "numeric",
         month: "short",
@@ -92,60 +72,55 @@ export default function ConsultantReport() {
         hour: "2-digit",
         minute: "2-digit",
       });
-      const pageWidth = doc.internal.pageSize.getWidth();
 
+      const { doc, margins, contentWidth, addPage, save } = await createGreenGrowLetterShell({
+        brandName: SITE_NAME,
+        brandAccent: [4, 120, 87],
+        brandPrimary: [17, 24, 39],
+        addressLines: ["123 Harvest Lane, Agricultural District, Colombo 05, Sri Lanka"],
+        contactLine: "Contact: +94 11 234 5678",
+        emailLine: "Email: support@greengrow.lk",
+        rightTitle: "Consultant Report",
+        rightSubTitle: `Generated on ${nowStr}`,
+        footerNoteLeft: "This is a computer-generated report.",
+        footerNoteRight: "greengrow.lk | +94 11 234 5678",
+      });
+
+      // ===== Body =====
+      let y = Math.max(margins.top, 36);
+      const x = margins.left;
+      const pageH = doc.internal.pageSize.getHeight();
+
+      // Section title
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text(SITE_NAME, left, y);
-      doc.setFontSize(11);
+      doc.setFontSize(12);
+      doc.setTextColor(17, 24, 39);
+      doc.text(`${SITE_NAME} — Consultant Appointments Summary`, x, y); y += 6;
+
+      // Divider
+      doc.setDrawColor(4, 120, 87);
+      doc.setLineWidth(0.6);
+      doc.line(x, y, x + contentWidth, y); y += 7;
+
+      // Summary statistics
       doc.setFont("helvetica", "normal");
-      doc.text("Consultant Appointments Report", left, (y += 8));
       doc.setFontSize(10);
-      const who = me?.name ? `${me.name} (${me.email || "-"})` : "Admin";
-      doc.text(`Generated on: ${nowStr}`, pageWidth - left, 16, { align: "right" });
-      doc.text(`Prepared for: ${who}`, pageWidth - left, 22, { align: "right" });
+      doc.text(`Total Appointments: ${stats.total}`, x, y); y += 5;
+      doc.text(`Confirmed: ${stats.confirmed}    Completed: ${stats.completed}    Unique Clients: ${stats.uniqueClients}`, x, y); y += 9;
 
-      y += 6;
-      doc.setDrawColor(200);
-      doc.line(left, y, pageWidth - left, y);
-      y += 6;
-
-      doc.setFontSize(11);
-      doc.text(`Total Requests: ${stats.total}`, left, y);
-      y += 6;
-      doc.text(`Confirmed: ${stats.confirmed}`, left, y);
-      y += 6;
-      doc.text(`Completed: ${stats.completed}`, left, y);
-      y += 6;
-      doc.text(`Unique Clients: ${stats.uniqueClients}`, left, y);
-      y += 8;
-
-      const head = [
-        [
-          "#",
-          "Appt ID",
-          "Status",
-          "Client",
-          "Email",
-          "Phone",
-          "City",
-          "Category",
-          "Date",
-          "Time",
-          "Hours",
-        ],
-      ];
-
+      // Appointments table
+      if (y > (pageH - margins.bottom - 20)) { addPage(); y = Math.max(margins.top, 36); }
+      const head = [["#", "Appt ID", "Status", "Client", "Email", "Phone", "City", "Category", "Date", "Time", "Hours"]];
       const body = items.map((a, i) => [
         String(i + 1),
         a?.appointmentId ?? "",
-        a?.status ?? "",
+        (a?.status ?? "").toUpperCase(),
         a?.name ?? "",
         a?.email ?? "",
         a?.phone ?? "",
         a?.city ?? "",
         a?.category ?? "",
-        a?.appointmentDate ? new Date(a.appointmentDate).toLocaleDateString() : "",
+        formatDate(a?.appointmentDate),
         a?.appointmentTime ?? "",
         a?.durationHours ?? "",
       ]);
@@ -156,34 +131,27 @@ export default function ConsultantReport() {
         head,
         body,
         styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
-        headStyles: { fillColor: [235, 250, 244], textColor: 0 },
+        headStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], lineWidth: 0.2, lineColor: [209, 213, 219] },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: {
+          0: { cellWidth: 8 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 40 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 25 },
+          8: { cellWidth: 20 },
+          9: { cellWidth: 15 },
+          10: { cellWidth: 12 },
+        },
         theme: "striped",
+        margin: { left: margins.left, right: margins.right },
       });
 
-      let sigY = doc.lastAutoTable.finalY + 12;
-      const pageHeight = doc.internal.pageSize.getHeight();
-      if (sigY + 40 > pageHeight) {
-        doc.addPage();
-        sigY = 20;
-      }
-
-      doc.setFontSize(10);
-      doc.setTextColor(0);
-      doc.text("Prepared by:", left, sigY);
-      doc.text("Authorized Signature:", pageWidth - left - 60, sigY);
-      doc.line(left, sigY + 18, left + 60, sigY + 18);
-      doc.line(pageWidth - left - 60, sigY + 18, pageWidth - left, sigY + 18);
-      doc.setFontSize(9);
-      doc.text(`${SITE_NAME} Admin`, left, sigY + 24);
-
-      const dt = new Date();
-      const ts = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(
-        dt.getDate()
-      ).padStart(2, "0")}_${String(dt.getHours()).padStart(2, "0")}${String(dt.getMinutes()).padStart(2, "0")}`;
-      const filename = `${SITE_NAME.replace(/\s+/g, "_")}_Consultant_Appointments_Report_${ts}.pdf`;
-
-      doc.save(filename);
-      toast.success(`PDF downloaded as "${filename}". Saved to your default Downloads folder.`);
+      save(`${SITE_NAME.replace(/\s+/g, "_")}_Consultant_Appointments_Report.pdf`);
+      toast.success(`PDF downloaded successfully! Saved to your default Downloads folder.`);
     } catch (err) {
       console.error(err);
       toast.error("PDF download failed.");

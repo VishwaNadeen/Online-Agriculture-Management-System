@@ -4,6 +4,7 @@ import cors from "cors"
 import "dotenv/config"
 import connectDB from "./config/mongodb.js"
 import cloudinary, { connectCloudinary } from "./config/cloudinary.js";
+import { initMailer } from "./utils/mailer.js";
 import appointmentRoutes from "./routes/AppointmentRoute.js";
 import userRoutes from "./routes/userRoute.js";
 import adminRoute from './routes/adminRoute.js';
@@ -22,6 +23,11 @@ const port = process.env.PORT || 4000
 
 connectDB()
 connectCloudinary();
+
+// Initialize email service
+initMailer().catch((error) => {
+  console.error("Failed to initialize email service:", error);
+});
 
 // middlewares
 app.use(express.json());

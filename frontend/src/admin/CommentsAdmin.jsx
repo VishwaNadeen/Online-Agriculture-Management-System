@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { BiTrash, BiX } from "react-icons/bi";
 import { FiDownload } from "react-icons/fi";
+import AdminLoader from "../components/AdminLoader";
 import {
   ensurePdfStackReady,
   createGreenGrowLetterShell,
@@ -100,50 +101,79 @@ function PostModal({ postId, onClose }) {
   if (!postId) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto relative border border-white/20">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 p-2 rounded-full bg-gray-200 hover:bg-gray-300"
+          className="absolute top-4 right-4 p-2 rounded-xl bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-300/20"
         >
-          <BiX className="text-xl" />
+          <BiX className="text-xl text-gray-600" />
         </button>
 
         {loading ? (
-          <div className="p-6 text-gray-600">Loading post…</div>
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-xl flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
+            </div>
+            <p className="text-gray-600 font-medium">Loading post…</p>
+          </div>
         ) : !post ? (
-          <div className="p-6 text-red-600">Failed to load post.</div>
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 bg-gradient-to-br from-red-100 to-red-200 rounded-xl flex items-center justify-center">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-red-600 font-medium">Failed to load post.</p>
+          </div>
         ) : (
-          <div className="p-6 space-y-4">
-            <h2 className="text-xl font-bold">{post.title}</h2>
-            {post.image && (
-              <img
-                src={resolveImageUrl(post.image)}
-                alt="post"
-                className="w-full rounded-lg border object-cover"
-              />
-            )}
-            <div className="text-gray-700">{post.description}</div>
+          <div className="p-8 space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{post.title}</h2>
+              {post.image && (
+                <img
+                  src={resolveImageUrl(post.image)}
+                  alt="post"
+                  className="w-full rounded-xl border border-gray-200 shadow-lg object-cover"
+                />
+              )}
+              <div className="mt-4 text-gray-700 leading-relaxed">{post.description}</div>
+            </div>
 
-            <div className="mt-6">
-              <h3 className="font-semibold mb-2">Comments</h3>
-              <div className="space-y-3">
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Comments
+              </h3>
+              <div className="space-y-4">
                 {(post.comments || []).map((c) => (
                   <div
                     key={c._id}
-                    className="p-3 rounded-lg border bg-gray-50"
+                    className="p-4 rounded-xl border border-emerald-200/50 bg-gradient-to-r from-emerald-50/60 to-emerald-100/40 shadow-sm"
                   >
-                    <div className="font-medium text-emerald-800">
-                      {c.authorName || "Anonymous"}
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                        {(c.authorName || "A")[0].toUpperCase()}
+                      </div>
+                      <div className="font-semibold text-emerald-800">
+                        {c.authorName || "Anonymous"}
+                      </div>
                     </div>
-                    <div className="text-gray-800">{c.text}</div>
+                    <div className="text-gray-800 mb-2">{c.text}</div>
                     <div className="text-xs text-gray-500">
                       {fmtDateTime(c.createdAt)}
                     </div>
                   </div>
                 ))}
                 {(!post.comments || post.comments.length === 0) && (
-                  <div className="text-gray-500">No comments yet.</div>
+                  <div className="text-center py-8 text-gray-500">
+                    <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <p>No comments yet.</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -446,176 +476,218 @@ export default function CommentsAdmin() {
     }
   };
 
-  if (loading) return <div className="text-gray-600 p-6">Loading comments...</div>;
+  if (loading) {
+    return <AdminLoader message="Loading comments..." />;
+  }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold">All Comments</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={downloadCommentsReport}
-            className="px-3 py-2 rounded-lg border shadow-sm inline-flex items-center gap-2 bg-emerald-700 text-white border-emerald-600/50 hover:shadow-emerald-700/30 disabled:opacity-50"
-            disabled={!pdfReady || comments.length === 0}
-            title="Download Comments Report (PDF)"
-          >
-            <FiDownload />
-            Download report
-          </button>
-          <button
-            onClick={loadComments}
-            className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:brightness-105"
-          >
-            Refresh
-          </button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 sm:mb-0">
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 bg-clip-text text-transparent mb-3">
+                Community Comments
+              </h1>
+              <p className="text-lg text-gray-600 max-w-2xl leading-relaxed">
+                Manage and moderate all community comments and interactions.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <button
+                onClick={downloadCommentsReport}
+                className="group relative px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+                disabled={!pdfReady || comments.length === 0}
+                title="Download Comments Report (PDF)"
+              >
+                <div className="flex items-center gap-2">
+                  <FiDownload className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+                  <span>Download Report</span>
+                </div>
+              </button>
+              
+              <button
+                onClick={loadComments}
+                className="group relative px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>Refresh</span>
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="mb-4">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by comment, name, title, or category…"
-          className="w-full rounded-xl border-2 border-emerald-200 p-3 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 bg-white"
-        />
-      </div>
-
-      <div className="rounded-2xl overflow-hidden border border-emerald-200 bg-white shadow">
-        <div className="grid grid-cols-12 items-center bg-emerald-100/80 text-emerald-900 font-semibold px-4 py-3">
-          <div className="col-span-3">Name</div>
-          <div className="col-span-3">Post Title</div>
-          <div className="col-span-2">Created</div>
-          <div className="col-span-3">Comment</div>
-          <div className="col-span-1 text-center">Action</div>
+        {/* Search Section */}
+        <div className="mb-8">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search by comment, name, title, or category…"
+              className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-emerald-200/50 bg-white/80 backdrop-blur-sm focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100/50 transition-all duration-300 text-gray-900 placeholder-gray-500"
+            />
+          </div>
         </div>
 
-        <div className="divide-y divide-emerald-100">
-          {filtered.length === 0 ? (
-            <div className="px-4 py-6 text-gray-600">No comments found.</div>
-          ) : (
-            filtered.map((c) => {
-              const isOpen = expanded.has(c._id);
-              const isDeleting = deleting.has(c._id);
-              const avatarRaw =
-                c.authorAvatar ||
-                c.userAvatar ||
-                c.avatar ||
-                c.photoURL ||
-                c.picture ||
-                c.image ||
-                c.profilePic ||
-                c.profilePicture ||
-                "";
-              const avatar = resolveImageUrl(avatarRaw);
-              const name = c.authorName || "Anonymous";
+        {/* Comments Table */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+          <div className="grid grid-cols-12 items-center bg-gradient-to-r from-emerald-50 to-emerald-100/50 text-emerald-800 font-bold px-6 py-4 border-b border-emerald-200/50">
+            <div className="col-span-3 text-sm tracking-wide">User</div>
+            <div className="col-span-3 text-sm tracking-wide">Post Title</div>
+            <div className="col-span-2 text-sm tracking-wide">Created</div>
+            <div className="col-span-3 text-sm tracking-wide">Comment</div>
+            <div className="col-span-1 text-center text-sm tracking-wide">Actions</div>
+          </div>
 
-              return (
-                <div key={c._id} className="relative">
-                  <div className="grid grid-cols-12 gap-3 items-start px-4 py-4 hover:bg-emerald-50/40 transition-colors">
-                    <div className="col-span-3 flex items-start gap-3">
-                      {avatar ? (
-                        <img
-                          src={avatar}
-                          alt="avatar"
-                          className="h-10 w-10 rounded-full border object-cover"
-                          onError={(e) => (e.currentTarget.style.display = "none")}
-                        />
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-700 font-bold">
-                          {name?.[0]?.toUpperCase() || "U"}
-                        </div>
-                      )}
-                      <div className="leading-tight">
-                        <div className="font-semibold text-emerald-900">{name}</div>
-                        {c.postCategory && (
-                          <div className="mt-1 inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {c.postCategory}
+          <div className="divide-y divide-emerald-100/50">
+            {filtered.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-2xl flex items-center justify-center">
+                  <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No comments found</h3>
+                <p className="text-gray-600">Try adjusting your search criteria.</p>
+              </div>
+            ) : (
+              filtered.map((c) => {
+                const isOpen = expanded.has(c._id);
+                const isDeleting = deleting.has(c._id);
+                const avatarRaw =
+                  c.authorAvatar ||
+                  c.userAvatar ||
+                  c.avatar ||
+                  c.photoURL ||
+                  c.picture ||
+                  c.image ||
+                  c.profilePic ||
+                  c.profilePicture ||
+                  "";
+                const avatar = resolveImageUrl(avatarRaw);
+                const name = c.authorName || "Anonymous";
+
+                return (
+                  <div key={c._id} className="group relative">
+                    <div className="grid grid-cols-12 gap-4 items-start px-6 py-5 hover:bg-gradient-to-r hover:from-emerald-50/30 hover:to-transparent transition-all duration-300">
+                      <div className="col-span-3 flex items-start gap-4">
+                        {avatar ? (
+                          <img
+                            src={avatar}
+                            alt="avatar"
+                            className="h-12 w-12 rounded-xl border-2 border-white shadow-lg object-cover"
+                            onError={(e) => (e.currentTarget.style.display = "none")}
+                          />
+                        ) : (
+                          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                            {name?.[0]?.toUpperCase() || "U"}
                           </div>
                         )}
+                        <div className="leading-tight">
+                          <div className="font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">{name}</div>
+                          {c.postCategory && (
+                            <div className="mt-2 inline-block text-xs px-3 py-1 rounded-full bg-gradient-to-r from-emerald-100 to-emerald-200 text-emerald-800 border border-emerald-300/50 font-medium">
+                              {c.postCategory}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    <div
-                      className="col-span-3 text-gray-800"
-                      style={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                      title={c.postTitle}
-                    >
-                      {c.postTitle}
-                    </div>
+                      <div
+                        className="col-span-3 text-gray-800 font-medium"
+                        style={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                        title={c.postTitle}
+                      >
+                        {c.postTitle}
+                      </div>
 
-                    <div className="col-span-2 text-gray-700 whitespace-nowrap">
-                      {fmtDateTime(c.createdAt)}
-                    </div>
+                      <div className="col-span-2 text-gray-600 text-sm whitespace-nowrap">
+                        {fmtDateTime(c.createdAt)}
+                      </div>
 
-                    {/* Comment + post image thumbnail */}
-                    <div className="col-span-3 text-gray-800">
-                      <div className="flex items-start gap-3">
-                        {c.postImage ? (
+                      {/* Comment + post image thumbnail */}
+                      <div className="col-span-3 text-gray-800">
+                        <div className="flex items-start gap-3">
+                          {c.postImage ? (
+                            <button
+                              onClick={() => setOpenPostId(c.postId)}
+                              className="shrink-0 block group/img"
+                              title="Open post (with comments)"
+                            >
+                              <img
+                                src={c.postImage}
+                                alt="post"
+                                className="h-12 w-12 rounded-lg object-cover border-2 border-white shadow-lg group-hover/img:scale-105 transition-transform duration-200"
+                                onError={(e) => (e.currentTarget.style.display = "none")}
+                              />
+                            </button>
+                          ) : null}
+
                           <button
-                            onClick={() => setOpenPostId(c.postId)}
-                            className="shrink-0 block"
-                            title="Open post (with comments)"
+                            onClick={() => toggleExpand(c._id)}
+                            className="text-left w-full group/expand"
+                            title={isOpen ? "Hide full comment" : "Show full comment"}
                           >
-                            <img
-                              src={c.postImage}
-                              alt="post"
-                              className="h-12 w-12 rounded-md object-cover border border-emerald-200 hover:opacity-90"
-                              onError={(e) => (e.currentTarget.style.display = "none")}
-                            />
+                            <span className="group-hover/expand:text-emerald-700 transition-colors">
+                              {preview(c.text, 15)}
+                            </span>
                           </button>
-                        ) : null}
+                        </div>
+                      </div>
 
+                      <div className="col-span-1 flex items-center justify-center">
                         <button
-                          onClick={() => toggleExpand(c._id)}
-                          className="text-left w-full"
-                          title={isOpen ? "Hide full comment" : "Show full comment"}
+                          onClick={() => deleteComment(c.postId, c._id)}
+                          className={`group/btn relative p-2.5 rounded-lg transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 ${
+                            isDeleting
+                              ? "bg-red-100 opacity-50 cursor-not-allowed"
+                              : "bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/30 focus:ring-red-500/20"
+                          }`}
+                          title="Delete Comment"
+                          disabled={isDeleting}
                         >
-                          {preview(c.text, 15)}
+                          {isDeleting ? (
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : (
+                            <BiTrash className="text-lg group-hover/btn:scale-110 transition-transform duration-200" />
+                          )}
                         </button>
                       </div>
                     </div>
 
-                    <div className="col-span-1 flex items-center justify-center">
-                      <button
-                        onClick={() => deleteComment(c.postId, c._id)}
-                        className={`p-2 rounded-full text-red-600 ${
-                          isDeleting
-                            ? "bg-red-100 opacity-50 cursor-not-allowed"
-                            : "bg-red-100 hover:bg-red-200"
-                        }`}
-                        title="Delete Comment"
-                        disabled={isDeleting}
-                      >
-                        {isDeleting ? (
-                          <span className="animate-spin">⏳</span>
-                        ) : (
-                          <BiTrash className="text-lg" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {isOpen && (
-                    <div className="px-4 pb-4 -mt-2">
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-gray-900 whitespace-pre-wrap">
-                        {c.text}
+                    {isOpen && (
+                      <div className="px-6 pb-5 -mt-2">
+                        <div className="rounded-xl border border-emerald-200/50 bg-gradient-to-r from-emerald-50/60 to-emerald-100/40 p-4 text-gray-900 whitespace-pre-wrap shadow-sm">
+                          {c.text}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Popup Modal */}
-      {openPostId && <PostModal postId={openPostId} onClose={() => setOpenPostId(null)} />}
+        {/* Popup Modal */}
+        {openPostId && <PostModal postId={openPostId} onClose={() => setOpenPostId(null)} />}
+      </div>
     </div>
   );
 }

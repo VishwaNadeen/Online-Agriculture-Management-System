@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { FiSearch, FiTrash2, FiDownload } from "react-icons/fi";
+import AdminLoader from "../components/AdminLoader";
 import {
   ensurePdfStackReady,
   createGreenGrowLetterShell,
@@ -115,7 +116,6 @@ export default function UsersAdmin() {
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [role, setRole] = useState("ALL");
-  const [status, setStatus] = useState("ALL");
   const [downloading, setDownloading] = useState(false);
   const [pdfReady, setPdfReady] = useState(false);
 
@@ -158,10 +158,11 @@ export default function UsersAdmin() {
           (u.phone || "").toLowerCase().includes(s)
       );
     }
-    if (role !== "ALL") rows = rows.filter((u) => (u.role || "").toUpperCase() === role);
-    if (status !== "ALL") rows = rows.filter((u) => (u.status || "").toUpperCase() === status);
+    if (role !== "ALL") {
+      rows = rows.filter((u) => (u.role || "").toUpperCase() === role);
+    }
     return rows;
-  }, [users, q, role, status]);
+  }, [users, q, role]);
 
   const deleteUser = async (id) => {
     const ok = confirm("Delete this user? This cannot be undone.");
@@ -275,166 +276,250 @@ export default function UsersAdmin() {
     }
   };
 
+  if (loading) {
+    return <AdminLoader message="Loading users data..." />;
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-green-700">Green Grow Users</h1>
-            <p className="text-gray-600">Manage farmers and consultants.</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 sm:mb-0">
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 bg-clip-text text-transparent mb-3">
+                Users Management
+              </h1>
+              <p className="text-lg text-gray-600 max-w-2xl leading-relaxed">
+                Manage and organize all your users, farmers, and consultants.
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="inline-flex items-center px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-100 to-emerald-200 text-emerald-800 border border-emerald-300/50 shadow-sm">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2" />
+                <span className="text-sm font-semibold">
+                  {count} {count === 1 ? "user" : "users"}
+                </span>
+              </div>
+              <button
+                onClick={downloadUsersReport}
+                disabled={downloading || loading || users.length === 0 || !pdfReady}
+                className="group relative px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+                title="Download Users Report (PDF)"
+              >
+                <div className="flex items-center gap-2">
+                  {downloading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Preparing…</span>
+                    </>
+                  ) : !pdfReady ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Preparing deps…</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiDownload className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+                      <span>Download Report</span>
+                    </>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={loadUsers}
+                className="group relative px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+                disabled={loading}
+              >
+                <div className="flex items-center gap-2">
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Refreshing…</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <span>Refresh</span>
+                    </>
+                  )}
+                </div>
+              </button>
+            </div>
           </div>
-        <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
-            {count} {count === 1 ? "user" : "users"}
-          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={downloadUsersReport}
-            disabled={downloading || loading || users.length === 0 || !pdfReady}
-            className={`px-3 py-2 rounded-lg border shadow-sm inline-flex items-center gap-2 ${
-              downloading || loading || users.length === 0 || !pdfReady
-                ? "bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed"
-                : "bg-emerald-700 text-white border-emerald-600/50 hover:shadow-emerald-700/30"
-            }`}
-            title="Download Users Report (PDF)"
-          >
-            <FiDownload />
-            {downloading ? "Preparing…" : !pdfReady ? "Preparing deps…" : "Download report"}
-          </button>
-          <button
-            onClick={loadUsers}
-            className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
-            disabled={loading}
-          >
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
+
+        {/* Filters */}
+        <div className="mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <FiSearch className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search by name, email, or phone…"
+                className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-emerald-200/50 bg-white/80 backdrop-blur-sm focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100/50 transition-all duration-300 text-gray-900 placeholder-gray-500"
+              />
+            </div>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full max-w-xs px-4 py-4 rounded-2xl border-2 border-emerald-200/50 bg-white/80 backdrop-blur-sm focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100/50 transition-all duration-300 text-gray-900"
+            >
+              <option value="ALL">All</option>
+              <option value="FARMER">Farmer</option>
+              <option value="CONSULTANT">Consultant</option>
+            </select>
+          </div>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="relative">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, email, phone…"
-            className="w-full pl-10 pr-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-600"
-          />
-        </div>
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-600"
-        >
-          <option value="ALL">All Roles</option>
-          <option value="FARMER">Farmer</option>
-          <option value="CONSULTANT">Consultant</option>
-          <option value="ADMIN">Admin</option>
-          <option value="USER">User</option>
-        </select>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-600"
-        >
-          <option value="ALL">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="PENDING">Pending</option>
-          <option value="INACTIVE">Inactive</option>
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr className="text-left text-gray-600">
-                <Th>Name</Th>
-                <Th>Email</Th>
-                <Th>Phone</Th>
-                <Th>Role</Th>
-                <Th>Status</Th>
-                <Th>Joined</Th>
-                <Th className="text-right pr-4">Actions</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading && (
-                <>
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <Td><div className="h-5 w-40 bg-gray-100 rounded" /></Td>
-                      <Td><div className="h-5 w-48 bg-gray-100 rounded" /></Td>
-                      <Td><div className="h-5 w-28 bg-gray-100 rounded" /></Td>
-                      <Td><div className="h-5 w-20 bg-gray-100 rounded" /></Td>
-                      <Td><div className="h-5 w-20 bg-gray-100 rounded" /></Td>
-                      <Td><div className="h-5 w-24 bg-gray-100 rounded" /></Td>
-                      <Td className="text-right pr-4"><div className="h-8 w-9 bg-gray-100 rounded-md ml-auto" /></Td>
-                    </tr>
-                  ))}
-                </>
-              )}
-
-              {!loading && error && (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center">
-                    <div className="inline-flex items-center gap-2 text-red-600 bg-red-50 px-3 py-2 rounded-lg ring-1 ring-red-200">
-                      {error}
-                    </div>
-                  </td>
+        {/* Users Table */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-b border-emerald-200/50">
+                <tr className="text-left">
+                  <th className="p-4 text-sm font-bold text-emerald-800 tracking-wide">Name</th>
+                  <th className="p-4 text-sm font-bold text-emerald-800 tracking-wide">Email</th>
+                  <th className="p-4 text-sm font-bold text-emerald-800 tracking-wide">Phone</th>
+                  <th className="p-4 text-sm font-bold text-emerald-800 tracking-wide">Role</th>
+                  <th className="p-4 text-sm font-bold text-emerald-800 tracking-wide">Joined</th>
+                  <th className="p-4 text-sm font-bold text-emerald-800 tracking-wide text-right">Actions</th>
                 </tr>
-              )}
+              </thead>
+              <tbody className="divide-y divide-emerald-100/50">
+                {loading && (
+                  <>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i} className="animate-pulse">
+                        <td className="p-4"><div className="h-4 w-40 bg-gray-200 rounded-lg" /></td>
+                        <td className="p-4"><div className="h-4 w-48 bg-gray-200 rounded-lg" /></td>
+                        <td className="p-4"><div className="h-4 w-28 bg-gray-200 rounded-lg" /></td>
+                        <td className="p-4"><div className="h-6 w-20 bg-gray-200 rounded-full" /></td>
+                        <td className="p-4"><div className="h-4 w-24 bg-gray-200 rounded-lg" /></td>
+                        <td className="p-4 text-right"><div className="h-10 w-10 bg-gray-200 rounded-lg ml-auto" /></td>
+                      </tr>
+                    ))}
+                  </>
+                )}
 
-              {!loading && !error && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-12 text-center">
-                    <div className="text-gray-600 font-medium">No users found</div>
-                    <div className="text-gray-500 text-sm mt-1">Try adjusting filters or refresh.</div>
-                  </td>
-                </tr>
-              )}
-
-              {!loading && !error && filtered.map((u, idx) => (
-                <tr key={u._id} className={idx % 2 ? "bg-white" : "bg-gray-50/40 hover:bg-gray-50"}>
-                  <Td>
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold ring-1 ring-emerald-200">
-                        {initials(`${u.firstName || ""} ${u.lastName || ""}`) || "U"}
+                {!loading && error && (
+                  <tr>
+                    <td colSpan={6} className="p-12 text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-red-100 to-red-200 rounded-2xl flex items-center justify-center">
+                        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                       </div>
-                      <div>
-                        <div className="font-medium text-gray-800 leading-5">
-                          {u.firstName} {u.lastName}
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Users</h3>
+                      <p className="text-red-600 mb-4">{error}</p>
+                      <button
+                        onClick={loadUsers}
+                        className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/30 transition-all duration-300 hover:-translate-y-0.5"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Try Again
+                      </button>
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && !error && filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-12 text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-2xl flex items-center justify-center">
+                        <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No users found</h3>
+                      <p className="text-gray-600 mb-6">Try adjusting your search criteria or refresh the data.</p>
+                      <button
+                        onClick={loadUsers}
+                        className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-0.5"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh Data
+                      </button>
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && !error && filtered.map((u, idx) => (
+                  <tr key={u._id} className="group border-b border-emerald-100/50 hover:bg-gradient-to-r hover:from-emerald-50/30 hover:to-transparent transition-all duration-300">
+                    <td className="p-4">
+                      <div className="flex items-center gap-4">
+                        {u.profilePicture || u.avatar || u.photoURL || u.picture || u.image || u.profilePic || u.profilePicture ? (
+                          <img
+                            src={u.profilePicture || u.avatar || u.photoURL || u.picture || u.image || u.profilePic || u.profilePicture}
+                            alt={`${u.firstName} ${u.lastName}`}
+                            className="h-12 w-12 rounded-xl object-cover border-2 border-white shadow-lg group-hover:scale-105 transition-transform duration-200"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.nextElementSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div 
+                          className={`h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white flex items-center justify-center text-sm font-bold shadow-lg group-hover:scale-105 transition-transform duration-200 ${u.profilePicture || u.avatar || u.photoURL || u.picture || u.image || u.profilePic || u.profilePicture ? 'hidden' : 'flex'}`}
+                        >
+                          {initials(`${u.firstName || ""} ${u.lastName || ""}`) || "U"}
                         </div>
-                        <div className="text-[11px] text-gray-500">#{u._id?.slice(-6)}</div>
+                        <div>
+                          <div className="font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                            {u.firstName} {u.lastName}
+                          </div>
+                          <div className="text-xs text-gray-500 font-mono">#{u._id?.slice(-6)}</div>
+                        </div>
                       </div>
-                    </div>
-                  </Td>
-                  <Td className="max-w-[260px]"><div className="truncate">{u.email}</div></Td>
-                  <Td className="whitespace-nowrap">{u.phone || "-"}</Td>
-                  <Td><RoleBadge role={u.role} /></Td>
-                  <Td><StatusBadge status={u.status} /></Td>
-                  <Td className="whitespace-nowrap">{formatDate(u.createdAt)}</Td>
-                  <Td className="text-right pr-4">
-                    <button
-                      title="Delete"
-                      className="inline-flex items-center justify-center h-9 w-9 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
-                      onClick={() => deleteUser(u._id)}
-                    >
-                      <FiTrash2 />
-                    </button>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-sm text-gray-700 truncate max-w-[260px]" title={u.email}>
+                        {u.email}
+                      </div>
+                    </td>
+                    <td className="p-4 text-sm text-gray-700 whitespace-nowrap">
+                      {u.phone || "-"}
+                    </td>
+                    <td className="p-4">
+                      <RoleBadge role={u.role} />
+                    </td>
+                    <td className="p-4 text-sm text-gray-700 whitespace-nowrap">
+                      {formatDate(u.createdAt)}
+                    </td>
+                    <td className="p-4 text-right">
+                      <button
+                        title="Delete User"
+                        className="group/btn relative p-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/30 transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-red-500/20"
+                        onClick={() => deleteUser(u._id)}
+                      >
+                        <FiTrash2 className="text-lg group-hover/btn:scale-110 transition-transform duration-200" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-      <div className="text-xs text-gray-500">
-        Showing <span className="font-medium">{count}</span> {count === 1 ? "record" : "records"}.
+        {/* Footer */}
+        <div className="mt-8 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Showing <span className="font-semibold text-emerald-700">{count}</span> {count === 1 ? "record" : "records"}
+          </div>
+          <div className="text-xs text-gray-500">
+            Last updated: {new Date().toLocaleTimeString()}
+          </div>
+        </div>
       </div>
     </div>
   );
