@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { 
@@ -11,7 +11,6 @@ import {
   FaFilter,
   FaChevronDown,
   FaChevronUp,
-  FaDownload,
   FaPhone,
   FaEnvelope,
   FaMapMarkerAlt,
@@ -22,7 +21,7 @@ import {
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
-// Helper function to get stored token
+// Helper: get stored token
 const getStoredToken = () =>
   localStorage.getItem("token") ||
   sessionStorage.getItem("token") ||
@@ -32,6 +31,65 @@ const getStoredToken = () =>
 const authHeaders = () => {
   const token = getStoredToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// Helper: pick a photo URL from various common fields
+const pickPhotoField = (c) => {
+  return (
+    c?.photo ||
+    c?.image ||
+    c?.avatar ||
+    c?.avatarUrl ||
+    c?.profileImage ||
+    c?.profilePic ||
+    c?.picture ||
+    c?.profile?.photo ||
+    c?.profile?.image ||
+    ""
+  );
+};
+
+// Helper: make relative URLs absolute with BASE_URL, keep absolute URLs as-is
+const resolveImageUrl = (urlLike) => {
+  if (!urlLike || typeof urlLike !== "string") return "";
+  const trimmed = urlLike.trim();
+  if (/^https?:\/\//i.test(trimmed) || /^data:image\//i.test(trimmed)) return trimmed;
+  const left = String(BASE_URL || "").replace(/\/+$/, "");
+  const right = trimmed.replace(/^\/+/, "");
+  return `${left}/${right}`;
+};
+
+// Avatar component with error fallback to initial
+const ConsultantAvatar = ({ name, photo }) => {
+  const imgRef = useRef(null);
+  const [broken, setBroken] = useState(false);
+  const initial =
+    (name && String(name).trim().charAt(0).toUpperCase()) || "C";
+  const src = photo ? resolveImageUrl(photo) : "";
+
+  useEffect(() => {
+    // reset broken state if photo prop changes
+    setBroken(false);
+  }, [photo]);
+
+  if (!src || broken) {
+    return (
+      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      ref={imgRef}
+      src={src}
+      alt={name ? `${name}'s profile` : "Consultant profile"}
+      className="w-16 h-16 rounded-full object-cover shadow-lg border border-white"
+      onError={() => setBroken(true)}
+      loading="lazy"
+    />
+  );
 };
 
 export default function ConsultantAdmin() {
@@ -60,7 +118,7 @@ export default function ConsultantAdmin() {
         }),
       ]);
 
-      const consultantsList = consultantsRes.data?.items || [];
+      const consultantsList = consultantsRes.data?.items || consultantsRes.data || [];
       const appointmentsList = Array.isArray(appointmentsRes.data) 
         ? appointmentsRes.data 
         : appointmentsRes.data?.appointments || [];
@@ -83,7 +141,10 @@ export default function ConsultantAdmin() {
     const pendingAppointments = appointments.filter(a => a.status === "pending").length;
     const confirmedAppointments = appointments.filter(a => a.status === "confirmed").length;
     const completedAppointments = appointments.filter(a => a.status === "completed").length;
-    const activeConsultants = new Set(appointments.map(a => a.consultantId)).size;
+    const cancelledAppointments = appointments.filter(a => a.status === "cancelled").length;
+    const activeConsultants = new Set(
+      appointments.map(a => String(a.consultantId ?? a.consultant?._id ?? a.consultant))
+    ).size;
 
     return {
       totalConsultants,
@@ -91,6 +152,7 @@ export default function ConsultantAdmin() {
       pendingAppointments,
       confirmedAppointments,
       completedAppointments,
+      cancelledAppointments,
       activeConsultants,
     };
   }, [consultants, appointments]);
@@ -99,17 +161,24 @@ export default function ConsultantAdmin() {
   const consultantsWithAppointments = useMemo(() => {
     const consultantMap = new Map();
 
-    // Initialize with all consultants
+    // Initialize with all consultants (support id or _id)
     consultants.forEach(consultant => {
-      consultantMap.set(consultant.id, {
+      const cid = String(consultant.id ?? consultant._id ?? "");
+      if (!cid) return;
+      consultantMap.set(cid, {
         ...consultant,
+        id: cid,
         appointments: [],
       });
     });
 
     // Add appointments to consultants
     appointments.forEach(appointment => {
-      const consultantId = String(appointment.consultantId);
+      const consultantId = String(
+        appointment.consultantId ?? appointment.consultant?._id ?? appointment.consultant ?? ""
+      );
+      if (!consultantId) return;
+
       if (consultantMap.has(consultantId)) {
         consultantMap.get(consultantId).appointments.push(appointment);
       } else {
@@ -280,8 +349,8 @@ export default function ConsultantAdmin() {
           </div>
         </div>
 
-        {/* Additional Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Additional Stats Row (includes Cancelled) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl shadow-lg p-6 border border-yellow-200">
             <div className="flex items-center justify-between">
               <div>
@@ -299,6 +368,16 @@ export default function ConsultantAdmin() {
                 <p className="text-3xl font-bold text-indigo-600 mt-2">{stats.confirmedAppointments}</p>
               </div>
               <FaCalendarCheck className="text-4xl text-indigo-400" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-rose-50 to-red-50 rounded-2xl shadow-lg p-6 border border-red-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-700 text-sm font-medium">Cancelled Appointments</p>
+                <p className="text-3xl font-bold text-red-600 mt-2">{stats.cancelledAppointments}</p>
+              </div>
+              <FaTimesCircle className="text-4xl text-red-400" />
             </div>
           </div>
         </div>
@@ -356,24 +435,25 @@ export default function ConsultantAdmin() {
         {/* Consultants List */}
         <div className="space-y-6">
           {filteredConsultants.map((consultant) => {
-            const isExpanded = expandedConsultants.has(consultant.id);
+            const cid = String(consultant.id ?? consultant._id ?? "");
+            const isExpanded = expandedConsultants.has(cid);
             const appointmentCount = consultant.appointments.length;
+            const photo = pickPhotoField(consultant);
 
             return (
               <div
-                key={consultant.id}
+                key={cid}
                 className="bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden"
               >
                 {/* Consultant Header */}
                 <div
                   className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() => toggleConsultant(consultant.id)}
+                  onClick={() => toggleConsultant(cid)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 flex-1">
-                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                        {consultant.name?.charAt(0).toUpperCase() || "C"}
-                      </div>
+                      {/* ✅ Avatar with image when available */}
+                      <ConsultantAvatar name={consultant.name} photo={photo} />
                       <div className="flex-1">
                         <h3 className="text-xl font-bold text-gray-900">{consultant.name || "Unknown"}</h3>
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
@@ -419,7 +499,7 @@ export default function ConsultantAdmin() {
                         <div className="grid gap-4">
                           {consultant.appointments.map((appointment, idx) => (
                             <div
-                              key={appointment._id || idx}
+                              key={appointment._id || appointment.appointmentId || idx}
                               className="bg-white rounded-xl p-5 shadow-md border border-gray-200 hover:shadow-lg transition-all duration-300"
                             >
                               <div className="flex items-start justify-between mb-3">
