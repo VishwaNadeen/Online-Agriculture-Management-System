@@ -101,9 +101,11 @@ export default function CommunityForum() {
   const [comment, setComment] = useState("");
   const [file, setFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState({ title: "", comment: "", file: "" });
+  // ⬇️ added "category" to errors
+  const [errors, setErrors] = useState({ title: "", comment: "", file: "", category: "" });
   const [category, setCategory] = useState("All");
-  const [selectedPostCategory, setSelectedPostCategory] = useState("General");
+  // ⬇️ start with empty selection to force user to choose
+  const [selectedPostCategory, setSelectedPostCategory] = useState("");
 
   const api = axios.create({ baseURL: BASE, timeout: 15000 });
 
@@ -153,7 +155,7 @@ export default function CommunityForum() {
     setAllPosts((prev) => prev.filter((p) => p._id !== postId));
   };
 
-  // ====== ONLY CHANGE: enforce 2 MB limit ======
+  // ====== ONLY CHANGE: enforce 2 MB limit (unchanged logic) ======
   const onPickFile = (e) => {
     const f = e.target.files?.[0] || null;
     if (!f) {
@@ -194,7 +196,8 @@ export default function CommunityForum() {
   const c = comment.trim();
   const invalidTitleNow =
     (t.length > 0 && !onlyLetters(t)) || (t.length > 0 && startsWithNumber.test(t));
-  const canShare = !!t && !!c && !invalidTitleNow && !errors.file && !submitting;
+  // ⬇️ must choose a category to enable Share button
+  const canShare = !!t && !!c && !!selectedPostCategory && !invalidTitleNow && !errors.file && !submitting;
 
   // JSON if no image, FormData if image — NO custom headers that cause CORS preflight failures
   const handleNewPost = async (e) => {
@@ -211,9 +214,11 @@ export default function CommunityForum() {
         : "",
       comment: !c ? "Description is required." : "",
       file: errors.file || "",
+      // ⬇️ show error if category not selected
+      category: !selectedPostCategory ? "Please select a category." : "",
     };
     setErrors(nextErr);
-    if (nextErr.title || nextErr.comment || nextErr.file) return;
+    if (nextErr.title || nextErr.comment || nextErr.file || nextErr.category) return;
 
     try {
       setSubmitting(true);
@@ -251,8 +256,9 @@ export default function CommunityForum() {
       setTitle("");
       setComment("");
       setFile(null);
-      setSelectedPostCategory("General");
-      setErrors({ title: "", comment: "", file: "" });
+      // ⬇️ reset category back to empty so user must choose again
+      setSelectedPostCategory("");
+      setErrors({ title: "", comment: "", file: "", category: "" });
       setComposerOpen(false);
     } catch (err) {
       console.error("Create post failed:", err?.response || err);
@@ -402,6 +408,8 @@ export default function CommunityForum() {
                         onChange={(e) => setSelectedPostCategory(e.target.value)}
                         className="w-full rounded-xl border-2 border-emerald-200 p-3 bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
                       >
+                        {/* ⬇️ placeholder so user must pick one */}
+                        <option value="">-- Select a Category --</option>
                         {categories
                           .filter((c) => c !== "All")
                           .map((c) => (
@@ -410,6 +418,10 @@ export default function CommunityForum() {
                             </option>
                           ))}
                       </select>
+                      {/* ⬇️ show error if not selected */}
+                      {errors.category && (
+                        <p className="text-red-600 text-sm mt-1">{errors.category}</p>
+                      )}
                     </div>
 
                     <div>
@@ -466,13 +478,13 @@ export default function CommunityForum() {
                       setTitle("");
                       setComment("");
                       setFile(null);
-                      setErrors({ title: "", comment: "", file: "" });
-                      setSelectedPostCategory("General");
+                      setErrors({ title: "", comment: "", file: "", category: "" });
+                      setSelectedPostCategory("");
                       setComposerOpen(false);
                     }}
                     className="px-4 py-2 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
                   >    
-                    Cancel  // Validation
+                    Cancel
                   </button>
                   <button
                     type="submit"
