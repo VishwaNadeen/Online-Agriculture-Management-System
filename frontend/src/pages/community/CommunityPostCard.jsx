@@ -5,7 +5,6 @@ import axios from "axios";
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 const api = axios.create({ baseURL: BASE, timeout: 15000 });
 
-/* --- auth helper --- */
 const AUTH_KEYS = ["authToken", "token", "accessToken", "jwt"];
 const auth = {
   token: () =>
@@ -377,7 +376,7 @@ export default function CommunityPostCard({ post, onReacted, onDeleted }) {
         <div className="fixed left-1/2 top-6 z-[60] -translate-x-1/2 rounded-xl bg-emerald-600 px-6 py-3 text-white shadow-lg border border-emerald-500">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+              <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" />
             </svg>
             {toast}
           </div>

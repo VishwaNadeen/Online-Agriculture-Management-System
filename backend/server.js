@@ -14,7 +14,6 @@ import communityRoutes from "./routes/CommunityPost.js";
 import eventRoutes from "./routes/EventRoute.js";
 import eventFeedbackRoutes from "./routes/EventFeedbackRoute.js";
 import eventRegistrationRoutes from "./routes/EventRegistrationRoute.js";
-import discoveryRoutes from "./routes/discoveryRoutes.js";
 
 configDotenv();
 
@@ -50,7 +49,6 @@ app.use("/community", communityRoutes);
 app.use("/events", eventRoutes);
 app.use("/eventregistration", eventRegistrationRoutes);
 app.use("/eventfeedback", eventFeedbackRoutes)
-app.use("/api/discoveries", discoveryRoutes);
 
 // api endpoints
 app.get("/", (req, res) => {

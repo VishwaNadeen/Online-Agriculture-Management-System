@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import CommunityPostCard from "./CommunityPostCard";
+import CategoriesSidebar from "./CategoriesSidebar"; 
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
@@ -100,13 +101,14 @@ export default function CommunityForum() {
   const [comment, setComment] = useState("");
   const [file, setFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState({ title: "", comment: "", file: "" });
+  // ⬇️ added "category" to errors
+  const [errors, setErrors] = useState({ title: "", comment: "", file: "", category: "" });
   const [category, setCategory] = useState("All");
-  const [selectedPostCategory, setSelectedPostCategory] = useState("General");
+  // ⬇️ start with empty selection to force user to choose
+  const [selectedPostCategory, setSelectedPostCategory] = useState("");
 
   const api = axios.create({ baseURL: BASE, timeout: 15000 });
 
-  // file input ref for camera button
   const fileInputRef = useRef(null);
 
   const categories = [
@@ -114,7 +116,6 @@ export default function CommunityForum() {
     "Crop Issues",
     "Pest & Disease",
     "Irrigation & Soil",
-    "Livestock",
     "Organic Farming",
     "Machinery & Tools",
     "General",
@@ -154,6 +155,7 @@ export default function CommunityForum() {
     setAllPosts((prev) => prev.filter((p) => p._id !== postId));
   };
 
+  // ====== ONLY CHANGE: enforce 2 MB limit (unchanged logic) ======
   const onPickFile = (e) => {
     const f = e.target.files?.[0] || null;
     if (!f) {
@@ -171,9 +173,12 @@ export default function CommunityForum() {
       setFile(null);
       return;
     }
-    const maxMB = 5;
+    const maxMB = 2; // ← 2 MB limit
     if (f.size > maxMB * 1024 * 1024) {
-      setErrors((x) => ({ ...x, file: `Image must be ≤ ${maxMB} MB.` }));
+      setErrors((x) => ({
+        ...x,
+        file: `Image must be ≤ ${maxMB} MB (your file is ${(f.size / (1024 * 1024)).toFixed(2)} MB).`,
+      }));
       e.target.value = "";
       setFile(null);
       return;
@@ -181,17 +186,18 @@ export default function CommunityForum() {
     setErrors((x) => ({ ...x, file: "" }));
     setFile(f);
   };
+  // =============================================
 
   // allow letters, numbers, spaces and common punctuation
-  const onlyLetters = (s) => /^[\p{L}\p{N}\s.,!?'()\-]+$/u.test(s);
-  // NEW: block titles starting with a number
+  const onlyLetters = (s) => /^[\p{L}\p{N}\s.,!?'()\-\u2013\u2014]+$/u.test(s);
   const startsWithNumber = /^\s*\d/;
 
   const t = title.trim();
   const c = comment.trim();
   const invalidTitleNow =
     (t.length > 0 && !onlyLetters(t)) || (t.length > 0 && startsWithNumber.test(t));
-  const canShare = !!t && !!c && !invalidTitleNow && !errors.file && !submitting;
+  // ⬇️ must choose a category to enable Share button
+  const canShare = !!t && !!c && !!selectedPostCategory && !invalidTitleNow && !errors.file && !submitting;
 
   // JSON if no image, FormData if image — NO custom headers that cause CORS preflight failures
   const handleNewPost = async (e) => {
@@ -208,9 +214,11 @@ export default function CommunityForum() {
         : "",
       comment: !c ? "Description is required." : "",
       file: errors.file || "",
+      // ⬇️ show error if category not selected
+      category: !selectedPostCategory ? "Please select a category." : "",
     };
     setErrors(nextErr);
-    if (nextErr.title || nextErr.comment || nextErr.file) return;
+    if (nextErr.title || nextErr.comment || nextErr.file || nextErr.category) return;
 
     try {
       setSubmitting(true);
@@ -229,8 +237,7 @@ export default function CommunityForum() {
         data.append("authorName", auth.name() || "User");
         const av = auth.avatar();
         if (av) data.append("authorAvatar", av);
-        data.append("image", file); // the actual file
-        // Note: do NOT set Content-Type manually for FormData; Axios will set it with the proper boundary
+        data.append("image", file);
       } else {
         data = {
           title: t,
@@ -249,8 +256,9 @@ export default function CommunityForum() {
       setTitle("");
       setComment("");
       setFile(null);
-      setSelectedPostCategory("General");
-      setErrors({ title: "", comment: "", file: "" });
+      // ⬇️ reset category back to empty so user must choose again
+      setSelectedPostCategory("");
+      setErrors({ title: "", comment: "", file: "", category: "" });
       setComposerOpen(false);
     } catch (err) {
       console.error("Create post failed:", err?.response || err);
@@ -282,63 +290,8 @@ export default function CommunityForum() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50/80 to-lime-50/60 relative overflow-hidden">
       <div className="relative z-10 container mx-auto lg:mx-0 px-3 lg:pl-6 lg:pr-0 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6 max-w-7xl lg:mx-0">
-          {/* Sidebar */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 shadow-lg p-6 h-fit sticky top-6 overflow-hidden relative">
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <svg
-                    className="w-5 h-5 text-emerald-600"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M12 2L2 7v10c0 5.55 3.84 9.74 9 11 5.16-1.26 9-5.45 9-11V7l-10-5z" />
-                    <path
-                      d="M9 12l2 2 4-4"
-                      stroke="white"
-                      strokeWidth="2"
-                      fill="none"
-                    />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-emerald-800 tracking-tight">
-                  Categories
-                </h2>
-              </div>
-
-              <ul className="space-y-1">
-                {categories.map((cat) => (
-                  <li key={cat}>
-                    <button
-                      onClick={() => setCategory(cat)}
-                      className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 group ${
-                        category === cat
-                          ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white font-semibold shadow-md transform scale-[1.02]"
-                          : "text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 hover:translate-x-1"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span>{cat}</span>
-                        {category === cat && (
-                          <svg
-                            className="w-4 h-4 text-emerald-200"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          {/* Sidebar (scrolls with page; not sticky) */}
+          <CategoriesSidebar category={category} setCategory={setCategory} />
 
           {/* Main Feed (centered) */}
           <div className="flex flex-col items-center">
@@ -455,6 +408,8 @@ export default function CommunityForum() {
                         onChange={(e) => setSelectedPostCategory(e.target.value)}
                         className="w-full rounded-xl border-2 border-emerald-200 p-3 bg-white focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
                       >
+                        {/* ⬇️ placeholder so user must pick one */}
+                        <option value="">-- Select a Category --</option>
                         {categories
                           .filter((c) => c !== "All")
                           .map((c) => (
@@ -463,6 +418,10 @@ export default function CommunityForum() {
                             </option>
                           ))}
                       </select>
+                      {/* ⬇️ show error if not selected */}
+                      {errors.category && (
+                        <p className="text-red-600 text-sm mt-1">{errors.category}</p>
+                      )}
                     </div>
 
                     <div>
@@ -519,12 +478,12 @@ export default function CommunityForum() {
                       setTitle("");
                       setComment("");
                       setFile(null);
-                      setErrors({ title: "", comment: "", file: "" });
-                      setSelectedPostCategory("General");
+                      setErrors({ title: "", comment: "", file: "", category: "" });
+                      setSelectedPostCategory("");
                       setComposerOpen(false);
                     }}
                     className="px-4 py-2 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-                  >
+                  >    
                     Cancel
                   </button>
                   <button
