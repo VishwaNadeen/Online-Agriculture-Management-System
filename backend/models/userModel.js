@@ -21,7 +21,7 @@ const latLngSchema = new Schema(
   { _id: false }
 );
 
-/*Main User schema*/
+/* Main User schema */
 const userSchema = new Schema(
   {
     // ===== All Users (compulsory) =====
@@ -30,56 +30,66 @@ const userSchema = new Schema(
     phone:       { type: String, required: true, unique: true, trim: true },
     email:       { type: String, required: true, unique: true, lowercase: true, trim: true },
     dateOfBirth: { type: Date,   required: true },
-    gender:      { type: String, required: true }, 
-    profilePicture: String,                           
-    
+    gender:      { type: String, required: true },
+    profilePicture: String,
+
     password:    { type: String, required: true },
 
-    address: { type: addressSchema, required: true }, 
+    address: { type: addressSchema, required: true },
 
     // ⬇️ Added "admin" here
     role: { type: String, enum: ["farmer", "consultant", "user", "admin"], default: "user" },
 
-    // Farmer-only
+    // ===== Password reset fields =====
+    // bcrypt hash of the 6-digit code (NEVER store raw code)
+    resetCodeHash: { type: String },
+    // when the code expires
+    resetCodeExpiresAt: { type: Date },
+    // number of attempts during the current reset window
+    resetAttempts: { type: Number, default: 0 },
+    // if locked out from further attempts until this time
+    resetLockedUntil: { type: Date },
+
+    // ===== Farmer-only =====
     farmer: {
       farmName: String,
-      farmType: String,            
-      farmSize: Number,                
+      farmType: String,
+      farmSize: Number,
       farmSizeUnit: { type: String, enum: ["perches", "acres", "hectares"] },
-      farmAddress: addressSchema,      
+      farmAddress: addressSchema,
       farmLocation: latLngSchema,
 
       experienceYears: Number,
       primaryIrrigationMethod: String,
       waterSource: String,
       fertilizerPractices: String,
-      pesticideUsage: String, 
-      soilType: String,  
+      pesticideUsage: String,
+      soilType: String,
       sustainabilityPractices: [String],
       preferredConsultationTopics: [String],
-      emergencyContact: String, 
+      emergencyContact: String,
     },
 
-    // Agri-Consultant-only
+    // ===== Agri-Consultant-only =====
     consultant: {
       primarySpecialization: String,
       secondaryExpertise: [String],
       yearsOfExperience: Number,
-      highestQualification: String, 
-      certifications: [String], 
+      highestQualification: String,
+      certifications: [String],
       organizationName: String,
 
       consultationTypes: [String],
-      feeStructure: String,  
+      feeStructure: String,
       availableServices: [String],
-      serviceRegions: [String], 
-      coverageRadiusKm: Number, 
+      serviceRegions: [String],
+      coverageRadiusKm: Number,
 
-      availableDays: [String],  
-      availableTimeSlots: [String],  
-      noticePeriod: String,  
+      availableDays: [String],
+      availableTimeSlots: [String],
+      noticePeriod: String,
 
-      languages: [String], 
+      languages: [String],
       bio: String,
       socialLinks: [String],
     },
@@ -89,7 +99,12 @@ const userSchema = new Schema(
     toJSON: {
       virtuals: true,
       transform: (_doc, ret) => {
+        // strip sensitive fields
         delete ret.password;
+        delete ret.resetCodeHash;
+        delete ret.resetCodeExpiresAt;
+        delete ret.resetAttempts;
+        delete ret.resetLockedUntil;
         delete ret.__v;
         return ret;
       },
@@ -98,11 +113,15 @@ const userSchema = new Schema(
   }
 );
 
+// Virtuals / Indexes
 userSchema.virtual("createdDate").get(function () {
   return this.createdAt;
 });
 
 userSchema.index({ firstName: "text", lastName: "text", email: "text", phone: "text" });
+
+// (Optional) helpful index for querying locked accounts
+userSchema.index({ resetLockedUntil: 1 });
 
 const User = mongoose.model("User", userSchema);
 export default User;

@@ -2,8 +2,13 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import multer from "multer";
-import cloudinary from "../config/cloudinary.js"; // <- use default import unless you truly export { cloudinary }
-import userCtrl from "../controllers/userCtrl.js";
+import cloudinary from "../config/cloudinary.js"; // default import
+import userCtrl, {
+  // reset flow handlers
+  requestPasswordReset,
+  verifyPasswordCode,
+  setNewPassword,
+} from "../controllers/userCtrl.js";
 import { requireAuth, selfOrAdmin } from "../middlewares/auth.js";
 
 const router = Router();
@@ -27,27 +32,36 @@ const uploadBufferToCloudinary = (buffer, filename) =>
       {
         folder: "greengrow/profiles",
         resource_type: "image",
-        format: ext === "jpeg" ? "jpg" : ext,
+        format: ext === "jpeg" ? "jpg" : ext, // normalize jpeg → jpg
       },
       (err, result) => (err ? reject(err) : resolve(result))
     );
     stream.end(buffer);
   });
 
+/* ---------------- Public Password Reset ---------------- */
+// 1) send code
+router.post("/password/forgot", requestPasswordReset);
+// 2) verify code (optional separate step)
+router.post("/password/verify", verifyPasswordCode);
+// 3) set new password (requires email+code+newPassword)
+router.post("/password/reset", setNewPassword);
+
 /* ---------------- Public Routes ---------------- */
 // Registration
 router.post("/userRegistration", upload.single("profile"), async (req, res) => {
   try {
+    // accept either plain fields or a `data` JSON blob (from multipart forms)
     const payload = req.body?.data ? JSON.parse(req.body.data) : (req.body || {});
 
+    // optional profile image -> Cloudinary
     if (req.file?.buffer) {
       const up = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname);
       payload.profilePicture = up.secure_url;
-      // If you need to delete/replace later, also store public_id:
-      // payload._profilePublicId = up.public_id;
     }
 
-    req.body = payload; // forward normalized body to controller
+    // forward normalized body to controller
+    req.body = payload;
     return userCtrl.create(req, res);
   } catch (err) {
     console.error("Registration error:", err);
