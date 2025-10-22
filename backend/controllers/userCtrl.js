@@ -2,12 +2,16 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
+import { sendPasswordCodeEmail } from "../utils/mailer.js";
 
-/* ---------- env admin config ---------- */
+/* ---------- env admin & reset config ---------- */
 const {
   ADMIN_EMAIL = "",
   ADMIN_PASSWORD_HASH = "",
   ADMIN_PASSWORD = "", // optional plaintext fallback (not recommended)
+  RESET_CODE_TTL_MINUTES = "10",
+  RESET_MAX_ATTEMPTS = "5",
+  RESET_LOCK_MINUTES = "15",
 } = process.env;
 
 /* ---------- helpers ---------- */
@@ -54,7 +58,28 @@ const pickUpdatable = (body) => {
   return out;
 };
 
-// ---------- controller methods ----------
+// ---------- reset helpers ----------
+function inFuture(date) {
+  return date && new Date(date).getTime() > Date.now();
+}
+
+function minutesFromNow(n) {
+  return new Date(Date.now() + n * 60 * 1000);
+}
+
+function generateNumericCode(len = 6) {
+  let s = "";
+  for (let i = 0; i < len; i++) s += Math.floor(Math.random() * 10);
+  if (s[0] === "0") s = String(1 + Math.floor(Math.random() * 9)) + s.slice(1);
+  return s;
+}
+
+// Neutral message to avoid user enumeration
+const NEUTRAL_OK = { message: "If that account exists, an email has been sent (if eligible)." };
+
+/* ======================================================================
+   Core CRUD + Auth
+====================================================================== */
 const create = async (req, res) => {
   try {
     const {
@@ -152,7 +177,7 @@ const login = async (req, res) => {
       });
     }
 
-    /* -------- 2) NORMAL DB LOGIN (unchanged) -------- */
+    /* -------- 2) NORMAL DB LOGIN -------- */
     const query = isEmail
       ? { email: val.toLowerCase() }
       : { phone: val };
@@ -240,7 +265,6 @@ const update = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // IMPORTANT: return the plain user (matches GET shape)
     res.json(user);
   } catch (err) {
     if (err.code === 11000) {
@@ -294,6 +318,8 @@ const remove = async (req, res) => {
     const isSelf = requesterId && String(requesterId) === String(id);
     const isAdmin = requesterRole === "admin";
 
+    // Only require password for self-deletion by non-admin users
+    // Note: env-admin cannot delete themselves since they don't exist in the database
     if (isSelf && !isAdmin) {
       const { currentPassword } = req.body || {};
       if (!currentPassword) {
@@ -304,6 +330,7 @@ const remove = async (req, res) => {
         return res.status(401).json({ message: "Password is incorrect." });
       }
     }
+    // Admin users can delete anyone without requiring the target user's password
 
     await User.findByIdAndDelete(id);
     return res.json({ message: "User deleted" });
@@ -313,5 +340,207 @@ const remove = async (req, res) => {
   }
 };
 
-const userCtrl = { create, login, list, get, update, changePassword, remove };
+/* ======================================================================
+   Password Reset Flow
+   1) requestPasswordReset -> send 6-digit code to email (for users in DB only).
+   2) verifyPasswordCode   -> verify the code without changing the password.
+   3) setNewPassword       -> set the password when code is valid.
+====================================================================== */
+
+// 1) Request reset (send code)
+const requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ message: "email is required" });
+
+    const val = String(email).toLowerCase().trim();
+
+    // ENV-admin is not a DB user; silently return neutral message
+    if (ADMIN_EMAIL && val === ADMIN_EMAIL.toLowerCase()) {
+      return res.json(NEUTRAL_OK);
+    }
+
+    const user = await User.findOne({ email: val });
+    if (!user) return res.json(NEUTRAL_OK);
+
+    // Check lockout
+    if (inFuture(user.resetLockedUntil)) {
+      return res.json(NEUTRAL_OK);
+    }
+
+    const code = generateNumericCode(6);
+    const hash = await bcrypt.hash(code, 10);
+    user.resetCodeHash = hash;
+    user.resetCodeExpiresAt = minutesFromNow(Number(RESET_CODE_TTL_MINUTES));
+    user.resetAttempts = 0;
+    user.resetLockedUntil = undefined;
+    await user.save();
+
+    // Send email
+    try {
+      await sendPasswordCodeEmail({ to: user.email, code });
+      console.log(`Password reset code sent to ${user.email}`);
+    } catch (emailError) {
+      console.error("Email sending failed:", emailError);
+      // Clear the reset code if email fails
+      user.resetCodeHash = undefined;
+      user.resetCodeExpiresAt = undefined;
+      user.resetAttempts = 0;
+      await user.save();
+      return res.status(500).json({ message: "Failed to send reset code. Please try again later." });
+    }
+
+    return res.json(NEUTRAL_OK);
+  } catch (err) {
+    console.error("requestPasswordReset error:", err);
+    return res.status(500).json({ message: "Failed to process request", error: err.message });
+  }
+};
+
+// 2) Verify code
+const verifyPasswordCode = async (req, res) => {
+  try {
+    const { email, code } = req.body || {};
+    if (!email || !code) return res.status(400).json({ message: "email and code are required" });
+
+    const val = String(email).toLowerCase().trim();
+
+    // ENV-admin not supported
+    if (ADMIN_EMAIL && val === ADMIN_EMAIL.toLowerCase()) {
+      return res.status(400).json({ message: "Reset not available for this account." });
+    }
+
+    const user = await User.findOne({ email: val });
+    // Always neutral if user missing
+    if (!user || !user.resetCodeHash || !user.resetCodeExpiresAt) {
+      return res.status(401).json({ message: "Invalid or expired code." });
+    }
+
+    // Lockout?
+    if (inFuture(user.resetLockedUntil)) {
+      return res.status(401).json({ message: "Invalid or expired code." });
+    }
+
+    // Expired?
+    if (new Date(user.resetCodeExpiresAt).getTime() < Date.now()) {
+      // expire the window
+      user.resetCodeHash = undefined;
+      user.resetCodeExpiresAt = undefined;
+      user.resetAttempts = 0;
+      await user.save();
+      return res.status(401).json({ message: "Invalid or expired code." });
+    }
+
+    // Compare
+    const ok = await bcrypt.compare(String(code), user.resetCodeHash);
+    if (!ok) {
+      user.resetAttempts = (user.resetAttempts || 0) + 1;
+      // Lock if exceeds
+      if (user.resetAttempts >= Number(RESET_MAX_ATTEMPTS)) {
+        user.resetLockedUntil = minutesFromNow(Number(RESET_LOCK_MINUTES));
+      }
+      await user.save();
+      return res.status(401).json({ message: "Invalid or expired code." });
+    }
+
+    return res.json({ message: "Code verified." });
+  } catch (err) {
+    console.error("verifyPasswordCode error:", err);
+    return res.status(500).json({ message: "Verification failed", error: err.message });
+  }
+};
+
+// 3) Set new password (requires valid code)
+const setNewPassword = async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body || {};
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ message: "email, code and newPassword are required" });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters." });
+    }
+
+    const val = String(email).toLowerCase().trim();
+
+    // ENV-admin not supported
+    if (ADMIN_EMAIL && val === ADMIN_EMAIL.toLowerCase()) {
+      return res.status(400).json({ message: "Reset not available for this account." });
+    }
+
+    const user = await User.findOne({ email: val });
+    if (!user || !user.resetCodeHash || !user.resetCodeExpiresAt) {
+      return res.status(401).json({ message: "Invalid or expired code." });
+    }
+
+    // Lockout?
+    if (inFuture(user.resetLockedUntil)) {
+      return res.status(401).json({ message: "Invalid or expired code." });
+    }
+
+    // Expired?
+    if (new Date(user.resetCodeExpiresAt).getTime() < Date.now()) {
+      user.resetCodeHash = undefined;
+      user.resetCodeExpiresAt = undefined;
+      user.resetAttempts = 0;
+      await user.save();
+      return res.status(401).json({ message: "Invalid or expired code." });
+    }
+
+    const ok = await bcrypt.compare(String(code), user.resetCodeHash);
+    if (!ok) {
+      user.resetAttempts = (user.resetAttempts || 0) + 1;
+      if (user.resetAttempts >= Number(RESET_MAX_ATTEMPTS)) {
+        user.resetLockedUntil = minutesFromNow(Number(RESET_LOCK_MINUTES));
+      }
+      await user.save();
+      return res.status(401).json({ message: "Invalid or expired code." });
+    }
+
+    // Good to reset
+    user.password = await bcrypt.hash(String(newPassword), 10);
+    // Clear reset state
+    user.resetCodeHash = undefined;
+    user.resetCodeExpiresAt = undefined;
+    user.resetAttempts = 0;
+    user.resetLockedUntil = undefined;
+    await user.save();
+
+    return res.json({ message: "Password has been reset." });
+  } catch (err) {
+    console.error("setNewPassword error:", err);
+    return res.status(500).json({ message: "Failed to reset password", error: err.message });
+  }
+};
+
+/* ======================================================================
+   Exports
+====================================================================== */
+const userCtrl = {
+  create,
+  login,
+  list,
+  get,
+  update,
+  changePassword,
+  remove,
+  // reset flow
+  requestPasswordReset,
+  verifyPasswordCode,
+  setNewPassword,
+};
+
 export default userCtrl;
+export {
+  // named exports (optional for direct import in routes)
+  create,
+  login,
+  list,
+  get,
+  update,
+  changePassword,
+  remove,
+  requestPasswordReset,
+  verifyPasswordCode,
+  setNewPassword,
+};

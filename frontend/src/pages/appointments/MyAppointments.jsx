@@ -2,7 +2,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { toast } from "react-hot-toast";
 import AppointmentCard from "../../components/appointmentCard.jsx";
+import ConfirmModal from "../../components/ConfirmModal.jsx";
 import {
   Calendar,
   Clock,
@@ -28,6 +30,7 @@ const ENDPOINTS = {
   decline:   (id) => `${BASE}/appointments/${id}/decline`,
   complete:  (id) => `${BASE}/appointments/${id}/complete`,
   cancel:    (id) => `${BASE}/appointments/${id}/cancel`,
+  remove:    (id) => `${BASE}/appointments/${id}`,      // DELETE completed appointment
 };
 
 /* =========================
@@ -174,8 +177,10 @@ const Avatar = ({ src, alt }) => (
 ========================= */
 function MyBookings() {
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [err, setErr] = useState("");
   const [rows, setRows] = useState([]);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, appt: null, action: "" });
   const token = getToken();
   const navigate = useNavigate();
 
@@ -187,7 +192,8 @@ function MyBookings() {
       setLoading(true);
       const { data } = await axios.get(ENDPOINTS.userBookings, { headers });
       const items = Array.isArray(data) ? data : data?.items || [];
-      setRows(items);
+      const filtered = items.filter((it) => !["cancelled", "canceled"].includes((it.status || "").toLowerCase()));
+      setRows(filtered);
     } catch (e) {
       setErr(e?.response?.data?.message || e.message || "Failed to load your bookings");
     } finally {
@@ -205,19 +211,37 @@ function MyBookings() {
     navigate(`/appointment/${appt._id}/edit`, { state: { appt } });
   };
 
-  const handleCancel = async (appt) => {
+  const handleCancel = (appt) => {
     if (!appt?._id) return;
-    if (!window.confirm("Cancel this appointment?")) return;
+    const action = "delete";
+    setConfirmModal({ isOpen: true, appt, action });
+  };
+
+  const confirmCancel = async () => {
+    const { appt } = confirmModal;
+    setConfirmModal({ isOpen: false, appt: null, action: "" });
+    
+    if (!appt?._id) return;
+    
     try {
-      await axios.post(ENDPOINTS.cancel(appt._id), {}, { headers });
-      await load();
+      setActionLoading(true);
+      await axios.delete(ENDPOINTS.remove(appt._id), { headers });
+      // Remove from UI immediately for smooth experience
+      setRows((prev) => prev.filter((a) => a._id !== appt._id));
+      toast.success("Appointment deleted successfully!");
+      // Quick refresh in background
+      setTimeout(() => load(), 200);
     } catch (e) {
-      alert(e?.response?.data?.message || e.message || "Cancel failed");
+      toast.error(e?.response?.data?.message || e.message || "Failed to delete appointment");
+      // Reload to restore state on error
+      load();
+    } finally {
+      setActionLoading(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 min-h-[70vh] pb-10">
+    <div className="max-w-6xl mx-auto px-4 py-6 min-h-[70vh] pb-10 relative">
       <h1 className="text-2xl font-bold text-gray-900 mb-4">My Appointments</h1>
 
       {err && (
@@ -227,6 +251,16 @@ function MyBookings() {
       )}
 
       {loading && <div className="text-gray-500">Loading...</div>}
+
+      {/* Action Loading Overlay */}
+      {actionLoading && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl p-6 flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-200 border-t-emerald-600"></div>
+            <p className="text-gray-700 font-medium">Processing...</p>
+          </div>
+        </div>
+      )}
 
       {!loading && rows.length === 0 && (
         <div className="text-gray-600 bg-white border border-gray-200 rounded-2xl p-8 text-center mb-8">
@@ -248,6 +282,18 @@ function MyBookings() {
           ))}
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title="Delete Appointment"
+        message="Are you sure you want to permanently delete this appointment? This action cannot be undone."
+        confirmText="OK"
+        cancelText="Cancel"
+        confirmColor="blue"
+        onConfirm={confirmCancel}
+        onCancel={() => setConfirmModal({ isOpen: false, appt: null, action: "" })}
+      />
     </div>
   );
 }
@@ -353,6 +399,7 @@ function ConsultantDashboard({ user }) {
   const [appointments, setAppointments] = useState([]);
   const [requests, setRequests] = useState([]); // derived from 'pending'
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [err, setErr] = useState("");
 
   // fetch helper so we can refresh after actions
@@ -421,24 +468,39 @@ function ConsultantDashboard({ user }) {
 
   const handleRequestAction = async (requestId, action) => {
     try {
+      setActionLoading(true);
       if (action === "accept") {
-        await axios.post(ENDPOINTS.confirm(requestId), {}, { headers });
+        const res = await axios.post(ENDPOINTS.confirm(requestId), {}, { headers });
+        const sent = !!res?.data?.emailSent;
+        toast.success(sent ? "Appointment confirmed. Email sent to client." : "Appointment confirmed. Email not sent.");
       } else if (action === "decline") {
         const reason = window.prompt("Reason (optional):") || "";
-        await axios.post(ENDPOINTS.decline(requestId), { reason }, { headers });
+        const res = await axios.post(ENDPOINTS.decline(requestId), { reason }, { headers });
+        const sent = !!res?.data?.emailSent;
+        toast.success(sent ? "Appointment declined. Email sent to client." : "Appointment declined. Email not sent.");
       }
-      await fetchConsultantAppointments();
+      setTimeout(() => fetchConsultantAppointments(), 200);
     } catch (e) {
-      setErr(e?.response?.data?.message || e.message || "Failed to update request");
+      const msg = e?.response?.data?.message || e.message || "Failed to update request";
+      setErr(msg);
+      toast.error(msg);
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleComplete = async (appointmentId) => {
     try {
+      setActionLoading(true);
       await axios.post(ENDPOINTS.complete(appointmentId), {}, { headers });
-      await fetchConsultantAppointments();
+      toast.success("Appointment marked as completed!");
+      setTimeout(() => fetchConsultantAppointments(), 200);
     } catch (e) {
-      setErr(e?.response?.data?.message || e.message || "Failed to mark as completed");
+      const msg = e?.response?.data?.message || e.message || "Failed to mark as completed";
+      setErr(msg);
+      toast.error(msg);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -462,7 +524,17 @@ function ConsultantDashboard({ user }) {
     );
 
   return (
-    <div className="min-h-screen bg-green-50/95">
+    <div className="min-h-screen bg-green-50/95 relative">
+      {/* Action Loading Overlay */}
+      {actionLoading && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl p-6 flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-emerald-200 border-t-emerald-600"></div>
+            <p className="text-gray-700 font-medium">Processing...</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-transparent">
         <div className="max-w-7xl mx-auto px-4 py-4">

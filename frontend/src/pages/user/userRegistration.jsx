@@ -50,7 +50,6 @@ export default function UserRegistration() {
   });
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -72,10 +71,6 @@ export default function UserRegistration() {
   });
 
   const [chooseRoleOpen, setChooseRoleOpen] = useState(false);
-
-  useEffect(() => {
-    setTimeout(() => setMounted(true), 100);
-  }, []);
 
   useEffect(() => {
     (async () => {
@@ -341,9 +336,7 @@ export default function UserRegistration() {
       
       <form
         onSubmit={handleSubmit}
-        className={`relative z-10 bg-white shadow-2xl p-8 rounded-3xl border border-emerald-100/50 max-w-3xl w-full space-y-6 transition-all duration-1000 ${
-          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`}
+        className="relative z-10 bg-white shadow-2xl p-8 rounded-3xl border border-emerald-100/50 max-w-3xl w-full space-y-6"
       >
         {/* Decorative top accent */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 rounded-t-3xl" />
@@ -466,7 +459,7 @@ export default function UserRegistration() {
           <div className="group">
             <label className="block text-sm font-semibold text-emerald-800 mb-2">Email</label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+              <div className="absolute inset-y-0 left-0 flex itemsCompanion-center pl-4 pointer-events-none">
                 <Mail className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
               </div>
               <input
@@ -598,8 +591,7 @@ export default function UserRegistration() {
               onChange={(e) =>
                 setForm({ ...form, address: { ...form.address, country: e.target.value } })
               }
-              required
-                                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+              required className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -628,7 +620,8 @@ export default function UserRegistration() {
                   setForm({ ...form, address: { ...form.address, city: e.target.value } })
                 }
                 required
-                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+
               />
             </div>
           </div>
@@ -644,7 +637,8 @@ export default function UserRegistration() {
                   setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
                 }
                 required
-                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+
               />
             </div>
             <div>
@@ -658,7 +652,8 @@ export default function UserRegistration() {
                   setForm({ ...form, address: { ...form.address, line1: e.target.value } })
                 }
                 required
-                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+
               />
             </div>
           </div>
@@ -672,7 +667,8 @@ export default function UserRegistration() {
               onChange={(e) =>
                 setForm({ ...form, address: { ...form.address, line2: e.target.value } })
               }
-              className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+              className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+
             />
           </div>
         </div>

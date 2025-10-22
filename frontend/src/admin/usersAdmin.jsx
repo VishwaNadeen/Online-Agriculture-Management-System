@@ -1,11 +1,16 @@
-// src/admin/users/UsersAdmin.jsx
+// src/admin/usersAdmin.jsx
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { FiSearch, FiTrash2 } from "react-icons/fi";
+import { FiSearch, FiTrash2, FiDownload } from "react-icons/fi";
+import {
+  ensurePdfStackReady,
+  createGreenGrowLetterShell,
+} from "../utils/pdf/greenGrowLetterShell";
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
+const SITE_NAME = import.meta.env.VITE_SITE_NAME || "Green Grow";
 
-/* read token the same way you do elsewhere (for DELETE auth) */
+/* read token (for DELETE auth) */
 function readAuthToken() {
   const get = (k) => localStorage.getItem(k) ?? sessionStorage.getItem(k);
   return (
@@ -54,7 +59,7 @@ function StatusBadge({ status }) {
   const map = {
     ACTIVE: "bg-green-50 text-green-700 ring-1 ring-green-200",
     PENDING: "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200",
-    INACTIVE: "bg-red-50 text-red-700 ring-1 ring-red-200",
+    INACTIVE: "bg-red-50 text-red-700 ring-red-200",
   };
   return (
     <span className={`text-[11px] px-2 py-1 rounded-full ${map[s] || "bg-gray-50 text-gray-700 ring-1 ring-gray-200"}`}>
@@ -77,6 +82,33 @@ function initials(name = "") {
     .join("");
 }
 
+/* --------- stats (for summary only) --------- */
+function buildStats(users) {
+  const total = users.length;
+
+  const roleCounts = users.reduce((acc, u) => {
+    const r = (u.role || "user").toLowerCase();
+    acc[r] = (acc[r] || 0) + 1;
+    return acc;
+  }, {});
+  const roleLabels = ["user", "farmer", "consultant", "admin"];
+  const roleData = roleLabels.map((k) => roleCounts[k] || 0);
+
+  const statusCounts = users.reduce((acc, u) => {
+    const s = (u.status || "ACTIVE").toUpperCase();
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {});
+  const statusLabels = ["ACTIVE", "PENDING", "INACTIVE"];
+  const statusData = statusLabels.map((k) => statusCounts[k] || 0);
+
+  return {
+    total,
+    role: { labels: roleLabels.map((s) => s.toUpperCase()), data: roleData },
+    status: { labels: statusLabels, data: statusData },
+  };
+}
+
 export default function UsersAdmin() {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
@@ -84,6 +116,8 @@ export default function UsersAdmin() {
   const [q, setQ] = useState("");
   const [role, setRole] = useState("ALL");
   const [status, setStatus] = useState("ALL");
+  const [downloading, setDownloading] = useState(false);
+  const [pdfReady, setPdfReady] = useState(false);
 
   const loadUsers = async () => {
     setError("");
@@ -101,7 +135,17 @@ export default function UsersAdmin() {
     }
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => {
+    loadUsers();
+    (async () => {
+      try {
+        await ensurePdfStackReady();
+        setPdfReady(true);
+      } catch (e) {
+        console.error("Failed to preload PDF deps:", e);
+      }
+    })();
+  }, []);
 
   const filtered = useMemo(() => {
     let rows = [...users];
@@ -136,6 +180,101 @@ export default function UsersAdmin() {
 
   const count = filtered.length;
 
+  const downloadUsersReport = async () => {
+    try {
+      if (loading) { alert("Please wait until data loads."); return; }
+      if (!Array.isArray(users) || users.length === 0) { alert("No users to export."); return; }
+      if (!pdfReady) { await ensurePdfStackReady(); setPdfReady(true); }
+      setDownloading(true);
+
+      // Stats for summary
+      const stats = buildStats(users);
+      const nowStr = new Date().toLocaleString(undefined, {
+        year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit",
+      });
+
+      // Shell (header + footer)
+      const { doc, margins, contentWidth, addPage, save } =
+        await createGreenGrowLetterShell({
+          brandName: SITE_NAME,
+          brandAccent: [4, 120, 87],
+          brandPrimary: [17, 24, 39],
+          addressLines: ["123 Harvest Lane, Agricultural District, Colombo 05, Sri Lanka"],
+          contactLine: "Contact: +94 11 234 5678",
+          emailLine: "Email: support@greengrow.lk",
+          rightTitle: "Users Report",
+          rightSubTitle: `Generated on ${nowStr}`,
+          footerNoteLeft: "This is a computer-generated report.",
+          footerNoteRight: "greengrow.lk | +94 11 234 5678",
+        });
+
+      // ===== Body =====
+      let y = Math.max(margins.top, 36);
+      const x = margins.left;
+      const pageH = doc.internal.pageSize.getHeight();
+
+      // Section title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(17, 24, 39);
+      doc.text(`${SITE_NAME} — Users Summary`, x, y); y += 6;
+
+      // Divider
+      doc.setDrawColor(4, 120, 87);
+      doc.setLineWidth(0.6);
+      doc.line(x, y, x + contentWidth, y); y += 7;
+
+      // Summary (Totals only)
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const farmers = stats.role.data[1] || 0;
+      const consultants = stats.role.data[2] || 0;
+      doc.text(`Total Users: ${stats.total}`, x, y); y += 5;
+      doc.text(`Farmers: ${farmers}    Consultants: ${consultants}`, x, y); y += 9;
+
+      // Users table
+      if (y > (pageH - margins.bottom - 20)) { addPage(); y = Math.max(margins.top, 36); }
+      const head = [["#", "Name", "Email", "Phone", "Role", "Status", "Joined"]];
+      const body = users.map((u, i) => [
+        String(i + 1),
+        `${u.firstName || ""} ${u.lastName || ""}`.trim(),
+        u.email || "",
+        u.phone || "",
+        (u.role || "").toUpperCase(),
+        (u.status || "ACTIVE").toUpperCase(),
+        formatDate(u.createdAt),
+      ]);
+
+      doc.setFontSize(10);
+      doc.autoTable({
+        startY: y,
+        head,
+        body,
+        styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
+        headStyles: { fillColor: [236, 253, 245], textColor: [4, 120, 87], lineWidth: 0.2, lineColor: [209, 213, 219] },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: {
+          0: { cellWidth: 8 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 46 },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 24 },
+          6: { cellWidth: 24 },
+        },
+        theme: "striped",
+        margin: { left: margins.left, right: margins.right },
+      });
+
+      save(`${SITE_NAME.replace(/\s+/g, "_")}_Users_Report.pdf`);
+    } catch (err) {
+      console.error(err);
+      alert("Users PDF download failed.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -145,17 +284,32 @@ export default function UsersAdmin() {
             <h1 className="text-2xl md:text-3xl font-bold text-green-700">Green Grow Users</h1>
             <p className="text-gray-600">Manage farmers and consultants.</p>
           </div>
-          <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
+        <span className="inline-flex items-center text-xs px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
             {count} {count === 1 ? "user" : "users"}
           </span>
         </div>
-        <button
-          onClick={loadUsers}
-          className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
-          disabled={loading}
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={downloadUsersReport}
+            disabled={downloading || loading || users.length === 0 || !pdfReady}
+            className={`px-3 py-2 rounded-lg border shadow-sm inline-flex items-center gap-2 ${
+              downloading || loading || users.length === 0 || !pdfReady
+                ? "bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed"
+                : "bg-emerald-700 text-white border-emerald-600/50 hover:shadow-emerald-700/30"
+            }`}
+            title="Download Users Report (PDF)"
+          >
+            <FiDownload />
+            {downloading ? "Preparing…" : !pdfReady ? "Preparing deps…" : "Download report"}
+          </button>
+          <button
+            onClick={loadUsers}
+            className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+            disabled={loading}
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -178,6 +332,7 @@ export default function UsersAdmin() {
           <option value="FARMER">Farmer</option>
           <option value="CONSULTANT">Consultant</option>
           <option value="ADMIN">Admin</option>
+          <option value="USER">User</option>
         </select>
         <select
           value={status}
@@ -191,7 +346,7 @@ export default function UsersAdmin() {
         </select>
       </div>
 
-      {/* Table Card */}
+      {/* Table */}
       <div className="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -243,10 +398,7 @@ export default function UsersAdmin() {
               )}
 
               {!loading && !error && filtered.map((u, idx) => (
-                <tr
-                  key={u._id}
-                  className={idx % 2 ? "bg-white" : "bg-gray-50/40 hover:bg-gray-50"}
-                >
+                <tr key={u._id} className={idx % 2 ? "bg-white" : "bg-gray-50/40 hover:bg-gray-50"}>
                   <Td>
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-semibold ring-1 ring-emerald-200">
@@ -260,9 +412,7 @@ export default function UsersAdmin() {
                       </div>
                     </div>
                   </Td>
-                  <Td className="max-w-[260px]">
-                    <div className="truncate">{u.email}</div>
-                  </Td>
+                  <Td className="max-w-[260px]"><div className="truncate">{u.email}</div></Td>
                   <Td className="whitespace-nowrap">{u.phone || "-"}</Td>
                   <Td><RoleBadge role={u.role} /></Td>
                   <Td><StatusBadge status={u.status} /></Td>
@@ -283,7 +433,6 @@ export default function UsersAdmin() {
         </div>
       </div>
 
-      {/* Footer hint */}
       <div className="text-xs text-gray-500">
         Showing <span className="font-medium">{count}</span> {count === 1 ? "record" : "records"}.
       </div>

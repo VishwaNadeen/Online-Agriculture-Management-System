@@ -55,7 +55,19 @@ export default function ConsultantAppointments() {
       if (q.trim()) query.set("q", q.trim());
       const qs = query.toString();
       const { data } = await API.get(`/appointments/my-consultant${qs ? `?${qs}` : ""}`);
-      setRows(Array.isArray(data) ? data : []);
+      // Exclude today's appointments from consultant dashboard
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const rows = (Array.isArray(data) ? data : []).filter((r) => {
+        const d = r?.appointmentDate || r?.appointmentDateISO;
+        if (!d) return true;
+        const dt = new Date(d);
+        if (Number.isNaN(dt.getTime())) return true;
+        const day = new Date(dt);
+        day.setHours(0, 0, 0, 0);
+        return day.getTime() !== today.getTime();
+      });
+      setRows(rows);
     } catch (e) {
       const msg = e?.response?.data?.message || e?.message || "Failed to load appointments";
       setErr(msg);

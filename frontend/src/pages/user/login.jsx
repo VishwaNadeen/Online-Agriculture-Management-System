@@ -14,13 +14,8 @@ export default function Login() {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [mounted, setMounted] = useState(false);
 
   const from = location.state?.from || "/";
-
-  useEffect(() => {
-    setTimeout(() => setMounted(true), 100);
-  }, []);
 
   const validate = () => {
     if (!emailOrPhone.trim()) return "Please enter your email or phone number.";
@@ -49,28 +44,23 @@ export default function Login() {
       const user  = data?.user;
       const store = remember ? localStorage : sessionStorage;
 
-      // store token under common keys
       if (token) {
         store.setItem("auth_token", token);
-        store.setItem("token", token); // <-- Community auth checks this
+        store.setItem("token", token);
       }
 
       if (user) {
-        // keep your original key
         store.setItem("auth_user", JSON.stringify(user));
-        // ALSO store under 'user' so other modules can find it
         store.setItem("user", JSON.stringify(user));
 
-        // compute a simple display name for Community headers
         const display =
           `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
           user.name ||
           user.username ||
           (user.email && String(user.email).split("@")[0]) ||
           "User";
-        store.setItem("userName", display); // <-- Community reads this
+        store.setItem("userName", display);
 
-        // optional: keep userId handy
         if (user._id) localStorage.setItem("userId", user._id);
 
         toast.success(`Welcome, ${display}!`);
@@ -78,15 +68,12 @@ export default function Login() {
         toast.success("Login successful");
       }
 
-      // notify rest of app
       window.dispatchEvent(new Event("auth-changed"));
 
-      /* --------- ADDED: redirect admins to /admin --------- */
       if (user?.role === "admin") {
         navigate("/admin", { replace: true });
         return;
       }
-      /* ---------------------------------------------------- */
 
       navigate(from, { replace: true });
     } catch (e) {
@@ -107,9 +94,7 @@ export default function Login() {
       <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200 rounded-full blur-3xl opacity-30 -translate-y-1/2 translate-x-1/2" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-300 rounded-full blur-3xl opacity-20 translate-y-1/2 -translate-x-1/2" />
       
-      <div className={`w-full max-w-md relative z-10 transition-all duration-1000 ${
-        mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-      }`}>
+      <div className="w-full max-w-md relative z-10">
         {/* Main Card */}
         <div className="bg-white shadow-2xl rounded-3xl p-8 border border-emerald-100/50 backdrop-blur-sm relative overflow-hidden">
           {/* Decorative top accent */}

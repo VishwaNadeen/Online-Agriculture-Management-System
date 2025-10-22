@@ -17,6 +17,10 @@ import ProfileEdit from "./pages/user/profileEdit.jsx";
 import FarmEdit from "./pages/user/farmEdit.jsx";
 import Consultant from "./pages/user/ConsultantDetailsPage.jsx";
 import ConsultantEdit from "./pages/user/consultantedit.jsx";
+import ConsultantPublicProfile from "./pages/consultants/ConsultantPublicProfile.jsx";
+import Forgotpassword from "./pages/user/ForgotPassword.jsx";
+import VerifyCode from "./pages/user/VerifyCode.jsx";
+import ResetPassword from "./pages/user/ResetPassword.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -47,6 +51,7 @@ export default function ClientApp() {
         {/* public */}
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
+        <Route path="/consultants/:id" element={<ConsultantPublicProfile />} />
 
         {/* Vishwa */}
         <Route path="/signup" element={<UserRegistration />} />
@@ -59,6 +64,9 @@ export default function ClientApp() {
         <Route path="/farm/edit" element={<FarmEdit />} />
         <Route path="/profile/consultant" element={<Consultant />} />
         <Route path="/profile/consultant/edit" element={<ConsultantEdit />} />
+        <Route path="/forgot-password" element={<Forgotpassword />} />
+        <Route path="/verify-code" element={<VerifyCode />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Methma */}
         <Route path="/SearchCon" element={<Searchcon />} />
@@ -75,7 +83,6 @@ export default function ClientApp() {
         {/* kalana */}
         <Route path="/community" element={<CommunityForum />} />
         <Route path="mine" element={<MyPosts />} />
-        
 
         {/* Chanaka */}
         <Route path="/coursepage" element={<CoursesPage />} />
