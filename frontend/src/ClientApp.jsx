@@ -77,7 +77,6 @@ export default function ClientApp() {
         {/* kalana */}
         <Route path="/community" element={<CommunityForum />} />
         <Route path="mine" element={<MyPosts />} />
-        
 
         {/* Chanaka */}
         <Route path="/coursepage" element={<CoursesPage />} />

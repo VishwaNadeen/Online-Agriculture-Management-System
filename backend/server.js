@@ -50,7 +50,6 @@ app.use("/community", communityRoutes);
 app.use("/events", eventRoutes);
 app.use("/eventregistration", eventRegistrationRoutes);
 app.use("/eventfeedback", eventFeedbackRoutes)
-app.use("/api/discoveries", discoveryRoutes);
 
 // api endpoints
 app.get("/", (req, res) => {

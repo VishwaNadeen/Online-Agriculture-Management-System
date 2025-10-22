@@ -1,129 +1,207 @@
-// src/utils/pdf/greenGrowLetterShell.js
-// Minimal, reusable header+footer shell for Green Grow official letters.
-// You add your own content separately using the returned margins/utilities.
+// Modern agriculture-themed PDF shell with fresh header + footer design (emoji-free)
 
-const BRAND = {
-  NAME: "Green Grow",
-  COLOR: { r: 4, g: 120, b: 87 },      // emerald-700
-  TINT:  { r: 209, g: 250, b: 229 },   // emerald-100
-  ADDRESS_LINES: ["Green Grow", "Colombo 1, Sri Lanka", "0112425451"],
-};
+let _pdfStackReadyPromise = null;
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
-    if ([...document.scripts].some(s => (s.src || "").includes(src))) return resolve();
+    const exists = Array.from(document.getElementsByTagName("script")).some(
+      (s) => s.src && s.src.includes(src)
+    );
+    if (exists) return resolve();
     const s = document.createElement("script");
     s.src = src;
     s.async = true;
-    s.onload = resolve;
+    s.onload = () => resolve();
     s.onerror = () => reject(new Error(`Failed to load ${src}`));
-    document.body.appendChild(s);
+    document.head.appendChild(s);
   });
 }
 
-async function ensureJsPDF() {
-  if (!window.jspdf || !window.jspdf.jsPDF) {
-    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-  }
-  if (!window.jspdf?.jsPDF) throw new Error("jsPDF failed to load");
-  return window.jspdf.jsPDF;
+export function ensurePdfStackReady() {
+  if (_pdfStackReadyPromise) return _pdfStackReadyPromise;
+  _pdfStackReadyPromise = (async () => {
+    if (!window.jspdf?.jsPDF) {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+    }
+    if (!window.jspdf?.jsPDF) throw new Error("jsPDF failed to load");
+
+    if (!window.jspdf?.jsPDF?.API?.autoTable) {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js");
+    }
+    if (!window.jspdf?.jsPDF?.API?.autoTable) throw new Error("autoTable failed to load");
+  })();
+  return _pdfStackReadyPromise;
 }
 
 /**
- * Create a blank A4 doc with Green Grow header & footer drawn.
- * Returns helpers so you can write body content without worrying about margins.
- *
- * @param {Object} [opts]
- * @param {number} [opts.left=18]     Left margin (mm)
- * @param {number} [opts.right=18]    Right margin (mm)
- * @param {string} [opts.logoDataUrl] Optional base64 PNG/SVG to place in the header
- * @returns {Promise<{
- *   doc:any,
- *   page:{ width:number, height:number },
- *   margins:{ left:number, right:number, top:number, bottom:number },
- *   contentWidth:number,
- *   contentHeight:number,
- *   addPage:()=>void,
- *   save:(fileName?:string)=>void,
- * }>}
+ * Small vector leaf mark (replaces emoji while keeping style).
+ * Draws two overlapping ellipses + a stem line.
  */
-export async function createGreenGrowLetterShell(opts = {}) {
-  const { left = 18, right = 18, logoDataUrl } = opts;
+function drawLeaf(doc, x, y, scale = 1, color = [4, 120, 87]) {
+  const [r, g, b] = color;
+  doc.setFillColor(r, g, b);
+  doc.setDrawColor(r, g, b);
 
-  const jsPDF = await ensureJsPDF();
-  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  // left leaf
+  doc.ellipse(x, y, 1.5 * scale, 1.0 * scale, "F");
+  // right leaf
+  doc.ellipse(x + 1.6 * scale, y, 1.5 * scale, 1.0 * scale, "F");
+  // stem
+  doc.setLineWidth(0.5 * scale);
+  doc.line(x + 0.8 * scale, y + 0.9 * scale, x + 0.8 * scale, y + 2.8 * scale);
+}
 
-  // Layout constants
+/**
+ * Create modern agriculture-themed header/footer with fresh design (no emojis).
+ */
+export async function createGreenGrowLetterShell(options = {}) {
+  await ensurePdfStackReady();
+  const { jsPDF } = window.jspdf;
+
+  const {
+    brandName = "Green Grow",
+    brandAccent = [4, 120, 87],   // emerald-700
+    brandPrimary = [17, 24, 39],  // gray-900
+    addressLines = ["123 Harvest Lane, Colombo, Sri Lanka"],
+    contactLine = "Contact: +94 11 234 5678",
+    emailLine = "Email: support@greengrow.lk",
+    rightTitle = "USERS REPORT",
+    rightSubTitle = new Date().toLocaleString(),
+    footerNoteLeft = "This is a computer-generated report.",
+    footerNoteRight = "greengrow.lk | +94 11 234 5678",
+  } = options;
+
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const headerH = 20;
-  const footerH = 16;
 
-  // Draw header/footer for current page
-  const drawShell = () => {
-    // Header band
-    doc.setFillColor(BRAND.COLOR.r, BRAND.COLOR.g, BRAND.COLOR.b);
-    doc.rect(0, 0, pageW, headerH, "F");
+  const margins = { top: 38, right: 18, bottom: 20, left: 18 };
+  const contentWidth = pageW - margins.left - margins.right;
 
-    // Optional logo
-    if (logoDataUrl) {
-      try { doc.addImage(logoDataUrl, "PNG", left, 3, 14, 14); } catch {}
-    }
+  // ===== HEADER (modern layered bands) =====
+  const drawHeader = () => {
+    // soft layered header bands
+    doc.setFillColor(240, 253, 244); // green-50
+    doc.rect(0, 0, pageW, 28, "F");
+    doc.setFillColor(220, 252, 231); // green-100
+    doc.rect(0, 0, pageW, 14, "F");
 
-    // Brand name
-    doc.setTextColor(255, 255, 255);
+    // Decorative accent bar
+    doc.setFillColor(...brandAccent);
+    doc.rect(0, 28, pageW, 2, "F");
+
+    // Brand mark (vector leaf) and brand name
+    drawLeaf(doc, margins.left - 1.5, 10, 1.1, brandAccent);
+
+    doc.setTextColor(...brandPrimary);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    const nameX = logoDataUrl ? left + 18 : left;
-    doc.text(BRAND.NAME, nameX, 12);
+    doc.setFontSize(15);
+    doc.text(brandName, margins.left + 6, 12);
 
-    // Address (right aligned)
+    // Company info
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    BRAND.ADDRESS_LINES.forEach((line, i) => {
-      doc.text(line, pageW - right, 7 + i * 4, { align: "right" });
+    doc.setFontSize(8);
+    doc.setTextColor(75, 85, 99); // gray-600
+
+    let y = 20;
+    addressLines.forEach((line) => {
+      if (line) doc.text(String(line), margins.left + 6, y);
+      y += 3.5;
     });
 
-    // Footer strip
-    doc.setFillColor(BRAND.TINT.r, BRAND.TINT.g, BRAND.TINT.b);
-    doc.rect(0, pageH - footerH, pageW, footerH, "F");
+    // Contact lines (emoji-free)
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.setFontSize(7.5);
+    if (contactLine) { doc.text("Tel: " + String(contactLine).replace(/^Contact:\s*/i, ""), margins.left + 6, y); y += 3.2; }
+    if (emailLine)   { doc.text("Email: " + String(emailLine).replace(/^Email:\s*/i, ""),   margins.left + 6, y); }
+
+    // Right side "card"
+    const boxWidth = 65;
+    const boxX = pageW - margins.right - boxWidth;
+    const boxY = 6;
+
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(209, 213, 219); // gray-300
+    doc.setLineWidth(0.3);
+    doc.roundedRect(boxX, boxY, boxWidth, 18, 2, 2, "FD");
+
+    doc.setTextColor(...brandAccent);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(String(rightTitle).toUpperCase(), boxX + boxWidth / 2, boxY + 6, { align: "center" });
+
+    doc.setTextColor(107, 114, 128); // gray-500
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(30);
-    doc.text(BRAND.ADDRESS_LINES.join(" • "), pageW / 2, pageH - 6, { align: "center" });
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(8);
+    doc.text(String(rightSubTitle), boxX + boxWidth / 2, boxY + 12, { align: "center" });
+
+    // Decorative corner dot
+    doc.setFillColor(...brandAccent);
+    doc.circle(boxX + boxWidth - 2, boxY + 2, 1.5, "F");
+
+    // baseline under header content
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.2);
+    doc.line(margins.left, 30, pageW - margins.right, 30);
   };
 
-  // Initial draw
-  drawShell();
+  // ===== FOOTER (same style, safer positioning) =====
+  const drawFooter = () => {
+    // nudge footer a bit higher so nothing clips at the bottom
+    const yBase = pageH - margins.bottom - 6;
 
-  // Suggested content margins (below header, above footer)
-  const top = headerH + 12;       // space under header
-  const bottom = footerH + 10;    // space above footer
-  const contentWidth = pageW - left - right;
-  const contentHeight = pageH - top - bottom;
+    // double line (accent + hairline)
+    doc.setDrawColor(...brandAccent);
+    doc.setLineWidth(0.5);
+    doc.line(margins.left, yBase, pageW - margins.right, yBase);
 
-  // Add a new page that already has header/footer
+    doc.setDrawColor(209, 213, 219);
+    doc.setLineWidth(0.2);
+    doc.line(margins.left, yBase + 0.5, pageW - margins.right, yBase + 0.5);
+
+    // footer strip filling to the bottom
+    const stripY = yBase + 1;
+    const stripH = pageH - stripY;
+    doc.setFillColor(249, 250, 251); // gray-50
+    doc.rect(0, stripY, pageW, stripH, "F");
+
+    // text lines
+    const textY = yBase + 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+
+    // left note
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(String(footerNoteLeft), margins.left, textY);
+
+    // center page number
+    const center = pageW / 2;
+    const pageText = `Page ${doc.getCurrentPageInfo().pageNumber} of ${doc.getNumberOfPages()}`;
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...brandAccent);
+    doc.text(pageText, center, textY, { align: "center" });
+
+    // right note
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(String(footerNoteRight), pageW - margins.right, textY, { align: "right" });
+
+    // tiny decorative leaves (vector) — keep inside margins
+    const leafY = textY + 1.2;
+    drawLeaf(doc, margins.left + 1.5, leafY, 0.6, brandAccent);
+    drawLeaf(doc, pageW - margins.right - 1.5, leafY, 0.6, brandAccent);
+  };
+
+  drawHeader();
+  drawFooter();
+
   const addPage = () => {
     doc.addPage();
-    drawShell();
+    drawHeader();
+    drawFooter();
   };
 
-  // Save helper with a sensible default filename
-  const save = (fileName) => {
-    const dt = new Date();
-    const ts = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}_${String(dt.getHours()).padStart(2,"0")}${String(dt.getMinutes()).padStart(2,"0")}`;
-    const out = fileName || `Green_Grow_Letter_${ts}.pdf`;
-    doc.save(out);
-  };
+  const save = (filename) => doc.save(filename || "report.pdf");
 
-  return {
-    doc,
-    page: { width: pageW, height: pageH },
-    margins: { left, right, top, bottom },
-    contentWidth,
-    contentHeight,
-    addPage,
-    save,
-  };
+  return { doc, margins, contentWidth, addPage, save };
 }
