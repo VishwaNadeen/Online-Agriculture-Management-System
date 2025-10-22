@@ -81,4 +81,37 @@ router.patch("/:id", validateId, requireAuth, selfOrAdmin(), userCtrl.update);
 router.patch("/:id/password", validateId, requireAuth, selfOrAdmin(), userCtrl.changePassword);
 router.delete("/:id", validateId, requireAuth, selfOrAdmin(), userCtrl.remove);
 
+// Profile picture upload for existing users
+router.post("/:id/upload", validateId, requireAuth, selfOrAdmin(), upload.single("profilePicture"), async (req, res) => {
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({ message: "No image file provided" });
+    }
+
+    // Upload to Cloudinary
+    const uploadResult = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname);
+    
+    // Update user's profile picture in database
+    const User = (await import("../models/userModel.js")).default;
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { profilePicture: uploadResult.secure_url },
+      { new: true, select: "-password" }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      message: "Profile picture updated successfully",
+      profilePicture: uploadResult.secure_url,
+      user: updatedUser
+    });
+  } catch (err) {
+    console.error("Profile picture upload error:", err);
+    res.status(500).json({ message: "Failed to upload profile picture", error: err.message });
+  }
+});
+
 export default router;
