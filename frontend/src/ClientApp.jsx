@@ -18,6 +18,7 @@ import FarmEdit from "./pages/user/farmEdit.jsx";
 import Consultant from "./pages/user/ConsultantDetailsPage.jsx";
 import ConsultantEdit from "./pages/user/consultantedit.jsx";
 import ConsultantPublicProfile from "./pages/consultants/ConsultantPublicProfile.jsx";
+import Forgotpassword from "./pages/user/ForgotPassword.jsx";
 
 // Methma
 import Searchcon from "./pages/appointments/SearchCon";
@@ -61,6 +62,7 @@ export default function ClientApp() {
         <Route path="/farm/edit" element={<FarmEdit />} />
         <Route path="/profile/consultant" element={<Consultant />} />
         <Route path="/profile/consultant/edit" element={<ConsultantEdit />} />
+        <Route path="/forgot-password" element={<Forgotpassword />} />
 
         {/* Methma */}
         <Route path="/SearchCon" element={<Searchcon />} />
