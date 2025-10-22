@@ -2,7 +2,7 @@
 import CommunityPost from "../models/CommunityPost.js";
 
 const communityCtrl = {
-  // ========= POSTS =========
+  
 
   // Create a post
   async create(req, res) {
@@ -94,7 +94,7 @@ const communityCtrl = {
     }
   },
 
-  // ========= COMMENTS =========
+  
 
   // Add root comment
   async addComment(req, res) {

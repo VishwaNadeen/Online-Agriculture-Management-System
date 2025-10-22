@@ -1,8 +1,8 @@
-// CategoriesSidebar.jsx
+
 import React from "react";
 
 export default function CategoriesSidebar({ category, setCategory }) {
-  // Removed “Livestock”
+  
   const categories = [
     "All",
     "Crop Issues",
@@ -14,7 +14,7 @@ export default function CategoriesSidebar({ category, setCategory }) {
   ];
 
   return (
-    // Removed sticky so sidebar scrolls normally with page
+    
     <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 shadow-lg p-6 h-fit">
       <div className="flex items-center gap-2 mb-4">
         <div className="p-2 bg-emerald-100 rounded-lg">

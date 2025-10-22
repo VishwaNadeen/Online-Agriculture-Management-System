@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import CommunityPostCard from "./CommunityPostCard";
-import CategoriesSidebar from "./CategoriesSidebar"; // uses the sidebar component
+import CategoriesSidebar from "./CategoriesSidebar"; 
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 
@@ -107,10 +107,8 @@ export default function CommunityForum() {
 
   const api = axios.create({ baseURL: BASE, timeout: 15000 });
 
-  // file input ref for camera button
   const fileInputRef = useRef(null);
 
-  // NOTE: "Livestock" removed
   const categories = [
     "All",
     "Crop Issues",
@@ -155,6 +153,7 @@ export default function CommunityForum() {
     setAllPosts((prev) => prev.filter((p) => p._id !== postId));
   };
 
+  // ====== ONLY CHANGE: enforce 2 MB limit ======
   const onPickFile = (e) => {
     const f = e.target.files?.[0] || null;
     if (!f) {
@@ -172,9 +171,12 @@ export default function CommunityForum() {
       setFile(null);
       return;
     }
-    const maxMB = 5;
+    const maxMB = 2; // ← 2 MB limit
     if (f.size > maxMB * 1024 * 1024) {
-      setErrors((x) => ({ ...x, file: `Image must be ≤ ${maxMB} MB.` }));
+      setErrors((x) => ({
+        ...x,
+        file: `Image must be ≤ ${maxMB} MB (your file is ${(f.size / (1024 * 1024)).toFixed(2)} MB).`,
+      }));
       e.target.value = "";
       setFile(null);
       return;
@@ -182,10 +184,10 @@ export default function CommunityForum() {
     setErrors((x) => ({ ...x, file: "" }));
     setFile(f);
   };
+  // =============================================
 
   // allow letters, numbers, spaces and common punctuation
-  const onlyLetters = (s) => /^[\p{L}\p{N}\s.,!?'()\-]+$/u.test(s);
-  // NEW: block titles starting with a number
+  const onlyLetters = (s) => /^[\p{L}\p{N}\s.,!?'()\-\u2013\u2014]+$/u.test(s);
   const startsWithNumber = /^\s*\d/;
 
   const t = title.trim();
@@ -469,8 +471,8 @@ export default function CommunityForum() {
                       setComposerOpen(false);
                     }}
                     className="px-4 py-2 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
+                  >    
+                    Cancel  // Validation
                   </button>
                   <button
                     type="submit"
