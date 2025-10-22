@@ -27,6 +27,8 @@ function countFrom(res) {
   if (Array.isArray(d?.users)) return d.users.length;    // { users: [...] }
   if (Array.isArray(d?.items)) return d.items.length;    // { items: [...] }
   if (Array.isArray(d?.data)) return d.data.length;      // { data: [...] }
+  if (Array.isArray(d?.appointments)) return d.appointments.length; // { appointments: [...] }
+  if (d?.pagination?.total) return d.pagination.total;   // { pagination: { total: ... } }
   return 0;
 }
 
@@ -44,23 +46,41 @@ async function safeGet(path, needsAuth = false) {
 
 function StatCard({ title, value, icon: Icon, to, warn }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-500">{title}</span>
-        <div className="h-9 w-9 rounded-lg bg-green-50 text-green-700 grid place-items-center">
-          <Icon />
+    <div className="group relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 hover:-translate-y-1 hover:bg-white/90">
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm font-medium text-gray-600 tracking-wide">{title}</span>
+          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white grid place-items-center shadow-lg shadow-emerald-500/25 group-hover:scale-110 transition-transform duration-300">
+            <Icon className="text-lg" />
+          </div>
         </div>
+        
+        <div className="mb-4">
+          <div className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-700 bg-clip-text text-transparent">
+            {value}
+          </div>
+        </div>
+        
+        {warn ? (
+          <div className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium text-amber-800 bg-gradient-to-r from-amber-100 to-orange-100 border border-amber-200/50 shadow-sm">
+            <div className="w-2 h-2 bg-amber-500 rounded-full mr-2 animate-pulse" />
+            {warn}
+          </div>
+        ) : to ? (
+          <Link 
+            to={to} 
+            className="inline-flex items-center text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors duration-200 group/link"
+          >
+            View details
+            <svg className="w-4 h-4 ml-1 group-hover/link:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        ) : null}
       </div>
-      <div className="mt-2 text-3xl font-semibold text-green-700">{value}</div>
-      {warn ? (
-        <div className="mt-3 text-xs text-amber-700 bg-amber-50 inline-block px-2 py-1 rounded ring-1 ring-amber-200">
-          {warn}
-        </div>
-      ) : to ? (
-        <Link to={to} className="inline-block mt-3 text-sm text-green-700 hover:underline">
-          View details →
-        </Link>
-      ) : null}
     </div>
   );
 }
@@ -87,7 +107,7 @@ export default function Dashboard() {
     ] = await Promise.all([
       safeGet("/api/users"),               // userRoutes.js -> router.get("/")
       safeGet("/courses"),                 // server mounts at "/courses"
-      safeGet("/api/appointments", true),  // appointmentRoutes.js is protected (router.use(requireAuth))
+      safeGet("/api/appointments?limit=1000", true),  // appointmentRoutes.js is protected (router.use(requireAuth))
       safeGet("/community"),               // server mounts at "/community"
       safeGet("/events"),                  // server mounts at "/events"
     ]);
@@ -114,36 +134,98 @@ export default function Dashboard() {
   ]), [stats]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl md:text-4xl font-bold text-green-700">Welcome, Admin!</h1>
-        <p className="mt-2 text-gray-600">
-          This is your main dashboard. From here you can manage users, tutorials, appointments, community posts, and events.
-        </p>
-      </div>
-
-      <div className="flex items-center justify-end">
-        <button
-          onClick={refresh}
-          className="px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
-          disabled={loading}
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {(loading ? Array.from({ length: 5 }) : cards).map((c, i) =>
-          loading ? (
-            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 animate-pulse">
-              <div className="h-4 w-24 bg-gray-100 rounded" />
-              <div className="mt-3 h-8 w-20 bg-gray-100 rounded" />
-              <div className="mt-4 h-4 w-28 bg-gray-100 rounded" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Section */}
+        <div className="mb-12">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 sm:mb-0">
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 bg-clip-text text-transparent mb-3">
+                Welcome, Admin!
+              </h1>
+              <p className="text-lg text-gray-600 max-w-2xl leading-relaxed">
+                Your comprehensive dashboard for managing users, tutorials, appointments, community posts, and events.
+              </p>
             </div>
-          ) : (
-            <StatCard key={c.title} title={c.title} value={c.count} icon={c.icon} to={c.to} warn={c.warn} />
-          )
-        )}
+            
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:block text-sm text-gray-500">
+                Last updated: {new Date().toLocaleTimeString()}
+              </div>
+              <button
+                onClick={refresh}
+                className="group relative px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+                disabled={loading}
+              >
+                <div className="flex items-center gap-2">
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Refreshing…</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <span>Refresh</span>
+                    </>
+                  )}
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+          {(loading ? Array.from({ length: 5 }) : cards).map((c, i) =>
+            loading ? (
+              <div key={i} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6 animate-pulse">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-4 w-24 bg-gray-200 rounded-lg" />
+                  <div className="h-12 w-12 bg-gray-200 rounded-xl" />
+                </div>
+                <div className="h-10 w-20 bg-gray-200 rounded-lg mb-4" />
+                <div className="h-4 w-28 bg-gray-200 rounded-lg" />
+              </div>
+            ) : (
+              <StatCard key={c.title} title={c.title} value={c.count} icon={c.icon} to={c.to} warn={c.warn} />
+            )
+          )}
+        </div>
+
+        {/* Quick Actions Section */}
+        <div className="mt-16">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { title: "Add New Course", to: "/admin/addCourse", icon: "📚", color: "from-blue-500 to-blue-600" },
+              { title: "Add New Event", to: "/admin/addevent", icon: "📅", color: "from-purple-500 to-purple-600" },
+              { title: "Manage Users", to: "/admin/users", icon: "👥", color: "from-green-500 to-green-600" },
+              { title: "View Reports", to: "/admin/consultantReport", icon: "📊", color: "from-orange-500 to-orange-600" },
+            ].map((action) => (
+              <Link
+                key={action.title}
+                to={action.to}
+                className="group relative overflow-hidden bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${action.color} text-white text-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    {action.icon}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
+                      {action.title}
+                    </h3>
+                    <p className="text-sm text-gray-500">Quick access</p>
+                  </div>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
