@@ -418,12 +418,13 @@ export async function confirmAppointment(req, res) {
     try {
       const farmer = await User.findById(appt.userId).lean();
       const consultant = await User.findById(appt.consultantId).lean();
-      if (farmer?.email) {
+      const targetEmail = (appt.email || "").trim() || farmer?.email; // prefer email from booking form
+      if (targetEmail) {
         await sendMail(
           EmailTpl.confirmed(
             `${consultant?.firstName || "Consultant"}`,
             fmtEmailDate(appt.appointmentDate),
-            farmer.email,
+            targetEmail,
             appt._id
           )
         );
@@ -472,12 +473,13 @@ export async function declineAppointment(req, res) {
     try {
       const farmer = await User.findById(appt.userId).lean();
       const consultant = await User.findById(appt.consultantId).lean();
-      if (farmer?.email) {
+      const targetEmail = (appt.email || "").trim() || farmer?.email; // prefer email from booking form
+      if (targetEmail) {
         await sendMail(
           EmailTpl.declined(
             `${consultant?.firstName || "Consultant"}`,
             fmtEmailDate(appt.appointmentDate),
-            farmer.email,
+            targetEmail,
             appt.declineReason,
             appt._id
           )

@@ -45,9 +45,13 @@ export async function sendMail({ to, subject, html }) {
     const transporter = await transporterPromise;
     const from = process.env.MAIL_FROM || "GreenGrow <no-reply@greengrow.example>";
     const info = await transporter.sendMail({ from, to, subject, html });
-
-    // Ethereal preview URL (optional, not logged)
-    nodemailer.getTestMessageUrl(info);
+    const preview = nodemailer.getTestMessageUrl(info);
+    if (preview) {
+      // Log preview URL in non-production to help verify emails during development
+      if (String(process.env.NODE_ENV || "development").toLowerCase() !== "production") {
+        console.info(`[mail] Preview URL: ${preview}`);
+      }
+    }
     return info;
   } catch (err) {
     // silently fail instead of logging to terminal

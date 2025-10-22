@@ -226,6 +226,9 @@ export default function SearchCon() {
     const catPrefix = CATEGORY_OPTIONS.find((c) => c.toLowerCase().startsWith(q));
     if (catPrefix) return { category: catPrefix, city: "", q: "" };
 
+    const cityPrefix = CITY_OPTIONS.find((c) => c.toLowerCase().startsWith(q));
+    if (cityPrefix) return { category: "", city: cityPrefix, q: "" };
+
     return { category: "", city: "", q };
   };
 
@@ -238,8 +241,6 @@ export default function SearchCon() {
         city: draft.city || parsed.city,
         q: !parsed.category && !parsed.city ? draft.q : "",
       };
-      // avoid network for 1-char free-text queries with no filters
-      if (next.q && next.q.trim().length === 1 && !next.category && !next.city) return;
       fetchConsultants(next);
     }, 350);
     return () => clearTimeout(h);
