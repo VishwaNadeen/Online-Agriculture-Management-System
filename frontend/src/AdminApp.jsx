@@ -11,6 +11,8 @@ import AddEvent from "./admin/AddEvent.jsx";
 import EditEvent from "./admin/EditEvent.jsx";
 import CoursesReport from "./admin/CourseReport.jsx";
 import ConsultantReport from "./admin/ConsultantReport.jsx";
+import ConsultantAdmin from "./admin/ConsultantAdmin.jsx";
+import AdminDiscoveryForm from "./admin/AdminDiscoveryForm.jsx";
 
 const AppointmentsAdmin = () => <div>Appointments page</div>;
 const CommunityAdmin = () => <div>Community page</div>;
@@ -27,11 +29,13 @@ export default function AdminApp() {
 
         {/*admin pages */}
         <Route path="users" element={<UsersAdmin />} />
+        <Route path="discoveries" element={<AdminDiscoveryForm></AdminDiscoveryForm>} />
         <Route path="courses" element={<CoursesAdmin></CoursesAdmin>} />
         <Route path="addCourse" element={<AddCourse></AddCourse>} />
         <Route path="courseReport" element={<CoursesReport></CoursesReport>} />
         <Route path="consultantReport" element={<ConsultantReport></ConsultantReport>} />
         <Route path="updateCourse" element={<UpdateCourse></UpdateCourse>} />
+        <Route path="consultant" element={<ConsultantAdmin></ConsultantAdmin>} />
         <Route path="appointments" element={<AppointmentsAdmin />} />
         <Route path="community" element={<CommunityAdmin />} />
         <Route path="settings" element={<SettingsAdmin />} />
