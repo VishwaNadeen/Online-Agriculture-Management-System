@@ -27,6 +27,8 @@ function countFrom(res) {
   if (Array.isArray(d?.users)) return d.users.length;    // { users: [...] }
   if (Array.isArray(d?.items)) return d.items.length;    // { items: [...] }
   if (Array.isArray(d?.data)) return d.data.length;      // { data: [...] }
+  if (Array.isArray(d?.appointments)) return d.appointments.length; // { appointments: [...] }
+  if (d?.pagination?.total) return d.pagination.total;   // { pagination: { total: ... } }
   return 0;
 }
 
@@ -87,7 +89,7 @@ export default function Dashboard() {
     ] = await Promise.all([
       safeGet("/api/users"),               // userRoutes.js -> router.get("/")
       safeGet("/courses"),                 // server mounts at "/courses"
-      safeGet("/api/appointments", true),  // appointmentRoutes.js is protected (router.use(requireAuth))
+      safeGet("/api/appointments?limit=1000", true),  // appointmentRoutes.js is protected (router.use(requireAuth))
       safeGet("/community"),               // server mounts at "/community"
       safeGet("/events"),                  // server mounts at "/events"
     ]);

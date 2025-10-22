@@ -125,7 +125,6 @@ export default function ConsultantAdmin() {
 
       setConsultants(consultantsList);
       setAppointments(appointmentsList);
-      toast.success("Data loaded successfully");
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load data");
