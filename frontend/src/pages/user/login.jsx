@@ -63,7 +63,10 @@ export default function Login() {
 
         if (user._id) localStorage.setItem("userId", user._id);
 
-        toast.success(`Welcome, ${display}!`);
+        // Only show welcome toast for non-admin users
+        if (user?.role !== "admin") {
+          toast.success(`Welcome, ${display}!`);
+        }
       } else {
         toast.success("Login successful");
       }
