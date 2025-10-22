@@ -80,10 +80,13 @@ const userSchema = new Schema(
       noticePeriod: String,  
 
       languages: [String], 
+
+      
       bio: String,
       socialLinks: [String],
     },
   },
+  
   {
     timestamps: true,
     toJSON: {

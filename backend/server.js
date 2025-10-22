@@ -14,7 +14,6 @@ import communityRoutes from "./routes/CommunityPost.js";
 import eventRoutes from "./routes/EventRoute.js";
 import eventFeedbackRoutes from "./routes/EventFeedbackRoute.js";
 import eventRegistrationRoutes from "./routes/EventRegistrationRoute.js";
-import discoveryRoutes from "./routes/discoveryRoutes.js";
 
 configDotenv();
 
