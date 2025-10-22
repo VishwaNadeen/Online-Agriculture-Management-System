@@ -379,7 +379,6 @@ const requestPasswordReset = async (req, res) => {
     // Send email
     try {
       await sendPasswordCodeEmail({ to: user.email, code });
-      console.log(`Password reset code sent to ${user.email}`);
     } catch (emailError) {
       console.error("Email sending failed:", emailError);
       // Clear the reset code if email fails
