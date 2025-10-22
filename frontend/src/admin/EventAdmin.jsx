@@ -20,6 +20,7 @@ export default function EventAdmin() {
   const [isLoading, setIsLoading] = useState(() => (!eventsCache ? true : false));
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
   // Initial load
@@ -260,7 +261,19 @@ doc.autoTable({
     }
   };
 
-  const rows = useMemo(() => events || [], [events]);
+  const rows = useMemo(() => {
+    const eventsList = events || [];
+    if (!searchTerm.trim()) return eventsList;
+    
+    const search = searchTerm.toLowerCase();
+    return eventsList.filter(event => 
+      event.title?.toLowerCase().includes(search) ||
+      event.description?.toLowerCase().includes(search) ||
+      event.category?.toLowerCase().includes(search) ||
+      event.trainerName?.toLowerCase().includes(search) ||
+      event.location?.toLowerCase().includes(search)
+    );
+  }, [events, searchTerm]);
 
   if (isLoading) {
     return <AdminLoader message="Loading events data..." />;
@@ -309,8 +322,67 @@ doc.autoTable({
                   )}
                 </div>
               </button>
+              <button
+                onClick={() => fetchData(true)}
+                disabled={isRefreshing || isLoading}
+                className="group relative px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+              >
+                <div className="flex items-center gap-2">
+                  {isRefreshing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Refreshing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <span>Refresh</span>
+                    </>
+                  )}
+                </div>
+              </button>
             </div>
           </div>
+        </div>
+
+        {/* Search Section */}
+        <div className="mb-8">
+          <div className="relative max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search events by title, description, category, trainer, or location..."
+              className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-emerald-200/50 bg-white/80 backdrop-blur-sm focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100/50 transition-all duration-300 text-gray-900 placeholder-gray-500"
+            />
+          </div>
+        </div>
+
+        {/* Results Count */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Showing <span className="font-semibold text-emerald-700">{rows.length}</span> event{rows.length !== 1 ? 's' : ''}
+            {searchTerm && (
+              <span className="ml-2 text-gray-500">
+                (filtered from {events.length} total)
+              </span>
+            )}
+          </div>
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
+            >
+              Clear search
+            </button>
+          )}
         </div>
 
         {/* Events Table */}
@@ -421,15 +493,35 @@ doc.autoTable({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No events found</h3>
-                <p className="text-gray-600 mb-6">Get started by creating your first event.</p>
-                <Link
-                  to="/admin/addevent"
-                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-0.5"
-                >
-                  <BiPlus className="w-4 h-4 mr-2" />
-                  Create Event
-                </Link>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {searchTerm ? "No events match your search" : "No events found"}
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  {searchTerm 
+                    ? "Try adjusting your search criteria or clear the search to see all events."
+                    : "Get started by creating your first event."
+                  }
+                </p>
+                {!searchTerm && (
+                  <Link
+                    to="/admin/addevent"
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-0.5"
+                  >
+                    <BiPlus className="w-4 h-4 mr-2" />
+                    Create Event
+                  </Link>
+                )}
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 hover:-translate-y-0.5"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear Search
+                  </button>
+                )}
               </div>
             )}
           </div>

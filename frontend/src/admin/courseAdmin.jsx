@@ -1,6 +1,6 @@
 // src/pages/Admin/CoursesAdmin.jsx
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import { BiEdit, BiPlus, BiTrash } from "react-icons/bi";
 import { Link, useNavigate } from "react-router-dom";
@@ -11,23 +11,44 @@ const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
 export default function CoursesAdmin() {
   const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
+
+  const fetchData = async (showLoader = false) => {
+    if (showLoader) setIsLoading(true);
+    setIsRefreshing(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/courses`);
+      setCourses(res.data || []);
+    } catch (err) {
+      console.error("Failed to load courses", err);
+      toast.error("Failed to load courses");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (isLoading) {
-      axios
-        .get(`${BASE_URL}/courses`)
-        .then((res) => {
-          setCourses(res.data || []);
-          setIsLoading(false);
-        })
-        .catch((err) => {
-          console.error("Failed to load courses", err);
-          toast.error("Failed to load courses");
-          setIsLoading(false);
-        });
+      fetchData();
     }
   }, [isLoading]);
+
+  // Filter courses based on search term
+  const filteredCourses = useMemo(() => {
+    if (!searchTerm.trim()) return courses;
+    
+    const term = searchTerm.toLowerCase();
+    return courses.filter(course => 
+      course.courseName?.toLowerCase().includes(term) ||
+      course.courseID?.toLowerCase().includes(term) ||
+      course.category?.toLowerCase().includes(term) ||
+      course.level?.toLowerCase().includes(term) ||
+      course.language?.toLowerCase().includes(term)
+    );
+  }, [courses, searchTerm]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30">
@@ -43,8 +64,82 @@ export default function CoursesAdmin() {
                 Manage and organize all your courses, tutorials, and educational content.
               </p>
             </div>
+            
+            <div className="flex items-center gap-4">
+              {isRefreshing && (
+                <div className="flex items-center gap-2 text-sm text-emerald-600">
+                  <div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
+                  <span>Updating...</span>
+                </div>
+              )}
+              <button
+                onClick={() => navigate("/admin/CourseReport")}
+                className="group relative px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20"
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Reports</span>
+                </div>
+              </button>
+              <button
+                onClick={() => fetchData(true)}
+                disabled={isRefreshing || isLoading}
+                className="group relative px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
+              >
+                <div className="flex items-center gap-2">
+                  {isRefreshing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Refreshing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <span>Refresh</span>
+                    </>
+                  )}
+                </div>
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Search Section */}
+        {!isLoading && courses.length > 0 && (
+          <div className="mb-6">
+            <div className="relative max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Search courses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-4 py-3 border border-emerald-200 rounded-xl bg-white/80 backdrop-blur-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200"
+              />
+            </div>
+            {searchTerm && (
+              <div className="mt-3 flex items-center gap-3">
+                <span className="text-sm text-gray-600">
+                  {filteredCourses.length} of {courses.length} courses
+                </span>
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition-colors"
+                >
+                  Clear search
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Courses Table */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
@@ -73,7 +168,7 @@ export default function CoursesAdmin() {
                 </thead>
 
                 <tbody>
-                  {courses.map((course, index) => {
+                  {filteredCourses.map((course, index) => {
                     const {
                       courseID,
                       courseName,
@@ -222,35 +317,41 @@ export default function CoursesAdmin() {
                   </Link>
                 </div>
               )}
+
+              {courses.length > 0 && filteredCourses.length === 0 && (
+                <div className="p-12 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center">
+                    <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No courses match your search</h3>
+                  <p className="text-gray-600 mb-6">Try adjusting your search criteria or clear the search to see all courses.</p>
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-0.5"
+                  >
+                    Clear Search
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Floating Action Buttons */}
-      <div className="fixed top-6 right-6 flex items-center gap-3">
-        <button
-          onClick={() => navigate("/admin/CourseReport")}
-          className="group relative px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
-        >
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span>Reports</span>
-          </div>
-        </button>
-        
+      {/* Floating Add Button */}
+      {!searchTerm && (
         <Link
           to={"/admin/addCourse"}
-          className="group relative px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 flex items-center gap-2"
+          className="group fixed bottom-6 right-6 px-6 py-4 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-2xl shadow-2xl shadow-emerald-500/25 hover:shadow-3xl hover:shadow-emerald-500/30 transition-all duration-300 hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 flex items-center gap-3"
         >
           <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:rotate-90 transition-transform duration-300">
             <BiPlus className="text-xl" />
           </div>
           <span className="font-semibold hidden sm:block tracking-wide">Add Course</span>
         </Link>
-      </div>
+      )}
     </div>
   );
 }
