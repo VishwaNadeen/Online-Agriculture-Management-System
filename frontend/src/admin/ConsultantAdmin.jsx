@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import AdminLoader from "../components/AdminLoader";
+import { ApptAPI } from "../api/appointments.js";
 import { 
   FaUserMd, 
   FaCalendarCheck, 
@@ -111,20 +112,16 @@ export default function ConsultantAdmin() {
     if (showLoader) setIsLoading(true);
     setIsRefreshing(true);
     try {
-      const [consultantsRes, appointmentsRes] = await Promise.all([
+      const [consultantsRes, appointmentsList] = await Promise.all([
         axios.get(`${BASE_URL}/consultants`, {
           headers: authHeaders(),
           params: { limit: 1000 }
         }),
-        axios.get(`${BASE_URL}/api/appointments`, {
-          headers: authHeaders(),
-        }),
+        ApptAPI.listAll({ limit: 1000 }) // Use the dedicated API method
       ]);
 
       const consultantsList = consultantsRes.data?.items || consultantsRes.data || [];
-      const appointmentsList = Array.isArray(appointmentsRes.data) 
-        ? appointmentsRes.data 
-        : appointmentsRes.data?.appointments || [];
+
 
       setConsultants(consultantsList);
       setAppointments(appointmentsList);
@@ -148,6 +145,7 @@ export default function ConsultantAdmin() {
     const activeConsultants = new Set(
       appointments.map(a => String(a.consultantId ?? a.consultant?._id ?? a.consultant))
     ).size;
+
 
     return {
       totalConsultants,
