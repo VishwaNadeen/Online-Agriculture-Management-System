@@ -50,6 +50,14 @@ const Navbar = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'smooth'
+    });
+  };
+
   const handleLogout = () => {
     const keys = ["auth_token", "token", "user_token", "authToken", "auth_user", "userId", "tempUserId"];
     keys.forEach((k) => {
@@ -92,6 +100,7 @@ const Navbar = () => {
             <div className="flex-shrink-0">
               <NavLink 
                 to="/" 
+                onClick={scrollToTop}
                 className="flex items-center gap-2 group transition-transform duration-300 hover:scale-105"
               >
                 <div className="relative">
@@ -112,7 +121,7 @@ const Navbar = () => {
               <ul className="flex items-center gap-1">
                 {commonTabs.map((tab) => (
                   <li key={tab.name}>
-                    <NavLink to={tab.to} className={tabClasses}>
+                    <NavLink to={tab.to} onClick={scrollToTop} className={tabClasses}>
                       {({ isActive }) => (
                         <>
                           <span className="relative z-10">{tab.name}</span>
@@ -139,12 +148,14 @@ const Navbar = () => {
                   <>
                     <NavLink
                       to="/login"
+                      onClick={scrollToTop}
                       className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-green-600 transition-colors duration-200"
                     >
                       Login
                     </NavLink>
                     <NavLink
                       to="/signup"
+                      onClick={scrollToTop}
                       className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200 hover:shadow-lg hover:shadow-green-600/30"
                     >
                       Sign Up
@@ -160,6 +171,7 @@ const Navbar = () => {
                     </button>
                     <NavLink 
                       to="/profile" 
+                      onClick={scrollToTop}
                       className="group relative"
                       title={`${user?.firstName || ""} ${user?.lastName || ""}`.trim()}
                     >
@@ -198,6 +210,7 @@ const Navbar = () => {
               <NavLink
                 key={tab.name}
                 to={tab.to}
+                onClick={scrollToTop}
                 className={({ isActive }) =>
                   `block px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
                     isActive
@@ -218,12 +231,14 @@ const Navbar = () => {
                 <>
                   <NavLink
                     to="/login"
+                    onClick={scrollToTop}
                     className="block px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
                   >
                     Login
                   </NavLink>
                   <NavLink
                     to="/signup"
+                    onClick={scrollToTop}
                     className="block px-4 py-3 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all duration-200 text-center"
                   >
                     Sign Up
@@ -233,6 +248,7 @@ const Navbar = () => {
                 <>
                   <NavLink
                     to="/profile"
+                    onClick={scrollToTop}
                     className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
                   >
                     <img
