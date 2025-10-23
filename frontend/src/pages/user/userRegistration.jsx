@@ -68,6 +68,7 @@ export default function UserRegistration() {
     dob: "",
     password: "",
     confirmPassword: "",
+    postalCode: "",
   });
 
   const [chooseRoleOpen, setChooseRoleOpen] = useState(false);
@@ -156,7 +157,12 @@ export default function UserRegistration() {
   const validatePhone = (val) => {
     if (!val) return "Phone is required";
     if (!/^\d+$/.test(val)) return "Only digits allowed";
-    if (val.length !== 9) return "Phone must be exactly 9 digits";
+    if (val.length !== 10) return "Phone must be exactly 10 digits";
+    return "";
+  };
+  const validatePostalCode = (val) => {
+    if (!val) return "Postal code is required";
+    if (!/^\d+$/.test(val)) return "Postal code must contain only numbers";
     return "";
   };
   const validateEmail = (val) => {
@@ -184,7 +190,7 @@ export default function UserRegistration() {
   };
 
   const handlePhoneChange = (e) => {
-    const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
     setPhoneLocal(digits);
     setErrors((p) => ({ ...p, phone: validatePhone(digits) }));
   };
@@ -192,6 +198,11 @@ export default function UserRegistration() {
     const value = e.target.value.trim();
     setForm((f) => ({ ...f, email: value }));
     setErrors((p) => ({ ...p, email: validateEmail(value) }));
+  };
+  const handlePostalCodeChange = (e) => {
+    const value = e.target.value.replace(/\D/g, ""); // Remove all non-digit characters
+    setForm((f) => ({ ...f, address: { ...f.address, postalCode: value } }));
+    setErrors((p) => ({ ...p, postalCode: validatePostalCode(value) }));
   };
   const handleDOBChange = (e) => {
     const value = e.target.value;
@@ -244,7 +255,7 @@ export default function UserRegistration() {
     form.address.line1.trim();
 
   const noErrors =
-    !errors.phone && !errors.email && !errors.dob && !errors.password && !errors.confirmPassword;
+    !errors.phone && !errors.email && !errors.dob && !errors.password && !errors.confirmPassword && !errors.postalCode;
 
   const phoneOk = !validatePhone(phoneLocal);
   const passwordsMatch = !validateConfirmPassword(form.password, confirmPassword);
@@ -278,6 +289,7 @@ export default function UserRegistration() {
       dob: "",
       password: "",
       confirmPassword: "",
+      postalCode: "",
     });
     setPreview("");
     setProfileFile(null);
@@ -293,10 +305,11 @@ export default function UserRegistration() {
     const dobErr = validateDOB(form.dateOfBirth);
     const pwdErr = validatePassword(form.password);
     const cpwErr = validateConfirmPassword(form.password, confirmPassword);
+    const postalCodeErr = validatePostalCode(form.address.postalCode);
 
-    const nextErrors = { phone: phoneErr, email: emailErr, dob: dobErr, password: pwdErr, confirmPassword: cpwErr };
+    const nextErrors = { phone: phoneErr, email: emailErr, dob: dobErr, password: pwdErr, confirmPassword: cpwErr, postalCode: postalCodeErr };
     setErrors(nextErrors);
-    if (phoneErr || emailErr || dobErr || pwdErr || cpwErr) return;
+    if (phoneErr || emailErr || dobErr || pwdErr || cpwErr || postalCodeErr) return;
 
     setLoading(true);
     try {
@@ -459,7 +472,7 @@ export default function UserRegistration() {
           <div className="group">
             <label className="block text-sm font-semibold text-emerald-800 mb-2">Email</label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 flex itemsCompanion-center pl-4 pointer-events-none">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
                 <Mail className="w-5 h-5 text-emerald-400 group-focus-within:text-emerald-600 transition-colors" />
               </div>
               <input
@@ -633,13 +646,22 @@ export default function UserRegistration() {
                 name="address.postalCode"
                 placeholder="Postal Code"
                 value={form.address.postalCode}
-                onChange={(e) =>
-                  setForm({ ...form, address: { ...form.address, postalCode: e.target.value } })
-                }
+                onChange={handlePostalCodeChange}
                 required
-                className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
-
+                className={`w-full rounded-xl border-2 px-4 py-3 focus:outline-none focus:border-[3px] transition-all ${
+                  errors.postalCode
+                    ? "border-red-300 bg-red-50/50 focus:border-red-500"
+                    : "border-emerald-200 bg-emerald-50/50 focus:border-emerald-600"
+                }`}
               />
+              {errors.postalCode && (
+                <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.791-.835 2.791-1.87V8.87c0-1.035-1.251-1.87-2.791-1.87H5.062c-1.54 0-2.791.835-2.791 1.87v8.26c0 1.035 1.251 1.87 2.791 1.87z" />
+                  </svg>
+                  {errors.postalCode}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-semibold text-emerald-800 mb-2">Address Line 1</label>

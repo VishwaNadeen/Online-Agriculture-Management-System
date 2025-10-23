@@ -37,6 +37,7 @@ export default function UserEditPage() {
   const [loading, setLoading] = useState(!cachedUser);
   const [saving, setSaving] = useState(false);
   const [pageErr, setPageErr] = useState("");
+  const [profileImage, setProfileImage] = useState(null);
 
   const [form, setForm] = useState(() => ({
     firstName: valueOrEmpty(cachedUser?.firstName),
@@ -45,6 +46,7 @@ export default function UserEditPage() {
     phone: valueOrEmpty(cachedUser?.phone),
     dateOfBirth: cachedUser?.dateOfBirth ? cachedUser.dateOfBirth.substring(0,10) : "",
     gender: valueOrEmpty(cachedUser?.gender),
+    profilePicture: valueOrEmpty(cachedUser?.profilePicture),
     address: {
       line1: valueOrEmpty(cachedUser?.address?.line1),
       line2: valueOrEmpty(cachedUser?.address?.line2),
@@ -78,6 +80,7 @@ export default function UserEditPage() {
           phone: valueOrEmpty(data.phone),
           dateOfBirth: data.dateOfBirth ? data.dateOfBirth.substring(0,10) : "",
           gender: valueOrEmpty(data.gender),
+          profilePicture: valueOrEmpty(data.profilePicture),
           address: {
             line1: valueOrEmpty(data?.address?.line1),
             line2: valueOrEmpty(data?.address?.line2),
@@ -102,10 +105,17 @@ export default function UserEditPage() {
     return () => { abort = true; };
   }, [userId, token, navigate]);
 
-  const avatarSrc =
-    (cachedUser?.profilePicture ||
-     "https://ui-avatars.com/api/?background=E6F4EA&color=166534&name=" +
-     encodeURIComponent(`${form.firstName || ""} ${form.lastName || ""}`.trim() || "User"));
+  const avatarSrc = useMemo(() => {
+    // Priority: 1. Newly selected image, 2. Current profile picture, 3. Fallback to initials
+    if (profileImage) {
+      return URL.createObjectURL(profileImage);
+    }
+    if (form.profilePicture) {
+      return form.profilePicture;
+    }
+    return "https://ui-avatars.com/api/?background=E6F4EA&color=166534&name=" +
+           encodeURIComponent(`${form.firstName || ""} ${form.lastName || ""}`.trim() || "User");
+  }, [profileImage, form.profilePicture, form.firstName, form.lastName]);
 
   const fullName = useMemo(
     () => `${form.firstName || ""} ${form.lastName || ""}`.trim() || "User",
@@ -127,6 +137,22 @@ export default function UserEditPage() {
     });
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error("Image size must be less than 5MB");
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error("Please select a valid image file");
+        return;
+      }
+      setProfileImage(file);
+      setField('profilePicture', URL.createObjectURL(file));
+    }
+  };
+
   const validate = () => {
     if (!form.firstName.trim()) return "First name is required.";
     if (!form.lastName.trim()) return "Last name is required.";
@@ -139,17 +165,50 @@ export default function UserEditPage() {
     const err = validate();
     if (err) { toast.error(err); return; }
 
-    const payload = {
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      phone: form.phone.trim(),
-      dateOfBirth: form.dateOfBirth ? new Date(form.dateOfBirth).toISOString() : null,
-      gender: form.gender || null,
-      address: form.address,
-    };
-
     try {
       setSaving(true);
+      
+      // If there's a new profile image, upload it first
+      let profilePictureUrl = form.profilePicture;
+      if (profileImage) {
+        try {
+          const formData = new FormData();
+          formData.append('profilePicture', profileImage);
+          
+          const uploadRes = await fetch(`${BASE}/users/${userId}/upload`, {
+            method: "POST",
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: formData,
+          });
+          
+          if (!uploadRes.ok) {
+            let msg = `Image upload failed (${uploadRes.status})`;
+            try { const j = await uploadRes.json(); msg = j?.message || msg; } catch {}
+            toast.error(msg);
+            return;
+          }
+          
+          const uploadResult = await uploadRes.json();
+          profilePictureUrl = uploadResult.profilePicture;
+        } catch (uploadError) {
+          console.error("Upload error:", uploadError);
+          toast.error("Failed to upload image. Please try again.");
+          return;
+        }
+      }
+
+      const payload = {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        phone: form.phone.trim(),
+        dateOfBirth: form.dateOfBirth ? new Date(form.dateOfBirth).toISOString() : null,
+        gender: form.gender || null,
+        profilePicture: profilePictureUrl,
+        address: form.address,
+      };
+
       const res = await fetch(`${BASE}/users/${userId}`, {
         method: "PATCH",
         headers: {
@@ -158,12 +217,14 @@ export default function UserEditPage() {
         },
         body: JSON.stringify(payload),
       });
+      
       if (!res.ok) {
         let msg = `Save failed (${res.status})`;
         try { const j = await res.json(); msg = j?.message || msg; } catch {}
         toast.error(msg);
         return;
       }
+      
       const updated = await res.json();
       toast.success("User details updated");
       const raw = JSON.stringify(updated);
@@ -197,15 +258,43 @@ export default function UserEditPage() {
 
           {/* Centered avatar + name (match profile design) */}
           <div className="px-6 -mt-14 flex flex-col items-center text-center">
-            <img
-              src={avatarSrc}
-              alt="Avatar"
-              className="w-28 h-28 rounded-full ring-4 ring-white object-cover shadow-lg"
-            />
+            <div className="relative group">
+              <img
+                src={avatarSrc}
+                alt="Avatar"
+                className="w-28 h-28 rounded-full ring-4 ring-white object-cover shadow-lg"
+              />
+              <label className="absolute -bottom-2 -right-2 w-8 h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg transition-all duration-200 group-hover:scale-110">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </label>
+              {/* Show indicator if new image is selected */}
+              {profileImage && (
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg animate-pulse">
+                  NEW
+                </div>
+              )}
+            </div>
             <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-emerald-900">
               {fullName}
             </h1>
             {pageErr ? <p className="text-sm text-red-600 mt-1">{pageErr}</p> : null}
+            {/* Show current photo status */}
+            {form.profilePicture && !profileImage && (
+              <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Current photo
+              </p>
+            )}
           </div>
 
           <form onSubmit={onSave} className="px-6 pb-6 pt-4">

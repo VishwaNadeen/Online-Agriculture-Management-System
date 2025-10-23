@@ -6,6 +6,14 @@ import { Mail, Phone, MapPin, Leaf, Facebook, Twitter, Instagram, Linkedin, Arro
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'smooth'
+    });
+  };
+
   return (
     <footer className="bg-gradient-to-br from-green-800 via-green-700 to-green-800 text-white mt-0">
       {/* Main Footer Content */}
@@ -65,6 +73,7 @@ const Footer = () => {
                 <li key={idx}>
                   <NavLink
                     to={link.to}
+                    onClick={scrollToTop}
                     className="group flex items-center gap-2 text-sm text-green-100 hover:text-white transition-all duration-300 hover:translate-x-1"
                   >
                     <ArrowRight className="w-4 h-4 opacity-0 -ml-6 group-hover:opacity-100 group-hover:ml-0 transition-all duration-300" />
@@ -93,6 +102,7 @@ const Footer = () => {
                 <li key={idx}>
                   <NavLink
                     to={link.to}
+                    onClick={scrollToTop}
                     className="group flex items-center gap-2 text-sm text-green-100 hover:text-white transition-all duration-300 hover:translate-x-1"
                   >
                     <ArrowRight className="w-4 h-4 opacity-0 -ml-6 group-hover:opacity-100 group-hover:ml-0 transition-all duration-300" />
@@ -167,13 +177,13 @@ const Footer = () => {
               © {currentYear} <span className="font-semibold text-white">Green Grow</span>. All rights reserved.
             </p>
             <div className="flex gap-6">
-              <NavLink to="#" className="hover:text-white transition-colors duration-300">
+              <NavLink to="#" onClick={scrollToTop} className="hover:text-white transition-colors duration-300">
                 Privacy Policy
               </NavLink>
-              <NavLink to="#" className="hover:text-white transition-colors duration-300">
+              <NavLink to="#" onClick={scrollToTop} className="hover:text-white transition-colors duration-300">
                 Terms of Service
               </NavLink>
-              <NavLink to="#" className="hover:text-white transition-colors duration-300">
+              <NavLink to="#" onClick={scrollToTop} className="hover:text-white transition-colors duration-300">
                 Cookie Policy
               </NavLink>
             </div>
