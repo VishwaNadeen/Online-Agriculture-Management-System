@@ -25,6 +25,11 @@ export default function AddCourse() {
   const [language, setLanguage] = useState("en");
   const [subCategory, setSubCategory] = useState("");
 
+  // ===== Validation States =====
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [isFormValid, setIsFormValid] = useState(false);
+
   // ===== Materials =====
   const [videoItems, setVideoItems] = useState([
     { name: "", videoFile: null, thumbFile: null },
@@ -47,12 +52,203 @@ export default function AddCourse() {
   const addTextRow = () => setTextItems((prev) => [...prev, { name: "", content: "" }]);
   const removeTextRow = (idx) => setTextItems((prev) => prev.filter((_, i) => i !== idx));
 
+  // ===== Validation Functions =====
+  const validateField = (name, value) => {
+    const newErrors = { ...errors };
+    
+    switch (name) {
+      case 'courseID':
+        if (!value.trim()) {
+          newErrors.courseID = 'Course ID is required';
+        } else if (value.length < 3) {
+          newErrors.courseID = 'Course ID must be at least 3 characters';
+        } else if (value.length > 20) {
+          newErrors.courseID = 'Course ID must be less than 20 characters';
+        } else if (!/^[a-zA-Z0-9]+$/.test(value)) {
+          newErrors.courseID = 'Course ID can only contain letters and numbers';
+        } else {
+          delete newErrors.courseID;
+        }
+        break;
+        
+      case 'courseName':
+        if (!value.trim()) {
+          newErrors.courseName = 'Course name is required';
+        } else if (value.trim().length < 3) {
+          newErrors.courseName = 'Course name must be at least 3 characters';
+        } else if (value.trim().length > 100) {
+          newErrors.courseName = 'Course name must be less than 100 characters';
+        } else {
+          delete newErrors.courseName;
+        }
+        break;
+        
+      case 'description':
+        if (!value.trim()) {
+          newErrors.description = 'Description is required';
+        } else if (value.trim().length < 10) {
+          newErrors.description = 'Description must be at least 10 characters';
+        } else if (value.trim().length > 1000) {
+          newErrors.description = 'Description must be less than 1000 characters';
+        } else {
+          delete newErrors.description;
+        }
+        break;
+        
+      case 'category':
+        if (!value.trim()) {
+          newErrors.category = 'Category is required';
+        } else if (value.trim().length < 2) {
+          newErrors.category = 'Category must be at least 2 characters';
+        } else if (value.trim().length > 50) {
+          newErrors.category = 'Category must be less than 50 characters';
+        } else {
+          delete newErrors.category;
+        }
+        break;
+        
+      case 'subCategory':
+        if (value && value.trim().length > 50) {
+          newErrors.subCategory = 'Sub-category must be less than 50 characters';
+        } else {
+          delete newErrors.subCategory;
+        }
+        break;
+        
+      case 'altTitles':
+        if (value && value.trim().length > 200) {
+          newErrors.altTitles = 'Alternative titles must be less than 200 characters';
+        } else {
+          delete newErrors.altTitles;
+        }
+        break;
+        
+      case 'tags':
+        if (value && value.trim().length > 200) {
+          newErrors.tags = 'Tags must be less than 200 characters';
+        } else {
+          delete newErrors.tags;
+        }
+        break;
+        
+      case 'thumbnailUrl':
+        if (value && value.trim()) {
+          const urlPattern = /^https?:\/\/.+/;
+          if (!urlPattern.test(value.trim())) {
+            newErrors.thumbnailUrl = 'Please enter a valid URL starting with http:// or https://';
+          } else {
+            delete newErrors.thumbnailUrl;
+          }
+        } else {
+          delete newErrors.thumbnailUrl;
+        }
+        break;
+        
+      default:
+        break;
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleFieldChange = (name, value) => {
+    // Handle Course ID with special filtering
+    if (name === 'courseID') {
+      const filteredValue = value.replace(/[^a-zA-Z0-9]/g, '');
+      setCourseID(filteredValue);
+      if (touched[name]) {
+        validateField(name, filteredValue);
+      }
+    } else {
+      // Handle other fields normally
+      switch (name) {
+        case 'courseName':
+          setCourseName(value);
+          break;
+        case 'description':
+          setDescription(value);
+          break;
+        case 'category':
+          setCategory(value);
+          break;
+        case 'subCategory':
+          setSubCategory(value);
+          break;
+        case 'altTitles':
+          setAltTitles(value);
+          break;
+        case 'tags':
+          setTags(value);
+          break;
+        case 'thumbnailUrl':
+          setThumbnailUrl(value);
+          break;
+        default:
+          break;
+      }
+      
+      if (touched[name]) {
+        validateField(name, value);
+      }
+    }
+  };
+
+  const handleFieldBlur = (name, value) => {
+    setTouched(prev => ({ ...prev, [name]: true }));
+    validateField(name, value);
+  };
+
+  // Check form validity
+  React.useEffect(() => {
+    const requiredFields = ['courseID', 'courseName', 'description', 'category'];
+    const hasRequiredFields = requiredFields.every(field => {
+      const value = field === 'courseID' ? courseID : 
+                   field === 'courseName' ? courseName :
+                   field === 'description' ? description :
+                   field === 'category' ? category : '';
+      return value && value.trim();
+    });
+    const hasNoErrors = Object.keys(errors).length === 0;
+    
+    setIsFormValid(hasRequiredFields && hasNoErrors);
+  }, [courseID, courseName, description, category, errors]);
+
   // ===== Validation =====
   function validateForm() {
-    if (!courseID.trim()) return "Course ID is required";
-    if (!courseName.trim()) return "Course Name is required";
-    if (!description.trim()) return "Description is required";
-    if (!category.trim()) return "Category is required";
+    // Mark all fields as touched to show all errors
+    const allFields = ['courseID', 'courseName', 'description', 'category', 'subCategory', 'altTitles', 'tags', 'thumbnailUrl'];
+    const newTouched = {};
+    allFields.forEach(field => {
+      newTouched[field] = true;
+    });
+    setTouched(newTouched);
+
+    // Validate all fields
+    const newErrors = {};
+    allFields.forEach(field => {
+      const value = field === 'courseID' ? courseID : 
+                   field === 'courseName' ? courseName :
+                   field === 'description' ? description :
+                   field === 'category' ? category :
+                   field === 'subCategory' ? subCategory :
+                   field === 'altTitles' ? altTitles :
+                   field === 'tags' ? tags :
+                   field === 'thumbnailUrl' ? thumbnailUrl : '';
+      
+      const isValid = validateField(field, value);
+      if (!isValid) {
+        newErrors[field] = errors[field];
+      }
+    });
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error("Please fix the errors before submitting");
+      return false;
+    }
+
+    return true;
 
     // Validate videos
     for (let i = 0; i < videoItems.length; i++) {
@@ -178,6 +374,23 @@ export default function AddCourse() {
           Add New Course
         </h1>
 
+        {/* Form Validation Summary */}
+        {Object.keys(errors).length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <h3 className="text-sm font-semibold text-red-800">Please fix the following errors:</h3>
+            </div>
+            <ul className="mt-2 text-sm text-red-700 list-disc list-inside">
+              {Object.entries(errors).map(([field, error]) => (
+                <li key={field} className="capitalize">{field.replace(/([A-Z])/g, ' $1').toLowerCase()}: {error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Basic Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Course ID */}
@@ -187,9 +400,31 @@ export default function AddCourse() {
               type="text"
               placeholder="e.g. IRR101"
               value={courseID}
-              onChange={(e) => setCourseID(e.target.value)}
-              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              onChange={(e) => handleFieldChange('courseID', e.target.value)}
+              onBlur={(e) => handleFieldBlur('courseID', e.target.value)}
+              className={`border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
+                touched.courseID && errors.courseID 
+                  ? 'border-red-300 focus:ring-red-500 bg-red-50' 
+                  : touched.courseID && !errors.courseID && courseID
+                  ? 'border-green-300 focus:ring-green-500 bg-green-50' 
+                  : 'focus:ring-emerald-500'
+              }`}
             />
+            {touched.courseID && errors.courseID && (
+              <p className="text-sm text-red-600 mt-1 flex items-center">
+                <span className="mr-1">⚠</span>
+                {errors.courseID}
+              </p>
+            )}
+            {touched.courseID && !errors.courseID && courseID && (
+              <p className="text-sm text-green-600 mt-1 flex items-center">
+                <span className="mr-1">✓</span>
+                Course ID looks good
+              </p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Only letters and numbers allowed (no special characters, spaces, or symbols)
+            </p>
           </div>
 
           {/* Course Name */}
@@ -199,9 +434,28 @@ export default function AddCourse() {
               type="text"
               placeholder="e.g. Drip Irrigation Basics"
               value={courseName}
-              onChange={(e) => setCourseName(e.target.value)}
-              className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              onChange={(e) => handleFieldChange('courseName', e.target.value)}
+              onBlur={(e) => handleFieldBlur('courseName', e.target.value)}
+              className={`border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
+                touched.courseName && errors.courseName 
+                  ? 'border-red-300 focus:ring-red-500 bg-red-50' 
+                  : touched.courseName && !errors.courseName && courseName
+                  ? 'border-green-300 focus:ring-green-500 bg-green-50' 
+                  : 'focus:ring-emerald-500'
+              }`}
             />
+            {touched.courseName && errors.courseName && (
+              <p className="text-sm text-red-600 mt-1 flex items-center">
+                <span className="mr-1">⚠</span>
+                {errors.courseName}
+              </p>
+            )}
+            {touched.courseName && !errors.courseName && courseName && (
+              <p className="text-sm text-green-600 mt-1 flex items-center">
+                <span className="mr-1">✓</span>
+                Course name looks good
+              </p>
+            )}
           </div>
 
           {/* Alt Titles */}
@@ -309,9 +563,31 @@ export default function AddCourse() {
             rows={4}
             placeholder="Enter course description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            onChange={(e) => handleFieldChange('description', e.target.value)}
+            onBlur={(e) => handleFieldBlur('description', e.target.value)}
+            className={`w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 ${
+              touched.description && errors.description 
+                ? 'border-red-300 focus:ring-red-500 bg-red-50' 
+                : touched.description && !errors.description && description
+                ? 'border-green-300 focus:ring-green-500 bg-green-50' 
+                : 'focus:ring-emerald-500'
+            }`}
           />
+          {touched.description && errors.description && (
+            <p className="text-sm text-red-600 mt-1 flex items-center">
+              <span className="mr-1">⚠</span>
+              {errors.description}
+            </p>
+          )}
+          {touched.description && !errors.description && description && (
+            <p className="text-sm text-green-600 mt-1 flex items-center">
+              <span className="mr-1">✓</span>
+              Description looks good
+            </p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            {description.length}/1000 characters
+          </p>
         </div>
 
         {/* Status */}
@@ -514,9 +790,14 @@ export default function AddCourse() {
         <div className="w-full flex justify-center gap-4 mt-8">
           <button
             onClick={handleCreateCourse}
-            className="bg-emerald-600 text-white px-6 py-2 rounded-xl shadow-md hover:bg-emerald-700 transition"
+            disabled={!isFormValid}
+            className={`px-6 py-2 rounded-xl shadow-md transition ${
+              isFormValid 
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+            }`}
           >
-            Create Course
+            {isFormValid ? 'Create Course' : 'Fill Required Fields'}
           </button>
           <Link
             to="/admin/courses"

@@ -53,6 +53,12 @@ const EyeOffIcon = (props) => (
     <path d="M10.58 10.58A3 3 0 0 0 12 15c.63 0 1.21-.2 1.68-.54M9.9 4.24A10.73 10.73 0 0 1 12 4c6.5 0 10 8 10 8a17.19 17.19 0 0 1-4.11 5.18M6.11 6.11A17.55 17.55 0 0 0 2 12s3.5 7 10 7c1.09 0 2.12-.18 3.08-.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
+const LockIcon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" {...props}>
+    <path d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 
 /* ---------------- shared UI bits ---------------- */
 function CenterTabs({ active, isConsultant }) {
@@ -119,6 +125,8 @@ export default function ProfilePage() {
   const [pageErr, setPageErr] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => { if (!token || !userId) navigate("/login"); }, [token, userId, navigate]);
 
@@ -171,6 +179,46 @@ export default function ProfilePage() {
 
   const handleEdit = () => navigate("/profile/edit");
   const onRequestDelete = () => setShowDeleteModal(true);
+  const onRequestChangePassword = () => setShowChangePasswordModal(true);
+
+  const onConfirmChangePassword = async (currentPassword, newPassword) => {
+    if (!user?._id || !token) return;
+    try {
+      setChangingPassword(true);
+      const res = await fetch(`${BASE}/users/${user._id}/password`, {
+        method: "PATCH",
+        headers: { 
+          Authorization: `Bearer ${token}`, 
+          "Content-Type": "application/json" 
+        },
+        body: JSON.stringify({ 
+          oldPassword: currentPassword, 
+          newPassword: newPassword 
+        }),
+      });
+      
+      if (!res.ok) {
+        let msg = "";
+        try { 
+          const j = await res.json(); 
+          msg = j?.message || j?.error || ""; 
+        } catch {}
+        if (res.status === 401 || /password/i.test(msg)) {
+          toast.error("Current password is incorrect");
+        } else {
+          toast.error(msg || `Password change failed (${res.status})`);
+        }
+        return;
+      }
+      
+      toast.success("Password changed successfully");
+      setShowChangePasswordModal(false);
+    } catch (error) {
+      toast.error("Failed to change password. Please try again.");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const onConfirmDelete = async (password) => {
     if (!user?._id || !token) return;
@@ -307,8 +355,18 @@ export default function ProfilePage() {
               )}
             </Section>
 
-            {/* Danger zone */}
-            <div className="mt-6 flex justify-end">
+            {/* Action buttons */}
+            <div className="mt-6 flex justify-between items-center">
+              {/* Change Password Button - Left */}
+              <button
+                onClick={onRequestChangePassword}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 font-medium transition"
+              >
+                <LockIcon className="w-5 h-5" />
+                Change Password
+              </button>
+
+              {/* Delete Account Button - Right */}
               <button
                 onClick={() => setShowDeleteModal(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400 font-medium transition"
@@ -319,12 +377,20 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Modal */}
+          {/* Modals */}
           {showDeleteModal && (
             <DeleteConfirmModal
               loading={deleting}
               onCancel={() => !deleting && setShowDeleteModal(false)}
               onConfirm={onConfirmDelete}
+            />
+          )}
+          
+          {showChangePasswordModal && (
+            <ChangePasswordModal
+              loading={changingPassword}
+              onCancel={() => !changingPassword && setShowChangePasswordModal(false)}
+              onConfirm={onConfirmChangePassword}
             />
           )}
         </div>
@@ -387,6 +453,209 @@ function DeleteConfirmModal({ loading, onCancel, onConfirm }) {
             </button>
             <button type="submit" disabled={loading} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400 font-medium transition disabled:opacity-60">
               {loading ? (<><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></span>Deleting...</>) : (<><TrashIcon className="w-5 h-5" />Confirm Delete</>)}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Change Password Modal ---------------- */
+function ChangePasswordModal({ loading, onCancel, onConfirm }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validatePassword = (password) => {
+    const errors = [];
+    if (password.length < 8) errors.push("at least 8 characters");
+    if (!/[A-Z]/.test(password)) errors.push("one uppercase letter");
+    if (!/[a-z]/.test(password)) errors.push("one lowercase letter");
+    if (!/\d/.test(password)) errors.push("one number");
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) errors.push("one special character");
+    return errors;
+  };
+
+  const getPasswordStrength = (password) => {
+    const errors = validatePassword(password);
+    if (errors.length === 0) return { strength: "Strong", color: "text-green-600" };
+    if (errors.length <= 2) return { strength: "Medium", color: "text-yellow-600" };
+    return { strength: "Weak", color: "text-red-600" };
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    setErrors({});
+    
+    const newErrors = {};
+    
+    if (!currentPassword.trim()) {
+      newErrors.currentPassword = "Current password is required";
+    }
+    
+    if (!newPassword.trim()) {
+      newErrors.newPassword = "New password is required";
+    } else {
+      const passwordErrors = validatePassword(newPassword);
+      if (passwordErrors.length > 0) {
+        newErrors.newPassword = `Password must have ${passwordErrors.join(", ")}`;
+      }
+    }
+    
+    if (!confirmPassword.trim()) {
+      newErrors.confirmPassword = "Please confirm your new password";
+    } else if (newPassword !== confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
+    
+    if (currentPassword === newPassword) {
+      newErrors.newPassword = "New password must be different from current password";
+    }
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    
+    onConfirm(currentPassword.trim(), newPassword.trim());
+  };
+
+  const passwordStrength = getPasswordStrength(newPassword);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
+      <div className="relative w-full max-w-md mx-4 bg-white rounded-2xl shadow-xl border border-emerald-100 overflow-hidden">
+        <div className="px-5 py-4 border-b">
+          <h3 className="text-lg font-semibold text-emerald-900">Change Password</h3>
+          <p className="text-sm text-gray-600 mt-1">Enter your current password and choose a new secure password.</p>
+        </div>
+
+        <form onSubmit={submit} className="px-5 py-4 space-y-4">
+          {/* Current Password */}
+          <div>
+            <label className="block text-sm font-medium text-emerald-900 mb-1">Current Password</label>
+            <div className="relative">
+              <input
+                type={showCurrentPw ? "text" : "password"}
+                className={`w-full rounded-lg border focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2 pr-10 ${
+                  errors.currentPassword ? "border-red-300" : "border-gray-300"
+                }`}
+                placeholder="Enter current password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPw((s) => !s)}
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-emerald-700"
+                tabIndex={-1}
+              >
+                {showCurrentPw ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+              </button>
+            </div>
+            {errors.currentPassword && (
+              <p className="text-sm text-red-600 mt-1">{errors.currentPassword}</p>
+            )}
+          </div>
+
+          {/* New Password */}
+          <div>
+            <label className="block text-sm font-medium text-emerald-900 mb-1">New Password</label>
+            <div className="relative">
+              <input
+                type={showNewPw ? "text" : "password"}
+                className={`w-full rounded-lg border focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2 pr-10 ${
+                  errors.newPassword ? "border-red-300" : "border-gray-300"
+                }`}
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPw((s) => !s)}
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-emerald-700"
+                tabIndex={-1}
+              >
+                {showNewPw ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+              </button>
+            </div>
+            {errors.newPassword && (
+              <p className="text-sm text-red-600 mt-1">{errors.newPassword}</p>
+            )}
+            {newPassword && !errors.newPassword && (
+              <div className="mt-1">
+                <p className={`text-xs ${passwordStrength.color}`}>
+                  Password strength: {passwordStrength.strength}
+                </p>
+                <div className="mt-1 text-xs text-gray-500">
+                  Password must have: at least 8 characters, one uppercase letter, one lowercase letter, one number, one special character
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div>
+            <label className="block text-sm font-medium text-emerald-900 mb-1">Confirm New Password</label>
+            <div className="relative">
+              <input
+                type={showConfirmPw ? "text" : "password"}
+                className={`w-full rounded-lg border focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 px-3 py-2 pr-10 ${
+                  errors.confirmPassword ? "border-red-300" : "border-gray-300"
+                }`}
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPw((s) => !s)}
+                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-emerald-700"
+                tabIndex={-1}
+              >
+                {showConfirmPw ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+              </button>
+            </div>
+            {errors.confirmPassword && (
+              <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>
+            )}
+          </div>
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button 
+              type="button" 
+              onClick={onCancel} 
+              disabled={loading} 
+              className="px-4 py-2 rounded-lg border bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 font-medium transition disabled:opacity-60"
+            >
+              {loading ? (
+                <>
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></span>
+                  Changing...
+                </>
+              ) : (
+                <>
+                  <LockIcon className="w-5 h-5" />
+                  Change Password
+                </>
+              )}
             </button>
           </div>
         </form>

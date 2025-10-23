@@ -13,6 +13,12 @@ export default function UpdateCourse() {
 
   // Expecting location.state to carry the course object
   const c = location.state || {};
+  
+  // If no course data is received, redirect back to courses page
+  if (!c.courseID) {
+    navigate("/admin/courses");
+    return null;
+  }
 
   // ===== Basic Course Fields (prefilled) =====
   const [courseID, setCourseID] = useState(c.courseID || "");
@@ -44,9 +50,9 @@ export default function UpdateCourse() {
   );
 
   const [textItems, setTextItems] = useState(
-    (Array.isArray(c.textLessons) && c.textLessons.length
+    Array.isArray(c.textLessons) && c.textLessons.length
       ? c.textLessons
-      : [{ name: "", content: "" }])
+      : [{ name: "", content: "" }]
   );
 
   const [isPublished, setIsPublished] = useState(

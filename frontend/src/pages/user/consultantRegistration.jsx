@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
@@ -17,23 +17,36 @@ const Field = ({ label, required, children }) => (
 );
 
 const Select = ({ value, onChange, options, placeholder = "Select...", disabled }) => (
-  <select
-    className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    disabled={disabled}
-  >
-    <option value="">{placeholder}</option>
-    {options.map((opt) => (
-      <option key={opt} value={opt}>
-        {opt}
-      </option>
-    ))}
-  </select>
+  <div className="relative">
+    <select
+      className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all disabled:bg-gray-100 disabled:cursor-not-allowed appearance-none pr-10"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((opt) => (
+        <option key={opt} value={opt}>
+          {opt}
+        </option>
+      ))}
+    </select>
+    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+      <svg
+        className="w-4 h-4 text-emerald-500"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </div>
+  </div>
 );
 
 const MultiSelect = ({ value = [], onChange, options, placeholder = "Select..." }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const toggleOption = (val) => {
     const newValue = value.includes(val)
@@ -42,35 +55,106 @@ const MultiSelect = ({ value = [], onChange, options, placeholder = "Select..." 
     onChange(newValue);
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      setIsOpen(false);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setIsOpen(!isOpen);
+    }
+  };
+
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-left text-sm text-emerald-900 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all"
+        onKeyDown={handleKeyDown}
+        className="w-full rounded-xl border-2 border-emerald-200 bg-emerald-50/50 px-4 py-3 text-left text-sm text-emerald-900 focus:outline-none focus:border-emerald-600 focus:border-[3px] transition-all flex items-center justify-between"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
       >
-        {value.length > 0 ? (
-          <span>{value.join(", ")}</span>
-        ) : (
-          <span className="text-emerald-400">{placeholder}</span>
-        )}
+        <span className={value.length > 0 ? "text-emerald-900" : "text-emerald-400"}>
+          {value.length > 0 ? (
+            <span className="flex flex-wrap gap-1">
+              {value.map((item, index) => (
+                <span
+                  key={item}
+                  className="inline-flex items-center px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 text-xs font-medium"
+                >
+                  {item}
+                  {index < value.length - 1 && <span className="ml-1">,</span>}
+                </span>
+              ))}
+            </span>
+          ) : (
+            placeholder
+          )}
+        </span>
+        <svg
+          className={`w-4 h-4 text-emerald-500 transition-transform duration-200 ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
       {isOpen && (
-        <div className="absolute z-10 mt-2 w-full rounded-xl border-2 border-emerald-200 bg-white shadow-xl max-h-60 overflow-y-auto">
-          {options.map((opt) => (
-            <label
-              key={opt}
-              className="flex items-center px-4 py-3 hover:bg-emerald-50 cursor-pointer transition-colors"
-            >
-              <input
-                type="checkbox"
-                checked={value.includes(opt)}
-                onChange={() => toggleOption(opt)}
-                className="mr-3 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-sm text-gray-700">{opt}</span>
-            </label>
-          ))}
+        <div className="absolute z-50 mt-2 w-full rounded-xl border-2 border-emerald-200 bg-white shadow-xl max-h-60 overflow-y-auto">
+          {value.length > 0 && (
+            <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                className="text-xs text-red-600 hover:text-red-800 font-medium"
+              >
+                Clear All ({value.length})
+              </button>
+            </div>
+          )}
+          {options.length > 0 ? (
+            options.map((opt) => (
+              <label
+                key={opt}
+                className="flex items-center px-4 py-3 hover:bg-emerald-50 cursor-pointer transition-colors border-b border-gray-100 last:border-b-0"
+              >
+                <input
+                  type="checkbox"
+                  checked={value.includes(opt)}
+                  onChange={() => toggleOption(opt)}
+                  className="mr-3 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 focus:ring-2"
+                />
+                <span className="text-sm text-gray-700 flex-1">{opt}</span>
+                {value.includes(opt) && (
+                  <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </label>
+            ))
+          ) : (
+            <div className="px-4 py-3 text-sm text-gray-500 text-center">
+              No options available
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -81,9 +165,14 @@ const MultiSelect = ({ value = [], onChange, options, placeholder = "Select..." 
 const CONSULTATION_TYPES = [
   "On-site Visit",
   "Remote Call",
+  "Video Consultation",
+  "Phone Consultation",
   "Soil Testing",
   "Irrigation Design",
   "Training/Workshops",
+  "Farm Planning",
+  "Crop Management",
+  "Livestock Consultation",
   "Other",
 ];
 const AVAILABLE_SERVICES = [
@@ -92,14 +181,64 @@ const AVAILABLE_SERVICES = [
   "Nutrient Planning",
   "Pest & Disease Diagnosis",
   "Yield Optimization",
+  "Farm Planning",
+  "Crop Rotation Planning",
+  "Livestock Health",
+  "Equipment Recommendations",
+  "Market Analysis",
   "Other",
 ];
-const SERVICE_REGIONS = ["Local", "District-wide", "Province-wide", "Nationwide", "International"];
-const AVAILABLE_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const TIME_SLOTS = ["08:00 - 10:00", "10:00 - 12:00", "12:00 - 14:00", "14:00 - 16:00", "16:00 - 18:00"];
-const FEE_STRUCTURES = ["Hourly", "Per Visit", "Negotiable", "Retainer", "Other"];
-const NOTICE_PERIODS = ["No notice", "24 hours", "48 hours", "1 week", "2 weeks", "Other"];
-const LANGUAGES = ["English", "Sinhala", "Tamil"];
+const SERVICE_REGIONS = [
+  "Local (Within 10km)",
+  "District-wide",
+  "Province-wide", 
+  "Nationwide",
+  "International",
+  "Remote Consultation Only"
+];
+const AVAILABLE_DAYS = [
+  "Monday", 
+  "Tuesday", 
+  "Wednesday", 
+  "Thursday", 
+  "Friday", 
+  "Saturday", 
+  "Sunday"
+];
+const TIME_SLOTS = [
+  "06:00 - 08:00",
+  "08:00 - 10:00", 
+  "10:00 - 12:00", 
+  "12:00 - 14:00", 
+  "14:00 - 16:00", 
+  "16:00 - 18:00",
+  "18:00 - 20:00"
+];
+const FEE_STRUCTURES = [
+  "Hourly Rate",
+  "Per Visit", 
+  "Per Project",
+  "Negotiable",
+  "Retainer",
+  "Free Consultation",
+  "Other"
+];
+const NOTICE_PERIODS = [
+  "No notice required",
+  "24 hours", 
+  "48 hours", 
+  "1 week", 
+  "2 weeks",
+  "1 month",
+  "Other"
+];
+const LANGUAGES = [
+  "English", 
+  "Sinhala", 
+  "Tamil",
+  "Hindi",
+  "Other"
+];
 
 /* ---------------- auth helpers ---------------- */
 const getToken = () =>
@@ -158,7 +297,9 @@ export default function ConsultantRegistration() {
     return Boolean(
       consultant.primarySpecialization &&
       consultant.yearsOfExperience &&
-      consultant.highestQualification
+      consultant.highestQualification &&
+      consultant.consultationTypes.length > 0 &&
+      consultant.availableServices.length > 0
     );
   }, [consultant]);
 
@@ -326,7 +467,7 @@ export default function ConsultantRegistration() {
             <h3 className="text-lg font-semibold text-emerald-800">Services & Availability</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Field label="Consultation Types">
+            <Field label="Consultation Types" required>
               <MultiSelect
                 value={consultant.consultationTypes}
                 onChange={(vals) => setConsultant({ ...consultant, consultationTypes: vals })}
@@ -334,7 +475,7 @@ export default function ConsultantRegistration() {
                 placeholder="Select consultation types"
               />
             </Field>
-            <Field label="Available Services">
+            <Field label="Available Services" required>
               <MultiSelect
                 value={consultant.availableServices}
                 onChange={(vals) => setConsultant({ ...consultant, availableServices: vals })}
@@ -464,6 +605,22 @@ export default function ConsultantRegistration() {
               placeholder="Tell us about yourself and your expertise..."
             />
           </Field>
+        </div>
+
+        {/* Form Status */}
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700 text-sm">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <p className="font-medium">Form Completion Status</p>
+              <p className="text-xs mt-1">
+                Required fields: Primary Specialization, Years of Experience, Highest Qualification, 
+                Consultation Types, and Available Services must be completed to submit.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Error and Submit */}

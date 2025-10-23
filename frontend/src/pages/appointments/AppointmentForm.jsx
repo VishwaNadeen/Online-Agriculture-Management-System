@@ -87,7 +87,8 @@ const Input = ({ id, label, error, success, warning, icon: Icon, className = "",
         name={id}
         autoComplete="off"
         className={`w-full rounded-xl border-2 ${Icon ? 'pl-12' : 'pl-4'} pr-4 py-3 text-emerald-900 placeholder-emerald-400 transition-all ${
-          error ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
+          props.disabled ? "border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed"
+          : error ? "border-red-400 bg-red-50/50 focus:border-red-500 focus:border-[3px]"
           : success ? "border-green-400 bg-green-50/50 focus:border-green-500 focus:border-[3px]"
           : warning ? "border-amber-400 bg-amber-50/50 focus:border-amber-500 focus:border-[3px]"
           : `border-emerald-200 bg-emerald-50/50 focus:border-emerald-600 focus:border-[3px] ${className}`
@@ -290,6 +291,7 @@ export default function AppointmentForm({
   setServerMsg,
   suppressSuccessFlow = false, // when true, parent handles toast/navigation
   successToast = "Appointment booked successfully!",
+  disableEmailEdit = false, // when true, email field becomes read-only
 }) {
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
   const tomorrowStr = useMemo(() => {
@@ -571,7 +573,7 @@ export default function AppointmentForm({
   };
 
   return (
-    <div className="min-h-screen flex justify-center items-center bg-emerald-50 px-4 py-12 relative overflow-hidden">
+    <div className="min-h-screen flex justify-center items-center px-4 py-12 relative overflow-hidden">
       <form
         onSubmit={handleSubmit}
         className={`relative z-10 bg-white shadow-md p-8 rounded-3xl max-w-4xl w-full space-y-6 transition-all duration-1000 ${
@@ -685,12 +687,19 @@ export default function AppointmentForm({
             required
             type="email"
             value={form.email}
-            onChange={(e) => setField("email", e.target.value)}
-            onBlur={() => handleBlur("email")}
+            onChange={disableEmailEdit ? undefined : (e) => setField("email", e.target.value)}
+            onBlur={disableEmailEdit ? undefined : () => handleBlur("email")}
             error={errors.email}
             success={success.email}
             placeholder="your.email@example.com"
+            disabled={disableEmailEdit}
           />
+          {disableEmailEdit && (
+            <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+              <span className="text-gray-400">🔒</span>
+              Email address cannot be changed when editing an appointment
+            </p>
+          )}
         </div>
 
         {/* Location Information */}

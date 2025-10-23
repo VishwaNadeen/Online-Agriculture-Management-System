@@ -171,6 +171,7 @@ export default function EditAppointment() {
         setServerMsg={setServerMsg}
         suppressSuccessFlow={true}
         disabled={submitting}
+        disableEmailEdit={true}
       />
     </div>
   );

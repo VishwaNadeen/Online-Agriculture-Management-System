@@ -23,37 +23,42 @@ export default function EventAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
 
+  // Fetch data function
+  const fetchData = useCallback(async (showLoader = false, forceRefresh = false) => {
+    if (showLoader) setIsLoading(true);
+    setIsRefreshing(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/events`);
+      const list = Array.isArray(res.data) ? res.data : [];
+      eventsCache = list;
+      eventsCacheTime = Date.now();
+      setEvents((prev) => {
+        if (!prev || prev.length !== list.length) return list;
+        const prevIds = prev.map((e) => e._id).join(",");
+        const nextIds = list.map((e) => e._id).join(",");
+        return prevIds !== nextIds ? list : prev;
+      });
+    } catch (err) {
+      console.error("Failed to load events", err);
+      toast.error("Failed to load events");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // Manual refresh function for the refresh button
+  const handleRefresh = useCallback(async () => {
+    try {
+      await fetchData(true, true); // Force refresh with loader
+      toast.success("Events refreshed successfully!");
+    } catch (error) {
+      // Error handling is already done in fetchData
+    }
+  }, [fetchData]);
+
   // Initial load
   useEffect(() => {
-    let cancelled = false;
-    const fetchData = async (showLoader) => {
-      if (showLoader) setIsLoading(true);
-      setIsRefreshing(true);
-      try {
-        const res = await axios.get(`${BASE_URL}/events`);
-        if (cancelled) return;
-        const list = Array.isArray(res.data) ? res.data : [];
-        eventsCache = list;
-        eventsCacheTime = Date.now();
-        setEvents((prev) => {
-          if (!prev || prev.length !== list.length) return list;
-          const prevIds = prev.map((e) => e._id).join(",");
-          const nextIds = list.map((e) => e._id).join(",");
-          return prevIds !== nextIds ? list : prev;
-        });
-      } catch (err) {
-        if (!cancelled) {
-          console.error("Failed to load events", err);
-          toast.error("Failed to load events");
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-          setIsRefreshing(false);
-        }
-      }
-    };
-
     if (hasFreshCache) {
       fetchData(false);
     } else if (!eventsCache) {
@@ -61,11 +66,7 @@ export default function EventAdmin() {
     } else {
       fetchData(false);
     }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hasFreshCache]);
+  }, [hasFreshCache, fetchData]);
 
   const confirmDelete = useCallback((id) => {
     if (!id) return;
@@ -323,7 +324,7 @@ doc.autoTable({
                 </div>
               </button>
               <button
-                onClick={() => fetchData(true)}
+                onClick={handleRefresh}
                 disabled={isRefreshing || isLoading}
                 className="group relative px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-500/20"
               >

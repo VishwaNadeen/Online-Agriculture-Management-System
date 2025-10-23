@@ -282,7 +282,7 @@ export default function CoursesAdmin() {
                             </button>
                             <button
                               onClick={() => {
-                                navigate("/admin/courseReport", {
+                                navigate("/admin/updateCourse", {
                                   state: course, // pass whole object for prefill
                                 });
                               }}
